@@ -1,416 +1,328 @@
 {% load static %}
-{% load humanize %}
 <!doctype html>
 <html>
 <head>
-    <meta charset="utf-8" />
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 11px;
-            margin: 0;
-            padding: 0;
-            line-height: 1.4;
-        }
+  <meta charset="utf-8" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .page-border {
-            border: 1px solid #000;
-            padding: 15px;
-            min-height: 1050px;
-            position: relative;
-        }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 10px;
+      color: #000;
+      background: #fff;
+    }
 
-        /* HEADER */
-        .company-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #000;
-            padding-bottom: 10px;
-        }
+    .page {
+      width: 100%;
+      padding: 10mm 10mm;
+    }
 
-        .company-header img {
-            width: 100px;
-            height: auto;
-        }
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      border-bottom: 3px solid #c8600a;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
 
-        .company-header .header-text {
-            text-align: center;
-            flex: 1;
-        }
+    .logo-box {
+      width: 72px;
+      min-width: 72px;
+      height: 68px;
+      border: 2px solid #c8600a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      padding: 4px;
+    }
 
-        .company-header h1 {
-            margin: 5px 0;
-            font-size: 18px;
-            font-weight: bold;
-        }
+    .logo-top {
+      font-size: 20px;
+      font-weight: 900;
+      color: #c8600a;
+      letter-spacing: 1px;
+      line-height: 1;
+    }
 
-        .company-header p {
-            margin: 2px 0;
-            font-size: 10px;
-        }
+    .logo-sub {
+      font-size: 5.5px;
+      font-weight: bold;
+      color: #c8600a;
+      text-align: center;
+      line-height: 1.3;
+      margin-top: 3px;
+      text-transform: uppercase;
+    }
 
-        /* TOP INFO */
-        .top-info {
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-        }
+    .header-info { flex: 1; }
 
-        .top-info-left, .top-info-right {
-            flex: 1;
-        }
+    .company-name {
+      font-size: 17px;
+      font-weight: 900;
+      color: #c8600a;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      line-height: 1.2;
+    }
 
-        .top-info-right {
-            text-align: right;
-        }
+    .company-subtitle {
+      font-size: 9px;
+      font-weight: bold;
+      color: #333;
+      margin: 2px 0 3px;
+    }
 
-        .info-row {
-            margin: 3px 0;
-        }
+    .company-address {
+      font-size: 8.5px;
+      color: #555;
+      line-height: 1.5;
+    }
 
-        .info-label {
-            font-weight: bold;
-        }
+    .header-contact {
+      font-size: 8.5px;
+      color: #333;
+      margin-top: 4px;
+    }
 
-        /* SECTION TITLES */
-        .section-title {
-            background-color: #e0e0e0;
-            padding: 8px;
-            margin-top: 15px;
-            margin-bottom: 10px;
-            font-weight: bold;
-            border-left: 4px solid #2c3e50;
-        }
+    /* ── TITLE ── */
+    .annexure-title {
+      text-align: center;
+      font-size: 13px;
+      font-weight: bold;
+      text-decoration: underline;
+      margin: 10px 0 8px;
+    }
 
-        /* TABLES */
-        .summary-table, .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 10px;
-            font-size: 11px;
-        }
+    /* ── PROJECT BOX ── */
+    .project-box {
+      border: 1px solid #000;
+      padding: 5px 8px;
+      margin-bottom: 10px;
+      font-size: 10px;
+      line-height: 1.8;
+    }
 
-        .summary-table th, .items-table th {
-            background-color: #34495e;
-            color: white;
-            padding: 8px;
-            text-align: left;
-            border: 1px solid #000;
-            font-weight: bold;
-        }
+    /* ── MAIN TABLE ── */
+    .main-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5px;
+      table-layout: fixed;
+    }
 
-        .summary-table td, .items-table td {
-            padding: 6px 8px;
-            border: 1px solid #000;
-        }
+    .main-table th {
+      border: 1px solid #000;
+      background: #ececec;
+      padding: 5px 4px;
+      text-align: center;
+      font-weight: bold;
+      vertical-align: middle;
+      word-wrap: break-word;
+    }
 
-        .summary-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
+    .main-table td {
+      border: 1px solid #000;
+      padding: 5px 4px;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
 
-        .items-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
+    .main-table td.center { text-align: center; vertical-align: middle; }
+    .main-table td.right  { text-align: right;  vertical-align: middle; }
+    .main-table td.mid    { vertical-align: middle; }
 
-        .amount-cell {
-            text-align: right;
-            font-weight: bold;
-        }
+    /* column widths — must total 100% */
+    .col-solution    { width: 28%; }
+    .col-units       { width: 9%; }
+    .col-rate        { width: 17%; }
+    .col-install     { width: 17%; }
+    .col-cars        { width: 9%; }
+    .col-total       { width: 20%; }
 
-        .qty-cell {
-            text-align: center;
-        }
+    /* ── TOTALS TABLE ── */
+    .totals-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5px;
+      table-layout: fixed;
+    }
 
-        .rate-cell {
-            text-align: right;
-        }
+    .totals-table td {
+      border: 1px solid #000;
+      padding: 4px 6px;
+      word-wrap: break-word;
+    }
 
-        .summary-total-row {
-            background-color: #ecf0f1;
-            font-weight: bold;
-        }
+    .totals-table td.right { text-align: right; font-weight: bold; }
+    .totals-table td.center { text-align: center; }
 
-        .summary-total-row td {
-            padding: 8px;
-            border: 2px solid #000;
-        }
+    .row-basic   { background: #f0f0f0; }
+    .row-grand   { background: #fff9e6; font-weight: bold; font-size: 10px; }
 
-        .gst-row {
-            background-color: #fff3cd;
-        }
+    /* ── WORDS ROW ── */
+    .amount-words {
+      border: 1px solid #000;
+      border-top: 0;
+      padding: 5px 8px;
+      font-size: 9.5px;
+    }
 
-        .grand-total-row {
-            background-color: #d4edda;
-            font-weight: bold;
-            font-size: 12px;
-        }
+    /* ── FOOTER ── */
+    .footer {
+      margin-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 9.5px;
+    }
 
-        /* TERMS */
-        .terms-section {
-            margin-top: 20px;
-            border: 1px solid #000;
-            padding: 10px;
-        }
+    .sig-line {
+      margin-top: 32px;
+      border-top: 1px solid #000;
+      padding-top: 3px;
+      font-size: 8.5px;
+      min-width: 130px;
+    }
 
-        .terms-section h3 {
-            margin: 0 0 10px 0;
-            font-size: 12px;
-            font-weight: bold;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 5px;
-        }
-
-        .terms-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .terms-list li {
-            margin-bottom: 5px;
-            padding-left: 15px;
-            text-align: justify;
-            font-size: 10px;
-            line-height: 1.3;
-        }
-
-        .terms-list li:before {
-            content: "•";
-            margin-left: -10px;
-            margin-right: 8px;
-        }
-
-        /* FOOTER */
-        .footer-section {
-            margin-top: 20px;
-            border-top: 2px solid #000;
-            padding-top: 15px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-        }
-
-        .footer-left, .footer-right {
-            flex: 1;
-        }
-
-        .footer-right {
-            text-align: right;
-        }
-
-        .signature-box {
-            margin-top: 40px;
-            border-top: 1px solid #000;
-            padding-top: 5px;
-            text-align: center;
-            font-size: 10px;
-        }
-
-        /* SUBTOTAL ROWS */
-        .subtotal-row {
-            background-color: #f0f0f0;
-            font-weight: bold;
-        }
-
-        .subtotal-row td {
-            padding: 8px;
-        }
-
-        @page {
-            size: A4;
-            margin: 15px;
-        }
-
-        .page-break {
-            page-break-after: always;
-        }
-    </style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+  </style>
 </head>
-
 <body>
-    <div class="page-border">
-        <!-- COMPANY HEADER -->
-        <div class="company-header">
-            <img src="file:///app/static/images/ka-logo.png" alt="Logo" />
-            <div class="header-text">
-                <h1>QUOTATION</h1>
-                <p>Supply, Installation, Testing & Commissioning</p>
-            </div>
-        </div>
+<div class="page">
 
-        <!-- TOP INFO -->
-        <div class="top-info">
-            <div class="top-info-left">
-                <div class="info-row"><span class="info-label">Ref. No:</span> {{ quotation_no }}</div>
-                <div class="info-row"><span class="info-label">Date:</span> {{ quotation_date|date:"d/m/Y" }}</div>
-                <div class="info-row"><span class="info-label">To:</span> {{ customer_name }}</div>
-                <div class="info-row"><span class="info-label">Site:</span> {{ site_name }}</div>
-            </div>
-            <div class="top-info-right">
-                <div class="info-row"><span class="info-label">Subject:</span> {{ subject }}</div>
-                <div class="info-row"><span class="info-label">Version:</span> {{ version.version_no }}</div>
-            </div>
-        </div>
-
-        <!-- INTRODUCTION -->
-        <p style="text-align: justify; font-size: 10px; margin: 10px 0;">
-            Dear Sir/Madam,<br>
-            Thank you for your valued enquiry. Based on our discussion with your good self, we provide below our quotation for Supply, Installation, Testing and Commissioning of Air Conditioning system.
-        </p>
-
-        <!-- ANNEXURE I: SUMMARY -->
-        <div class="section-title">ANNEXURE I: SUMMARY OF PROPOSAL</div>
-        <table class="summary-table">
-            <thead>
-                <tr>
-                    <th>S.N.</th>
-                    <th>Description</th>
-                    <th class="amount-cell">Amount (Rs.)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for section in summary_sections %}
-                    <tr>
-                        <td colspan="3" style="background-color: #ecf0f1; font-weight: bold;">{{ section.title }}</td>
-                    </tr>
-                    {% for item in section.items %}
-                        <tr>
-                            <td>{{ forloop.counter }}</td>
-                            <td>{{ item.description }}</td>
-                            <td class="amount-cell">{{ item.amount|floatformat:2|intcomma }}</td>
-                        </tr>
-                    {% endfor %}
-                    <tr class="subtotal-row">
-                        <td colspan="2" style="text-align: right;">Subtotal ({{ section.title }}):</td>
-                        <td class="amount-cell">{{ section.subtotal|floatformat:2|intcomma }}</td>
-                    </tr>
-                {% endfor %}
-                <tr class="summary-total-row">
-                    <td colspan="2">GRAND SUBTOTAL:</td>
-                    <td class="amount-cell">{{ subtotal|floatformat:2|intcomma }}</td>
-                </tr>
-                <tr class="gst-row">
-                    <td colspan="2">GST @ {{ gst_percentage|floatformat:0 }}%:</td>
-                    <td class="amount-cell">{{ gst_amount|floatformat:2|intcomma }}</td>
-                </tr>
-                <tr class="grand-total-row">
-                    <td colspan="2">GRAND TOTAL (INCLUDING GST):</td>
-                    <td class="amount-cell">Rs. {{ grand_total|floatformat:2|intcomma }}</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <!-- ANNEXURE II: BILL OF QUANTITIES -->
-        <div class="section-title">ANNEXURE II: BILL OF QUANTITIES</div>
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th>S.N.</th>
-                    <th>Description / Item Code</th>
-                    <th class="qty-cell">Qty</th>
-                    <th>Unit</th>
-                    <th class="rate-cell">Rate (Rs.)</th>
-                    <th class="amount-cell">Amount (Rs.)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in quotation_items %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>
-                        {% if item.item %}
-                            <strong>{{ item.item.item_code }}</strong><br>
-                            {{ item.description }}
-                        {% elif item.product_variant %}
-                            <strong>{{ item.product_variant.sku }}</strong><br>
-                            {{ item.description }}
-                        {% endif %}
-                    </td>
-                    <td class="qty-cell">{{ item.quantity|floatformat:2 }}</td>
-                    <td>{{ item.unit }}</td>
-                    <td class="rate-cell">{{ item.rate|floatformat:2 }}</td>
-                    <td class="amount-cell">{{ item.amount|floatformat:2|intcomma }}</td>
-                </tr>
-                {% endfor %}
-                <tr class="summary-total-row">
-                    <td colspan="2"></td>
-                    <td class="qty-cell"><strong>{{ total_quantity|floatformat:2 }}</strong></td>
-                    <td></td>
-                    <td></td>
-                    <td class="amount-cell"><strong>{{ subtotal|floatformat:2|intcomma }}</strong></td>
-                </tr>
-            </tbody>
-        </table>
-
-        <!-- ANNEXURE III: TERMS & CONDITIONS -->
-        <div class="section-title">ANNEXURE III: TERMS & CONDITIONS</div>
-        <div class="terms-section">
-            <h3>Payment Terms:</h3>
-            <ul class="terms-list">
-                <li><strong>Equipment Supply:</strong> 100% advance along with PO against Proforma Invoice</li>
-                <li><strong>Installation Work:</strong> 50% advance, 30% on material delivery, 10% on installation, 10% on completion & commissioning</li>
-            </ul>
-
-            <h3>Validity of Rates:</h3>
-            <ul class="terms-list">
-                <li>Equipment rates valid for 7 days from quotation date</li>
-                <li>Installation rates valid for 30 days from quotation date</li>
-            </ul>
-
-            <h3>Warranty & Service:</h3>
-            <ul class="terms-list">
-                <li>15 months compressor warranty from delivery or 12 months from commissioning (whichever is earlier)</li>
-                <li>3 free warranty services within 12 months of installation (if supply & installation by Krishna Air)</li>
-            </ul>
-
-            <h3>Important Notes:</h3>
-            <ul class="terms-list">
-                <li>Electrical power cables and socket arrangements are customer's scope</li>
-                <li>Local transportation/Mathadi charges extra at actual</li>
-                <li>Costing estimated; final billing based on actual installed quantities</li>
-                <li>Lifting/shifting arrangements to be provided by customer</li>
-                <li>Scaffolding for installation above 3m height to be provided by customer</li>
-                <li>Material storage arrangements to be made by customer</li>
-            </ul>
-
-            <h3>Exclusions:</h3>
-            <ul class="terms-list">
-                <li>Carpentry, civil finishing, and other fabrication work</li>
-                <li>Protected storage of materials</li>
-                <li>Any item not specifically mentioned in BOQ</li>
-            </ul>
-        </div>
-
-        <!-- FOOTER -->
-        <div class="footer-section">
-            <div class="footer-left">
-                <strong>Declaration:</strong><br>
-                We declare that this quotation shows the actual price for the services.
-                <div class="signature-box">
-                    Customer's Seal & Signature
-                </div>
-            </div>
-            <div class="footer-right">
-                <strong>For Krishna Airconditioning</strong><br><br><br>
-                <div class="signature-box">
-                    Authorized Signatory
-                </div>
-            </div>
-        </div>
-
-        <!-- BANK DETAILS -->
-        <div style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; font-size: 9px;">
-            <strong>Bank Details for Payment:</strong><br>
-            Account Name: Krisna Airconditioning | Account No: 051330110000016<br>
-            Bank: Bank of India, Sahakar Nagar Branch | IFSC: BKID0000513 | GST: 27AITPP8825B2ZS
-        </div>
-
-        <p style="text-align: center; margin-top: 10px; font-size: 9px;">
-            This is a computer-generated quotation
-        </p>
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo-box">
+      <div class="logo-top">NNIT</div>
+      <div class="logo-sub">CAR PARKING<br>SYSTEMS<br>PVT. LTD.<br><span style="font-size:4.5px;">CARS. CARE. CONVENIENCE.</span></div>
     </div>
+    <div class="header-info">
+      <div class="company-name">NNIT Car Parking Systems Pvt. Ltd.</div>
+      <div class="company-subtitle">(NILESH NIRMAN INNOVATIVE TECHNOLOGIES)</div>
+      <div class="company-address">
+        Office: Survey No 37, Ground Floor, Flat No 1, Ruturaj Society,<br>
+        Nr. Vitthal Mandir, Karve Nagar, Pune - 52.
+      </div>
+      <div class="header-contact">
+        &#9742; +91 9518377159 &nbsp;&nbsp;
+        &#127760; www.nnitcarparking.in &nbsp;&nbsp;
+        &#9993; info@nnitcarparking.in
+      </div>
+    </div>
+  </div>
+
+  <!-- TITLE -->
+  <div class="annexure-title">Annexure I</div>
+
+  <!-- PROJECT BOX -->
+  <div class="project-box">
+    <strong>Project Name:</strong> {{ project_name }}<br>
+    <strong>Product Name:</strong> {{ product_name }}
+  </div>
+
+  <!-- MAIN TABLE -->
+  <table class="main-table">
+    <colgroup>
+      <col class="col-solution">
+      <col class="col-units">
+      <col class="col-rate">
+      <col class="col-install">
+      <col class="col-cars">
+      <col class="col-total">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Parking Solution</th>
+        <th>No. of Units</th>
+        <th>Rate per Units (Rs.)</th>
+        <th>Installation Per system (Rs.)</th>
+        <th>No. Of Cars</th>
+        <th>Total Value (Rs.)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in line_items %}
+      <tr>
+        <td class="mid">{{ item.description }}</td>
+        <td class="center">{{ item.quantity }}</td>
+        <td class="right">{{ item.unit_price_fmt }}</td>
+        <td class="right">{{ item.installation_fmt }}</td>
+        <td class="center">{{ item.cars }}</td>
+        <td class="right">{{ item.total_fmt }}</td>
+      </tr>
+      {% endfor %}
+      {% for i in filler_rows %}
+      <tr>
+        <td style="height:20px">&nbsp;</td>
+        <td></td><td></td><td></td><td></td><td></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- TOTALS -->
+  <table class="totals-table">
+    <colgroup>
+      <col style="width:28%">
+      <col style="width:9%">
+      <col style="width:17%">
+      <col style="width:17%">
+      <col style="width:9%">
+      <col style="width:20%">
+    </colgroup>
+    <tr class="row-basic">
+      <td colspan="5" style="text-align:right; font-weight:bold; padding-right:8px;">Basic Total Value</td>
+      <td class="right">{{ basic_total_fmt }}</td>
+    </tr>
+    {% if gst_type == "CGST_SGST" %}
+    <tr>
+      <td colspan="2"></td>
+      <td colspan="2" style="font-weight:bold;">Add: SGST</td>
+      <td class="center">@ {{ sgst_pct }}%</td>
+      <td class="right">{{ sgst_fmt }}</td>
+    </tr>
+    <tr>
+      <td colspan="2"></td>
+      <td colspan="2" style="font-weight:bold;">Add: CGST</td>
+      <td class="center">@ {{ cgst_pct }}%</td>
+      <td class="right">{{ cgst_fmt }}</td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="2"></td>
+      <td colspan="2" style="font-weight:bold;">Add: IGST</td>
+      <td class="center">@ {{ igst_pct }}%</td>
+      <td class="right">{{ igst_fmt }}</td>
+    </tr>
+    {% endif %}
+    <tr class="row-grand">
+      <td colspan="5" style="text-align:right; font-weight:bold; padding-right:8px;">Grand Total Value</td>
+      <td class="right">{{ grand_total_fmt }}</td>
+    </tr>
+  </table>
+
+  <!-- AMOUNT IN WORDS -->
+  <div class="amount-words">
+    <strong>Total Contract Value in words:</strong> Rs. {{ amount_in_words }}
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div>
+      <div class="sig-line">Customer's Seal &amp; Signature</div>
+    </div>
+    <div style="text-align:right;">
+      <strong>For NNIT Car Parking Systems Pvt. Ltd.</strong>
+      <div class="sig-line" style="text-align:center;">Authorized Signatory</div>
+    </div>
+  </div>
+
+</div>
 </body>
 </html>

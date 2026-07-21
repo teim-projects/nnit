@@ -272,7 +272,9 @@ export default function ParkingProducts() {
                         {product.min_length}m × {product.min_width}m × {product.min_height}m
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {product.base_price ? `₹${Number(product.base_price).toLocaleString('en-IN')}L` : '—'}
+                        {product.base_price
+                          ? `₹${parseFloat(product.base_price).toFixed(2)}L`
+                          : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <div className="flex items-center justify-center gap-2">

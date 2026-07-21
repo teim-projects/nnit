@@ -1,15 +1,18 @@
 from rest_framework import viewsets, status, filters
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import TokenError
+from django.contrib.auth import get_user_model
 from .filters import QuotationFilter
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 import logging
 from decimal import Decimal
-from .models import Quotation, QuotationVersion
+from .models import Quotation, QuotationVersion, QuotationHighSideItem, QuotationLowSideItem
 from .serializers import QuotationSerializer
 from .utils.pdf_generator import generate_quotation_pdf as build_quotation_pdf, generate_quotation_print_pdf
 
@@ -20,7 +23,47 @@ from .serializers import (
     QuotationServiceItemCreateSerializer
 )
 
+User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def quotation_pdf_token_view(request, quotation_id):
+    """
+    GET /quotation/quotation/<id>/view-pdf/?token=<jwt>
+    Opens PDF directly in browser — accepts JWT as query param so it can be
+    used as a plain <a href> or window.open() without fetch+blob dance.
+    """
+    token_str = request.GET.get("token", "")
+    if not token_str:
+        return HttpResponse("Missing token", status=401)
+    try:
+        token = AccessToken(token_str)
+        user_id = token["user_id"]
+        User.objects.get(pk=user_id)
+    except (TokenError, User.DoesNotExist, KeyError):
+        return HttpResponse("Invalid or expired token", status=401)
+
+    quotation = get_object_or_404(
+        Quotation.objects.select_related("customer", "site"), pk=quotation_id
+    )
+    version = QuotationVersion.objects.filter(
+        quotation=quotation, is_active=True
+    ).prefetch_related("high_side_items", "low_side_items").first()
+
+    if not version:
+        return HttpResponse("No active version found", status=404)
+
+    try:
+        pdf_content = build_quotation_pdf(
+            quotation, version, base_url=request.build_absolute_uri("/")
+        )
+    except Exception as e:
+        logger.error(f"PDF generation error: {str(e)}")
+        return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
+
+    response = HttpResponse(pdf_content, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="quotation_{quotation.quotation_no}.pdf"'
+    return response
 
 
 def quotation_pdf_view(request, quotation_id):
@@ -108,6 +151,48 @@ class QuotationViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
+
+    @action(detail=True, methods=['post'], url_path='send-email')
+    def send_email(self, request, pk=None):
+        """Send quotation via email"""
+        from django.core.mail import send_mail
+        from django.conf import settings
+
+        quotation = self.get_object()
+        email = request.data.get('email', '')
+        note = request.data.get('note', '')
+        version_id = request.data.get('version_id')
+
+        if not email:
+            return Response({"detail": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        version = None
+        if version_id:
+            version = QuotationVersion.objects.filter(pk=version_id, quotation=quotation).first()
+        if not version:
+            version = QuotationVersion.objects.filter(quotation=quotation, is_active=True).first()
+
+        try:
+            subject = f"Quotation {quotation.quotation_no} from Krishna Air"
+            body = f"Dear {quotation.customer_name},\n\n"
+            if note:
+                body += f"{note}\n\n"
+            body += f"Please find your quotation {quotation.quotation_no}"
+            if version:
+                body += f" ({version.version_no})"
+                body += f"\nTotal Amount: ₹{version.grand_total}"
+            body += "\n\nThank you for your business.\n\nKrishna Air"
+
+            send_mail(
+                subject,
+                body,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False,
+            )
+            return Response({"detail": "Email sent successfully"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"detail": f"Email failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=["get"], url_path="latest-version")
     def latest_version(self, request, pk=None):
@@ -323,3 +408,151 @@ class QuotationCustomerViewSet(viewsets.ReadOnlyModelViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     pagination_class = None
+
+
+# =====================================================
+# SIMPLE QUOTATION VIEW
+# POST /quotation/simple-quotation/
+# =====================================================
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def simple_quotation_create(request):
+    """
+    Simple quotation creation: customer + parking product + qty + price.
+    Used by the basic Create Quotation form.
+    """
+    from .serializers import SimpleQuotationSerializer
+    serializer = SimpleQuotationSerializer(data=request.data, context={"request": request})
+    if serializer.is_valid():
+        quotation = serializer.create(serializer.validated_data)
+        return Response(
+            {"id": quotation.id, "quotation_no": quotation.quotation_no},
+            status=status.HTTP_201_CREATED,
+        )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def simple_quotation_detail(request, pk):
+    """
+    GET /quotation/simple-quotation/<pk>/
+    Returns simple-form-friendly data for editing.
+    """
+    from lead_management.serializers import CustomerSerializer
+    quotation = get_object_or_404(Quotation, pk=pk)
+    version = quotation.versions.filter(is_active=True).first()
+    item = version.high_side_items.first() if version else None
+
+    data = {
+        "id": quotation.id,
+        "quotation_no": quotation.quotation_no,
+        "customer": quotation.customer_id,
+        "customer_name": quotation.customer.name,
+        "subject": quotation.subject,
+        "quantity": item.quantity if item else 1,
+        "unit_price": float(item.unit_price) if item else 0,
+        "gst_percent": float(item.gst_percent) if item else 18,
+        "parking_product_id": item.product_data.get("id") if item else None,
+        "parking_product_name": item.product_data.get("name") if item else "",
+        "subtotal": float(version.subtotal) if version else 0,
+        "gst_amount": float(version.gst_amount) if version else 0,
+        "grand_total": float(version.grand_total) if version else 0,
+        "terms_conditions": list(quotation.terms_conditions.values_list("id", flat=True)),
+    }
+    return Response(data)
+
+
+@api_view(["PUT"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def simple_quotation_update(request, pk):
+    """
+    PUT /quotation/simple-quotation/<pk>/
+    Creates a new version with updated product/price.
+    """
+    from parking_products.models import ParkingProduct
+    from inventory.models import TermsConditions as TC
+
+    quotation = get_object_or_404(Quotation, pk=pk)
+    data = request.data
+
+    quantity = int(data.get("quantity", 1))
+    unit_price = float(data.get("unit_price", 0))
+    gst_percent = float(data.get("gst_percent", 18))
+    parking_product_id = data.get("parking_product_id")
+    terms_ids = data.get("terms_conditions", [])
+
+    parking_product = get_object_or_404(ParkingProduct, pk=parking_product_id) if parking_product_id else None
+
+    # Update quotation fields
+    if parking_product:
+        quotation.subject = f"{parking_product.product_name} - {parking_product.category.display_name}"
+    quotation.save()
+
+    if terms_ids is not None:
+        quotation.terms_conditions.set(TC.objects.filter(id__in=terms_ids))
+
+    # Deactivate old version
+    old_version = quotation.versions.filter(is_active=True).first()
+    next_r = 1
+    if old_version:
+        old_version.is_active = False
+        old_version.save()
+        try:
+            next_r = int(old_version.version_no.split("-R")[-1]) + 1
+        except Exception:
+            next_r = 2
+
+    new_version_no = f"{quotation.quotation_no}-R{next_r}"
+    version = QuotationVersion.objects.create(
+        quotation=quotation,
+        version_no=new_version_no,
+        is_active=True,
+        gst_type="CGST_SGST",
+        created_by=request.user,
+    )
+
+    if parking_product:
+        product_data = {
+            "id": parking_product.id,
+            "name": parking_product.product_name,
+            "sku": parking_product.product_code or parking_product.product_name,
+            "category": parking_product.category.display_name,
+            "car_capacity": parking_product.car_capacity,
+        }
+    else:
+        product_data = {}
+
+    base_amount = quantity * unit_price
+    gst_value = (base_amount * gst_percent) / 100
+
+    QuotationHighSideItem.objects.create(
+        quotation_version=version,
+        product_data=product_data,
+        quantity=quantity,
+        unit_price=unit_price,
+        unit="NOS",
+        gst_percent=gst_percent,
+        mathadi_charges=0,
+        transportation_charges=0,
+        description="",
+        hsn_sac="",
+        base_amount=base_amount,
+        gst_amount=gst_value,
+        total_with_gst=base_amount + gst_value,
+    )
+
+    half_gst = gst_value / 2
+    version.subtotal = base_amount
+    version.gst_amount = gst_value
+    version.cgst_amount = half_gst
+    version.sgst_amount = half_gst
+    version.igst_amount = 0
+    version.total_amount = base_amount + gst_value
+    version.grand_total = base_amount + gst_value
+    version.save()
+
+    return Response({"id": quotation.id, "quotation_no": quotation.quotation_no, "version": new_version_no})

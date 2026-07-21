@@ -585,7 +585,42 @@ export default function AddLeadForm({
     try {
       let finalCustomerId = customerId;
 
-      if (!finalCustomerId) {
+      // Customer payload — always built from form data
+      const customerPayload = {
+        contact_number: formData.contactNumber,
+        name: formData.clientName,
+        email: formData.email || null,
+        secondary_email: formData.secondary_email || null,
+        secondary_contact_number: formData.secondaryContactNumber || null,
+        address: formData.address || "",
+        city: formData.city || "",
+        state: formData.state || "",
+        pin_code: formData.pincode || null,
+        poc_name: formData.contact_person_name || null,
+        poc_contact_number: formData.contact_person_number || null,
+        is_lead_only: true, // Hidden from Customers page until "Convert to Customer"
+      };
+
+      if (finalCustomerId) {
+        // Customer already exists → PATCH to update their data (keep is_lead_only as-is)
+        const { is_lead_only: _skip, ...updatePayload } = customerPayload;
+        const updateRes = await fetch(
+          `${baseApi.replace(/\/$/, "")}/lead/customer/${finalCustomerId}/`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+            },
+            body: JSON.stringify(updatePayload),
+          }
+        );
+        if (!updateRes.ok) {
+          const errText = await updateRes.text().catch(() => "");
+          console.warn("Customer update warning:", errText);
+        }
+      } else {
+        // No existing customer → CREATE with is_lead_only: true
         if (!formData.clientName) {
           throw new Error("Customer name is required");
         }
@@ -598,17 +633,7 @@ export default function AddLeadForm({
               "Content-Type": "application/json",
               ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
             },
-            body: JSON.stringify({
-              contact_number: formData.contactNumber,
-              name: formData.clientName,
-              email: formData.email,
-              secondary_email: formData.secondary_email,
-              secondary_contact_number: formData.secondaryContactNumber,
-              address: formData.address,
-              city: formData.city,
-              state: formData.state,
-              pin_code: formData.pincode,
-            }),
+            body: JSON.stringify(customerPayload),
           }
         );
 
@@ -640,15 +665,9 @@ export default function AddLeadForm({
         remarks: formData.remarks || "",
         is_qualified: isQualified,
         qualifying_answers: qualifyingAnswers,
+        customer: finalCustomerId,
+        assign_to: assignId,
       };
-
-      if (lead) {
-        payload.customer = finalCustomerId;
-        payload.assign_to = assignId;
-      } else {
-        payload.customer = finalCustomerId;
-        payload.assign_to = assignId;
-      }
 
       const url = lead ? `${API_URL}${lead.id}/` : API_URL;
       const method = lead ? "PATCH" : "POST";
@@ -746,7 +765,7 @@ export default function AddLeadForm({
 
     try {
       const res = await fetch(
-        `${baseApi.replace(/\/$/, "")}/lead/customer/?search=${name}`,
+        `${baseApi.replace(/\/$/, "")}/lead/customer/lookup/?search=${encodeURIComponent(name)}`,
         {
           headers: {
             "Content-Type": "application/json",

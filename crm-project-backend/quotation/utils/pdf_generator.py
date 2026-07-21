@@ -36,140 +36,124 @@ def _item_base_amount(item):
     return qty * rate
 
 
-def _build_quotation_pdf_context(quotation, version):
-    high_side_items = list(
-        version.high_side_items.select_related('product_variant__product_model').all()
-    )
-    low_side_items = list(
-        version.low_side_items.select_related(
-            'item__material_type_id',
-            'item__item_type_id',
-            'item__feature_type_id',
-            'item__brand',
-        ).all()
-    )
-    service_items = list(version.service_items.select_related('service').all())
+def _fmt_inr(value):
+    """Format decimal as Indian number e.g. 1170000 → 11,70,000.00"""
+    from decimal import Decimal
+    n = Decimal(str(value or 0))
+    # Split into integer and decimal parts
+    int_part = int(n)
+    dec_part = int(round((n - int_part) * 100))
+    # Indian grouping
+    s = str(int_part)
+    if len(s) > 3:
+        last3 = s[-3:]
+        rest = s[:-3]
+        groups = []
+        while len(rest) > 2:
+            groups.append(rest[-2:])
+            rest = rest[:-2]
+        if rest:
+            groups.append(rest)
+        groups.reverse()
+        s = ",".join(groups) + "," + last3
+    return f"{s}.{dec_part:02d}"
 
-    high_side_total = sum((_item_line_amount(i) for i in high_side_items), Decimal('0'))
-    low_side_total = sum((_item_line_amount(i) for i in low_side_items), Decimal('0'))
-    service_total = sum((_item_line_amount(i) for i in service_items), Decimal('0'))
 
-    subtotal = version.subtotal or (high_side_total + low_side_total + service_total)
-    gst_amount = version.gst_amount or Decimal('0')
-    grand_total = version.grand_total or version.total_amount or (subtotal + gst_amount)
+def _amount_in_words(amount):
+    """Convert amount to words (Indian style)."""
+    try:
+        from num2words import num2words
+        n = int(amount)
+        p = int(round((float(amount) - n) * 100))
+        words = num2words(n, lang='en_IN').title()
+        if p > 0:
+            return f"{words} and {num2words(p, lang='en_IN').title()} Paise Only"
+        return f"{words} Rupees Only"
+    except Exception:
+        return str(amount)
 
-    if subtotal and gst_amount:
-        gst_percentage = (gst_amount / subtotal) * Decimal('100')
-    else:
-        gst_percentage = Decimal('18')
 
-    summary_sections = []
+def _build_simple_quotation_context(quotation, version):
+    """Build context for the Annexure I style PDF matching the NNIT format."""
+    from decimal import Decimal
 
-    if high_side_items:
-        summary_sections.append({
-            'title': 'Part A: High Side Equipment',
-            'items': [
-                {
-                    'description': item.description or str(item.product_variant.sku),
-                    'amount': _item_line_amount(item),
-                }
-                for item in high_side_items
-            ],
-            'subtotal': high_side_total,
+    high_items = list(version.high_side_items.all())
+    line_items = []
+
+    for item in high_items:
+        qty = int(item.quantity or 0)
+        unit_price = Decimal(str(item.unit_price or 0))
+        base = qty * unit_price
+        gst_amt = Decimal(str(item.gst_amount or 0))
+        total = base + gst_amt
+
+        car_capacity = item.product_data.get('car_capacity', 0) if item.product_data else 0
+        total_cars = int(car_capacity) * qty if car_capacity else "—"
+
+        product_name_full = item.product_data.get('name', '') if item.product_data else ''
+        description = item.description or product_name_full or "Parking System"
+
+        line_items.append({
+            'description': description,
+            'quantity': qty,
+            'unit_price': unit_price,
+            'unit_price_fmt': _fmt_inr(unit_price),
+            'installation': Decimal('0'),
+            'installation_fmt': '—',
+            'cars': total_cars,
+            'total': total,
+            'total_fmt': _fmt_inr(total),
         })
 
-    if low_side_items:
-        summary_sections.append({
-            'title': 'Part B: Low Side Installation Work',
-            'items': [
-                {
-                    'description': item.description or str(item.item.item_code),
-                    'amount': _item_line_amount(item),
-                }
-                for item in low_side_items
-            ],
-            'subtotal': low_side_total,
-        })
+    basic_total = sum((i['total'] for i in line_items), Decimal('0'))
+    cgst = Decimal(str(version.cgst_amount or 0))
+    sgst = Decimal(str(version.sgst_amount or 0))
+    igst = Decimal(str(version.igst_amount or 0))
+    grand_total = Decimal(str(version.grand_total or 0))
 
-    if service_items:
-        summary_sections.append({
-            'title': 'Part C: Services',
-            'items': [
-                {
-                    'description': f"{item.service.name} ({item.service.category})",
-                    'amount': _item_line_amount(item),
-                }
-                for item in service_items
-            ],
-            'subtotal': service_total,
-        })
+    gst_type = version.gst_type or "CGST_SGST"
+    half_pct = "9.00" if gst_type == "CGST_SGST" else "0.00"
+    total_gst_pct = float(version.gst_amount or 0) / float(basic_total) * 100 if basic_total else 18
 
-    all_items = []
+    # Filler rows to give table some visual height (min 3 rows)
+    filler_count = max(0, 3 - len(line_items))
 
-    for item in high_side_items:
-        all_items.append({
-            'description': item.description or str(item.product_variant.sku),
-            'product_variant': item.product_variant,
-            'quantity': item.quantity,
-            'unit': item.unit,
-            'rate': item.unit_price,
-            'amount': _item_line_amount(item),
-        })
+    # Product name for project box
+    first_item = high_items[0] if high_items else None
+    product_name = (first_item.product_data.get('name', '') if first_item and first_item.product_data else '') or quotation.subject or "Parking System"
 
-    for item in low_side_items:
-        all_items.append({
-            'description': item.description or str(item.item.item_code),
-            'item': item.item,
-            'quantity': item.quantity,
-            'unit': item.unit,
-            'rate': item.unit_price,
-            'amount': _item_line_amount(item),
-        })
-
-    for item in service_items:
-        all_items.append({
-            'description': item.description or item.service.name,
-            'quantity': item.quantity,
-            'unit': item.unit,
-            'rate': item.unit_price,
-            'amount': _item_line_amount(item),
-        })
-
-    customer = quotation.customer
-    site = quotation.site
+    project_name = quotation.site_name or (quotation.site.site_name if quotation.site else None) or quotation.subject or "—"
 
     return {
         'quotation': quotation,
         'version': version,
-        'quotation_no': quotation.quotation_no,
-        'quotation_date': version.created_at,
-        'customer_name': customer.name if customer else '-',
-        'customer_contact': getattr(customer, 'contact_number', '') or '',
-        'site_name': (site.site_name if site else None) or quotation.site_name or '-',
-        'subject': quotation.subject or '-',
-        'summary_sections': summary_sections,
-        'quotation_items': all_items,
-        'subtotal': subtotal,
-        'gst_amount': gst_amount,
-        'gst_percentage': gst_percentage,
-        'grand_total': grand_total,
-        'total_quantity': sum(
-            (Decimal(str(item.get('quantity', 0) or 0)) for item in all_items),
-            Decimal('0'),
-        ),
+        'project_name': project_name,
+        'product_name': product_name,
+        'line_items': line_items,
+        'filler_rows': range(filler_count),
+        'basic_total_fmt': _fmt_inr(basic_total),
+        'gst_type': gst_type,
+        'sgst_pct': half_pct,
+        'cgst_pct': half_pct,
+        'igst_pct': f"{total_gst_pct:.2f}",
+        'sgst_fmt': _fmt_inr(sgst),
+        'cgst_fmt': _fmt_inr(cgst),
+        'igst_fmt': _fmt_inr(igst),
+        'grand_total_fmt': _fmt_inr(grand_total),
+        'amount_in_words': _amount_in_words(grand_total),
     }
 
 
 def generate_quotation_pdf(quotation, version, base_url=None):
     """
-    Generate quotation PDF using WeasyPrint with HTML template (existing design).
+    Generate quotation PDF — Annexure I format matching NNIT style.
     """
     try:
         if HTML is None:
             raise RuntimeError(
-                "PDF generation is unavailable on this machine. Install WeasyPrint system libraries first."
+                "PDF generation is unavailable. Install WeasyPrint system libraries first."
             )
-        context = _build_quotation_pdf_context(quotation, version)
+        context = _build_simple_quotation_context(quotation, version)
         html_string = render_to_string('pdf/quotation.html', context)
         pdf = HTML(
             string=html_string,

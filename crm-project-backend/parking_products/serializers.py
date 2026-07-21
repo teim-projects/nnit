@@ -58,9 +58,21 @@ class ParkingProductSerializer(serializers.ModelSerializer):
             'configurations', 'configuration_summary', 'space_required',
             'created_at', 'updated_at'
         ]
-        # ✅ Added 'category' to read_only_fields so it's not required in requests
         read_only_fields = ['created_at', 'updated_at', 'category']
     
+    def validate_product_code(self, value):
+        # Convert empty string to None so MySQL unique constraint doesn't
+        # raise Duplicate entry '' for key 'product_code'
+        if value is not None and str(value).strip() == "":
+            return None
+        return value or None
+
+    def validate_base_price(self, value):
+        # Convert empty string / falsy to None
+        if value is None or str(value).strip() == "":
+            return None
+        return value
+
     def get_configuration_summary(self, obj):
         return obj.get_configuration_summary()
     

@@ -1,29 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Base from "../components/Base";
-import TableView from "../components/TableView";
-import { MdEdit, MdDelete } from "react-icons/md";
 import Swal from "sweetalert2";
-import AddCustomerForm from "../components/customers/AddCustomerForm"; // <-- import the form
+import AddCustomerForm from "../components/customers/AddCustomerForm";
+import CustomerDetails from "../components/customers/CustomerDetails";
 
 export default function Customer() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL ?? "http://127.0.0.1:8000";
   const API_URL = `${BASE_API}/lead/customer/`;
+
   const initialFilters = useMemo(() => ({ search: "" }), []);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const PAGE_SIZE_FALLBACK = 10;
+  const PAGE_SIZE = 10;
 
-  // modal / edit state
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
+  const [detailCustomerId, setDetailCustomerId] = useState(null);
 
   const token = useMemo(() => (
     localStorage.getItem("access") ||
@@ -40,140 +38,45 @@ export default function Customer() {
   const fetchData = useCallback(async (page = 1) => {
     setLoading(true);
     setError(null);
-
     try {
       const params = new URLSearchParams();
       params.set("page", String(page));
+      params.set("is_lead_only", "false");
       if (appliedFilters?.search) params.set("search", appliedFilters.search);
 
-      const url = `${API_URL}?${params.toString()}`;
-      const res = await fetch(url, {
+      const res = await fetch(`${API_URL}?${params.toString()}`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(`${res.status} ${res.statusText}${body ? " — " + body : ""}`);
-      }
-
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const data = await res.json();
-
-      if (data && Array.isArray(data.results)) {
-        const items = data.results;
-        const count = Number.isFinite(data.count) ? data.count : items.length;
-        const pageSize = items.length || PAGE_SIZE_FALLBACK;
-        const calculatedPages = Math.max(1, Math.ceil(count / pageSize));
-        
-        setRows(items);
-        setTotalCount(count);
-        setTotalPages(calculatedPages);
-        
-        // Ensure current page doesn't exceed total pages
-        if (page > calculatedPages && calculatedPages > 0) {
-          setCurrentPage(calculatedPages);
-        } else {
-          setCurrentPage(page);
-        }
-      } else if (Array.isArray(data)) {
-        const calculatedPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE_FALLBACK));
-        setRows(data);
-        setTotalCount(data.length);
-        setTotalPages(calculatedPages);
-        setCurrentPage(1);
-      } else {
-        const items = Array.isArray(data?.results) ? data.results : Array.isArray(data?.data) ? data.data : [];
-        const calculatedPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE_FALLBACK));
-        setRows(items);
-        setTotalCount(items.length);
-        setTotalPages(calculatedPages);
-        setCurrentPage(1);
-      }
+      const items = Array.isArray(data) ? data : data?.results || [];
+      const count = data?.count ?? items.length;
+      setRows(items);
+      setTotalCount(count);
+      setTotalPages(Math.max(1, Math.ceil(count / PAGE_SIZE)));
+      setCurrentPage(page);
     } catch (err) {
       setError(err.message || String(err));
       setRows([]);
-      setTotalCount(0);
-      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   }, [API_URL, token, appliedFilters]);
 
-  useEffect(() => { fetchData(currentPage); }, [fetchData, currentPage]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-    fetchData(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedFilters]);
+  useEffect(() => { fetchData(1); }, [fetchData]);
 
   const handleFilterChange = useCallback((filters) => {
-    setAppliedFilters(prev => ({ ...prev, ...filters }));
+    setAppliedFilters((prev) => ({ ...prev, ...filters }));
   }, []);
 
-  const handleDelete = async (id) => {
-    const res = await Swal.fire({
-      title: "Delete customer?",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Delete"
-    });
-    if (!res.isConfirmed) return;
-
-    try {
-      const resp = await fetch(`${API_URL}${id}/`, {
-        method: "DELETE",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => "");
-        throw new Error(`${resp.status} ${resp.statusText} — ${text}`);
-      }
-      Swal.fire({ icon: "success", text: "Customer deleted", timer: 1000, showConfirmButton: false });
-      // refresh current page
-      fetchData(currentPage);
-    } catch (err) {
-      Swal.fire({ icon: "error", title: "Delete failed", text: err.message || String(err) });
-    }
+  const fmtDate = (val) => {
+    if (!val) return "—";
+    const d = new Date(val);
+    return isNaN(d) ? val : d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
   };
-
-  const columns = [
-    { key: "sr", label: "Sr.No", render: (_, idx) => (currentPage - 1) * PAGE_SIZE_FALLBACK + (idx + 1) },
-    { key: "name", label: "Company Name", render: (r) => r.name },
-    { key: "contact", label: "Contact", render: (r) => r.contact_number },
-    { key: "email", label: "Email", render: (r) => r.email },
-    { key: "land_line_no", label: "Landline No", render: (r) => r.land_line_no },
-    { key: "poc_name", label: "POC Name", render: (r) => r.poc_name },
-    { key: "poc_contact_number", label: "POC Contact", render: (r) => r.poc_contact_number },
-    { key: "city", label: "City", render: (r) => r.city },
-    { key: "state", label: "State", render: (r) => r.state },
-    // { key: "pin", label: "Pin", render: (r) => r.pin_code },
-    // { key: "addr", label: "Address", render: (r) => r.address },
-    // { key: "site_addr", label: "Site Address", render: (r) => r.site_address },
-  ];
-
-  // actions renderer (centered by TableView)
-    const actionsRenderer = useCallback((row) => (
-      <>
-        <button
-          onClick={() => { setEditingCustomer(row); setShowCustomerForm(true); }}
-          className="px-2 py-1 bg-yellow-200 text-yellow-800 rounded"
-          title="Edit"
-        >
-          <MdEdit />
-        </button>
-  
-        <button
-          onClick={() => handleDelete(row.id)}
-          className="px-2 py-1 bg-red-200 text-red-800 rounded"
-          title="Delete"
-        >
-          <MdDelete />
-        </button>
-      </>
-    ), [handleDelete]);
 
   return (
     <Base
@@ -182,45 +85,127 @@ export default function Customer() {
       initialFilterValues={initialFilters}
       onFiltersChange={handleFilterChange}
     >
-      <div className="space-y-6 ">
-        <div className="bg-white p-4 rounded-md shadow flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Customers</h2>
-            <div className="text-sm text-slate-600">
-              {loading ? "Loading…" : `${totalCount} total • ${rows.length} shown`}
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            
-            <button
-              onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
-              className="px-4 py-2 rounded-md bg-sky-600 text-white"
-            >
-              + Add
-            </button>
-          </div>
+      {/* ── Customer Detail View ── */}
+      {detailCustomerId && (
+        <CustomerDetails
+          customerId={detailCustomerId}
+          baseApi={BASE_API}
+          token={token}
+          onBack={() => setDetailCustomerId(null)}
+        />
+      )}
+
+      {/* ── Customer List ── */}
+      {!detailCustomerId && (
+      <div className="space-y-2">
+
+        {/* Page heading */}
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-slate-900">Customers</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Converted leads and active customers</p>
         </div>
 
-        <TableView
-          columns={columns}
-          rows={rows}
-          loading={loading}
-          error={error}
-          page={currentPage}
-          totalPages={totalPages}
-          onPageChange={(p) => {
-            // Safeguard: Don't allow navigation beyond total pages
-            if (p < 1 || p > totalPages) {
-              console.warn(`Invalid page ${p}. Total pages: ${totalPages}`);
-              return;
-            }
-            setCurrentPage(p);
-          }}
-          pageSize={PAGE_SIZE_FALLBACK}
-          actions={actionsRenderer}
-          emptyMessage="No customers found"
-        />
+        {/* Card */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+
+          {/* Card header */}
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-800">All Customers</h2>
+            <button
+              onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
+              className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium transition"
+            >
+              + Add Customer
+            </button>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  {["Name", "Phone", "Email", "City", "Converted Date", "Status", "Actions"].map((h) => (
+                    <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm">
+                      Loading…
+                    </td>
+                  </tr>
+                )}
+                {!loading && error && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-red-500 text-sm">{error}</td>
+                  </tr>
+                )}
+                {!loading && !error && rows.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm">
+                      No customers found.
+                    </td>
+                  </tr>
+                )}
+                {!loading && rows.map((r) => (
+                  <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 font-semibold text-slate-800">{r.name || "—"}</td>
+                    <td className="px-6 py-4 text-slate-600">{r.contact_number ? `+${r.contact_number.replace(/^\+/, "")}` : "—"}</td>
+                    <td className="px-6 py-4 text-slate-600">{r.email || "—"}</td>
+                    <td className="px-6 py-4 text-slate-600">{r.city || "—"}</td>
+                    <td className="px-6 py-4 text-slate-600">{fmtDate(r.updated_at || r.created_at)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-md text-xs font-semibold border
+                        ${r.is_lead_only
+                          ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                          : "bg-green-50 text-green-700 border-green-200"}`}>
+                        {r.is_lead_only ? "Lead" : "Active"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => setDetailCustomerId(r.id)}
+                        className="px-4 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
+                      >
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
+              <span>Page {currentPage} of {totalPages} · {totalCount} total</span>
+              <div className="flex gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => fetchData(currentPage - 1)}
+                  className="px-3 py-1 rounded border bg-white disabled:opacity-40 hover:bg-slate-50"
+                >
+                  ← Prev
+                </button>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => fetchData(currentPage + 1)}
+                  className="px-3 py-1 rounded border bg-white disabled:opacity-40 hover:bg-slate-50"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      )} {/* end !detailCustomerId */}
 
       {/* Add / Edit Customer Modal */}
       <AddCustomerForm
@@ -229,19 +214,7 @@ export default function Customer() {
         baseApi={BASE_API}
         customer={editingCustomer}
         onSuccess={() => {
-          // After adding a new customer, calculate which page it should be on
-          if (!editingCustomer) {
-            // This is a new customer (not editing)
-            const newTotalCount = totalCount + 1;
-            const lastPage = Math.ceil(newTotalCount / PAGE_SIZE_FALLBACK);
-            
-            // Navigate to the last page where the new item will be
-            fetchData(lastPage);
-          } else {
-            // Editing existing customer, stay on current page
-            fetchData(currentPage);
-          }
-          
+          fetchData(editingCustomer ? currentPage : 1);
           setEditingCustomer(null);
         }}
       />

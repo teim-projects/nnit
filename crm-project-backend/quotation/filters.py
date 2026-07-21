@@ -20,9 +20,12 @@ class QuotationFilter(django_filters.FilterSet):
         lookup_expr="date__lte"
     )
 
+    customer = django_filters.NumberFilter(field_name="customer__id")
+
     class Meta:
         model = Quotation
         fields = [
             "date_from",
             "date_to",
+            "customer",
         ]

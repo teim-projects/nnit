@@ -16,7 +16,6 @@ from django.core.cache import cache
 
 
 class CustomerViewsets(viewsets.ModelViewSet):
-    queryset = Customer.objects.all().order_by('-id')
     serializer_class = CustomerSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -28,6 +27,34 @@ class CustomerViewsets(viewsets.ModelViewSet):
     ]
     ordering_fields = ['name', 'city', 'created_at']
     ordering = ['-created_at']
+
+    def get_queryset(self):
+        """
+        Only show REAL customers (is_lead_only=False).
+        Customers created from leads (is_lead_only=True) are hidden here
+        until they are explicitly converted via "Convert to Customer".
+        """
+        return Customer.objects.filter(is_lead_only=False).order_by('-id')
+
+    @action(detail=False, methods=['get'], url_path='lookup')
+    def lookup(self, request):
+        """
+        Search ALL customers including lead-only ones.
+        Used by the lead creation form to find existing customer records.
+        """
+        search = request.query_params.get('search', '').strip()
+        if not search:
+            return Response([])
+
+        from django.db.models import Q
+        qs = Customer.objects.filter(
+            Q(contact_number__icontains=search) |
+            Q(name__icontains=search) |
+            Q(email__icontains=search)
+        ).order_by('-id')[:20]
+
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['get'], url_path='leads')
     def customer_leads(self, request, pk=None):
@@ -45,7 +72,6 @@ class CustomerViewsets(viewsets.ModelViewSet):
         followups = LeadFollowUp.objects.filter(
             lead__customer=customer
         ).select_related('lead', 'created_by').order_by('-followup_date')
-        
         serializer = LeadFollowUpSerializer(followups, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -124,6 +150,57 @@ class LeadViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(lead_source=lead_source)
 
         return queryset
+
+    @action(detail=True, methods=['post'], url_path='convert-to-customer')
+    def convert_to_customer(self, request, pk=None):
+        """
+        Convert a lead to a customer:
+        - Sets customer.is_lead_only = False  → NOW visible in Customers page
+        - Sets lead.is_converted = True
+        - Sets lead.status = 'closed'
+        - Sets lead.converted_at = now
+        """
+        lead = self.get_object()
+
+        if lead.is_converted:
+            return Response(
+                {
+                    "detail": "This lead is already converted to customer.",
+                    "customer_id": lead.customer.id,
+                    "customer_name": lead.customer.name,
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        customer = lead.customer
+
+        # Mark customer as a real customer (visible in Customers page)
+        customer.is_lead_only = False
+        customer.save(update_fields=['is_lead_only'])
+
+        # Mark lead as converted
+        lead.is_converted = True
+        lead.converted_at = timezone.now()
+        lead.status = 'closed'
+        lead.save(update_fields=['is_converted', 'converted_at', 'status'])
+
+        return Response(
+            {
+                "detail": "Lead successfully converted to customer.",
+                "lead_id": lead.id,
+                "is_converted": lead.is_converted,
+                "converted_at": lead.converted_at,
+                "customer": {
+                    "id": customer.id,
+                    "name": customer.name,
+                    "contact_number": customer.contact_number,
+                    "email": customer.email,
+                    "city": customer.city,
+                    "state": customer.state,
+                }
+            },
+            status=status.HTTP_200_OK
+        )
 
     @action(detail=False, methods=['get'], url_path='latest-lead-by-mobile')
     def latest_lead_by_mobile(self, request):

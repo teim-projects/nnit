@@ -177,13 +177,15 @@ class LeadSerializer(serializers.ModelSerializer):
             "service_type",
             "is_qualified",
             "qualifying_answers",
+            "is_converted",
+            "converted_at",
             "followups",
             "total_followups",
             "latest_followup",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "date", "creatd_by", "created_at", "updated_at"]
+        read_only_fields = ["id", "date", "creatd_by", "created_at", "updated_at", "is_converted", "converted_at"]
     
     def get_total_followups(self, obj):
         return obj.followups.count()

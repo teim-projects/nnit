@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Base from "../components/Base";
 import TableView from "../components/TableView";
 import LeadDetails from "../components/lead/LeadDetails";
@@ -418,6 +418,31 @@ export default function Lead() {
       initialFilterValues={initialFilters}
       onFiltersChange={handleFilterChange}
     >
+      {/* ── Lead Detail full-page view ── */}
+      {showLeadDetails && leadDetailsId && (
+        <LeadDetails
+          open={true}
+          onClose={() => { setShowLeadDetails(false); setLeadDetailsId(null); }}
+          leadId={leadDetailsId}
+          baseApi={BASE_API}
+          token={token}
+          inline={true}
+          onCreateQuotation={(lead) => {
+            setShowLeadDetails(false);
+            setLeadDetailsId(null);
+            setQuotationLeadData({
+              customer_id: lead.customer,
+              customer_name: lead.customer_name,
+              project_name: lead.project_name,
+              project_address: lead.project_address,
+            });
+            setShowQuotationForm(true);
+          }}
+        />
+      )}
+
+      {/* ── Lead List ── */}
+      {!showLeadDetails && (
       <div className="space-y-6 ">
         <div className="bg-white p-4 rounded-md shadow flex items-center justify-between">
           <div>
@@ -451,12 +476,14 @@ export default function Lead() {
           rowClassName={getRowClassName}
         />
       </div>
+      )} {/* end !showLeadDetails */}
+
       <AddLeadForm
         open={showLeadForm}
         onClose={() => setShowLeadForm(false)}
         baseApi={BASE_API}
         token={token}
-        lead={editingLead}  // null = add | object = edit
+        lead={editingLead}
         onSuccess={() => {
           fetchData(currentPage);
           setShowLeadForm(false);
@@ -464,16 +491,6 @@ export default function Lead() {
         }}
       />
 
-
-      <LeadDetails
-        open={showLeadDetails}
-        onClose={() => setShowLeadDetails(false)}
-        leadId={leadDetailsId}
-        baseApi={BASE_API}
-        token={token}
-      />
-
-      {/* 👉 Follow-up form modal – use your existing AddLeadFollowUpForm */}
       <AddLeadFollowUpForm
         open={showLeadFollowUp}
         onClose={() => setShowLeadFollowUp(false)}
@@ -487,14 +504,12 @@ export default function Lead() {
         }}
       />
 
-      {/* ADD QUOTATION FORM */}
       {showQuotationForm && (
         <AddQuotation
           leadData={quotationLeadData}
           onBack={() => {
             setShowQuotationForm(false);
             setQuotationLeadData(null);
-            // Refresh the leads list
             fetchData(currentPage);
           }}
         />

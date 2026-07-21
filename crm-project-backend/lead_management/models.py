@@ -25,6 +25,9 @@ class Customer(models.Model):
     site_pin_code = models.CharField(max_length=10, blank=True, null=True)
     gst = models.CharField(max_length=15, blank=True, null=True)
     pan = models.CharField(max_length=10, blank=True, null=True)
+    # If True → created from a lead, not yet converted. Hidden from Customers page.
+    # Becomes False only after "Convert to Customer" action.
+    is_lead_only = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -88,6 +91,9 @@ class lead_management(models.Model):
     is_qualified = models.BooleanField(default=False)
     # JSON: { "<faq_id>": "<answer_text>", ... }
     qualifying_answers = models.JSONField(blank=True, null=True, default=dict)
+    # Customer conversion tracking
+    is_converted = models.BooleanField(default=False)
+    converted_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

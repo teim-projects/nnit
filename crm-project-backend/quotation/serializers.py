@@ -50,6 +50,7 @@ class QuotationVersionSerializer(serializers.ModelSerializer):
     high_side_items = QuotationHighSideItemSerializer(many=True)
     low_side_items = QuotationLowSideItemSerializer(many=True)
     version_label = serializers.SerializerMethodField()
+    version_number = serializers.SerializerMethodField()
 
     class Meta:
         model = QuotationVersion
@@ -69,7 +70,14 @@ class QuotationVersionSerializer(serializers.ModelSerializer):
         )
 
     def get_version_label(self, obj):
-        return f"{obj.quotation.quotation_no}-R{obj.version_no}"    
+        return f"{obj.quotation.quotation_no}-R{obj.version_no}"
+
+    def get_version_number(self, obj):
+        """Return the integer version number for easy frontend display"""
+        try:
+            return int(obj.version_no.split("-R")[-1])
+        except (ValueError, AttributeError):
+            return 1
 
 
 # =====================================================
@@ -333,3 +341,104 @@ class QuotationServiceItemCreateSerializer(serializers.ModelSerializer):
         service = validated_data['service']
         validated_data['unit'] = service.unit
         return super().create(validated_data)
+
+
+# =====================================================
+# SIMPLE QUOTATION SERIALIZER
+# For the simple form: customer + parking product + qty + unit_price
+# =====================================================
+class SimpleQuotationSerializer(serializers.Serializer):
+    customer = serializers.IntegerField()
+    parking_product_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)
+    unit_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    gst_percent = serializers.DecimalField(max_digits=5, decimal_places=2, default=18)
+    terms_conditions = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
+
+    @transaction.atomic
+    def create(self, validated_data):
+        from parking_products.models import ParkingProduct
+        from lead_management.models import Customer
+        request = self.context.get("request")
+
+        customer = Customer.objects.get(pk=validated_data["customer"])
+        parking_product = ParkingProduct.objects.get(pk=validated_data["parking_product_id"])
+        quantity = validated_data["quantity"]
+        unit_price = validated_data["unit_price"]
+        gst_percent = validated_data.get("gst_percent", 18)
+        terms_ids = validated_data.get("terms_conditions", [])
+
+        # Build subject from parking product
+        subject = f"{parking_product.product_name} - {parking_product.category.display_name}"
+
+        # Create quotation
+        quotation = Quotation.objects.create(
+            quotation_no="TEMP",
+            customer=customer,
+            subject=subject,
+            site_name="",
+            thank_you_note="Thank you for choosing us. We look forward to serving you.",
+        )
+
+        if terms_ids:
+            quotation.terms_conditions.set(TermsConditions.objects.filter(id__in=terms_ids))
+
+        # Build quotation number
+        from datetime import datetime as dt
+        now = dt.now()
+        year = str(now.year)[-2:]
+        month = str(now.month).zfill(2)
+        code = parking_product.product_name[:3].upper() if parking_product.product_name else "PKG"
+        quotation.quotation_no = f"KA/{code}/{year}/{month}{quotation.id}"
+        quotation.save(update_fields=["quotation_no"])
+
+        # Create version
+        version = QuotationVersion.objects.create(
+            quotation=quotation,
+            version_no=f"{quotation.quotation_no}-R1",
+            is_active=True,
+            gst_type="CGST_SGST",
+            created_by=request.user if request else None,
+        )
+
+        # Product data snapshot
+        product_data = {
+            "id": parking_product.id,
+            "name": parking_product.product_name,
+            "sku": parking_product.product_code or parking_product.product_name,
+            "category": parking_product.category.display_name,
+            "car_capacity": parking_product.car_capacity,
+        }
+
+        base_amount = float(quantity) * float(unit_price)
+        gst_value = (base_amount * float(gst_percent)) / 100
+        total_with_gst = base_amount + gst_value
+
+        QuotationHighSideItem.objects.create(
+            quotation_version=version,
+            product_data=product_data,
+            quantity=quantity,
+            unit_price=unit_price,
+            unit="NOS",
+            gst_percent=gst_percent,
+            mathadi_charges=0,
+            transportation_charges=0,
+            description="",
+            hsn_sac="",
+            base_amount=base_amount,
+            gst_amount=gst_value,
+            total_with_gst=total_with_gst,
+        )
+
+        # Update version totals
+        half_gst = gst_value / 2
+        version.subtotal = base_amount
+        version.gst_amount = gst_value
+        version.cgst_amount = half_gst
+        version.sgst_amount = half_gst
+        version.igst_amount = 0
+        version.total_amount = base_amount + gst_value
+        version.grand_total = base_amount + gst_value
+        version.save()
+
+        return quotation
