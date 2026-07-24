@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
+import QuotationTermsSelector from "../QuotationTermsSelector";
 
 const BASE_API = import.meta.env.VITE_BASE_API_URL ?? "http://127.0.0.1:8000";
 
@@ -38,23 +39,26 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
   // unitPriceLakhs: value in Lakhs (e.g. 6.5 = ₹6.5L)
   const [unitPriceLakhs, setUnitPriceLakhs] = useState("");
   const [gstPercent, setGstPercent] = useState(18);
+  const [selectedTerms, setSelectedTerms] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isEditLoaded, setIsEditLoaded] = useState(false);
 
   // ── Load reference data ───────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       setRefLoading(true);
       try {
-        const [custRes, prodRes, termsRes] = await Promise.all([
+        const [custRes, prodRes] = await Promise.all([
           api.get("lead/customer/?page_size=500&is_lead_only=false"),
           api.get("parking/products/?is_active=true&page_size=500"),
-          api.get("inventory/terms/?is_active=true&page_size=500"),
+          // Removed: inventory/terms - module removed from backend
         ]);
         setCustomers(Array.isArray(custRes.data) ? custRes.data : custRes.data?.results || []);
         setProducts(Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.results || []);
-        setTermsOptions(Array.isArray(termsRes.data) ? termsRes.data : termsRes.data?.results || []);
+        // setTermsOptions(Array.isArray(termsRes.data) ? termsRes.data : termsRes.data?.results || []);
+        setTermsOptions([]); // Empty - inventory module removed
       } catch (e) {
         console.error("Reference data failed", e);
       } finally {
@@ -72,7 +76,7 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
   // Load existing quotation for edit
   useEffect(() => {
     if (!id) return;
-    api.get(`quotation/simple-quotation/${id}/`)
+    api.get(`api/quotation/simple-quotation/${id}/`)
       .then((res) => {
         const d = res.data;
         setCustomerId(String(d.customer ?? ""));
@@ -82,6 +86,7 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
         const rawPrice = parseFloat(d.unit_price) || 0;
         setUnitPriceLakhs(rawPrice > 0 ? String(rawPrice / 100000) : "");
         setGstPercent(d.gst_percent ?? 18);
+        setIsEditLoaded(true); // Mark that edit data has been loaded
       })
       .catch((e) => console.error("Edit load failed", e));
   }, [id]);
@@ -93,11 +98,14 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
   );
 
   // Auto-fill price (in Lakhs) from product base_price (also stored in Lakhs)
+  // Only auto-fill when creating new quotation, not when editing
   useEffect(() => {
+    if (id && !isEditLoaded) return; // Wait for edit data to load first
+    if (id && isEditLoaded) return; // Don't auto-fill when editing
     if (selectedProduct?.base_price != null) {
       setUnitPriceLakhs(String(parseFloat(selectedProduct.base_price) || ""));
     }
-  }, [selectedProduct]);
+  }, [selectedProduct, id, isEditLoaded]);
 
   // ── Derived calculations (all in Lakhs) ──────────────────────────────────
   const qty = parseInt(quantity) || 0;
@@ -129,15 +137,16 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
       quantity: qty,
       unit_price: unitPriceRaw,
       gst_percent: gst,
-      terms_conditions: termsOptions.map((t) => t.id),
+      terms_ids: selectedTerms,  // Add selected terms
+      // terms_conditions: termsOptions.map((t) => t.id), // Inventory module removed
     };
 
     setLoading(true);
     try {
       if (id) {
-        await api.put(`quotation/simple-quotation/${id}/update/`, payload);
+        await api.put(`api/quotation/simple-quotation/${id}/update/`, payload);
       } else {
-        await api.post("quotation/simple-quotation/", payload);
+        await api.post("api/quotation/simple-quotation/", payload);
       }
       Swal.fire({
         icon: "success",
@@ -308,6 +317,12 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
               </div>
             </div>
           )}
+
+          {/* Terms & Conditions Selector - NEW! */}
+          <QuotationTermsSelector
+            quotationId={id}
+            onTermsChange={(terms) => setSelectedTerms(terms)}
+          />
 
           {/* Buttons */}
           <div className="flex gap-3 pt-1">

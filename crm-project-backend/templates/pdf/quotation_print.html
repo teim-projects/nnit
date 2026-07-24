@@ -150,6 +150,31 @@
           </tr>
         </tfoot>
       </table>
+
+      <!-- TERMS & CONDITIONS SECTION -->
+      {% if terms %}
+      <div style="margin-top: 25px; page-break-inside: avoid;">
+        <h3 style="font-size: 14px; font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 12px;">
+          Terms & Conditions
+        </h3>
+        <div style="font-size: 10px; line-height: 1.7;">
+          {% for term in terms %}
+          <div style="margin-bottom: 12px; page-break-inside: avoid;">
+            <div style="font-weight: bold; margin-bottom: 3px;">
+              {{ term.sequence }}. {{ term.title }}
+              {% if term.is_customized %}
+              <span style="font-size: 7px; background: #e0d4ff; padding: 1px 4px; border-radius: 2px; color: #6b21a8;">[CUSTOM]</span>
+              {% endif %}
+            </div>
+            <div style="padding-left: 12px; text-align: justify;">
+              {{ term.content|linebreaksbr }}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
     </div>
   </body>
 </html>

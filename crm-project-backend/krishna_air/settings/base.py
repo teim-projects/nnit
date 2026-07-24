@@ -66,8 +66,8 @@ INSTALLED_APPS = [
     'lead_management',
     'product_management',
     'quotation',
-    'invoice',
-    'inventory',
+    
+    # 'inventory',  # Temporarily disabled - module removed
     'amc',
     'parking_products',
 ] 

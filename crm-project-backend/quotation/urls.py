@@ -13,6 +13,8 @@ from .views import (
     simple_quotation_create,
     simple_quotation_detail,
     simple_quotation_update,
+    TermsMasterViewSet,
+    QuotationTermsViewSet,
 )
 
 router = DefaultRouter()
@@ -22,6 +24,8 @@ router.register(r'service-masters', ServiceMasterViewSet, basename='service-mast
 router.register(r'service-masters-create', ServiceMasterCreateViewSet, basename='service-masters-create')
 router.register(r'quotation-service-items', QuotationServiceItemViewSet, basename='quotation-service-items')
 router.register(r'customer', QuotationCustomerViewSet, basename='quotation-customer')
+router.register(r'terms', TermsMasterViewSet, basename='terms')
+router.register(r'quotation-terms', QuotationTermsViewSet, basename='quotation-terms')
 
 urlpatterns = [
     path('thank-you-suggestions/', thank_you_suggestions, name='thank_you_suggestions'),

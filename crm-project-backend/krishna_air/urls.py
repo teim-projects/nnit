@@ -47,11 +47,11 @@ urlpatterns = [
 
 
    
-    path('invoice/',include('invoice.urls')),
+    # path('invoice/',include('invoice.urls')),  # Invoice module removed
     path('lead/', include('lead_management.urls')),
     path('product/', include('product_management.urls')),
-    path('quotation/', include('quotation.urls')),
-    path('inventory/', include("inventory.urls")),
+    path('api/quotation/', include('quotation.urls')),  # Fixed: Added 'api/' prefix
+    # path('inventory/', include("inventory.urls")),  # Inventory module removed
     path('amc/', include('amc.urls')),
     path('parking/', include('parking_products.urls')),
 ]

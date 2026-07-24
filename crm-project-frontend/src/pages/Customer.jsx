@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Base from "../components/Base";
+import TableView from "../components/TableView";
 import Swal from "sweetalert2";
 import AddCustomerForm from "../components/customers/AddCustomerForm";
 import CustomerDetails from "../components/customers/CustomerDetails";
@@ -52,31 +53,77 @@ export default function Customer() {
       });
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const data = await res.json();
-      const items = Array.isArray(data) ? data : data?.results || [];
-      const count = data?.count ?? items.length;
-      setRows(items);
-      setTotalCount(count);
-      setTotalPages(Math.max(1, Math.ceil(count / PAGE_SIZE)));
-      setCurrentPage(page);
+      
+      // Handle pagination response
+      if (data && Array.isArray(data.results)) {
+        setRows(data.results);
+        const count = Number.isFinite(data.count) ? data.count : (data.results.length || 0);
+        setTotalCount(count);
+        const pages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+        setTotalPages(pages);
+        setCurrentPage(page);
+      } else if (Array.isArray(data)) {
+        setRows(data);
+        setTotalCount(data.length);
+        setTotalPages(Math.max(1, Math.ceil(data.length / PAGE_SIZE)));
+        setCurrentPage(1);
+      } else {
+        throw new Error("Unexpected response shape");
+      }
     } catch (err) {
       setError(err.message || String(err));
       setRows([]);
+      setTotalCount(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   }, [API_URL, token, appliedFilters]);
 
-  useEffect(() => { fetchData(1); }, [fetchData]);
+  useEffect(() => { fetchData(currentPage); }, [fetchData, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchData(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appliedFilters]);
 
   const handleFilterChange = useCallback((filters) => {
     setAppliedFilters((prev) => ({ ...prev, ...filters }));
   }, []);
 
-  const fmtDate = (val) => {
-    if (!val) return "—";
-    const d = new Date(val);
-    return isNaN(d) ? val : d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
   };
+
+  // Define columns exactly like Lead.jsx
+  const columns = [
+    { key: "sr", label: "Sr.No", render: (_, idx) => (currentPage - 1) * PAGE_SIZE + (idx + 1) },
+    { key: "date", label: "Date", render: (r) => formatDate(r.created_at) },
+    { key: "name", label: "Name", render: (r) => r.name || "—" },
+    { key: "contact", label: "Contact", render: (r) => r.contact_number || "—" },
+    { key: "email", label: "Email", render: (r) => r.email || "—" },
+    { key: "city", label: "City", render: (r) => r.city || "—" },
+    { key: "status", label: "Status", render: (r) => r.is_lead_only ? "lead" : "active" },
+  ];
+
+  // Actions renderer (centered by TableView) - exactly like Lead.jsx
+  const actionsRenderer = useCallback((row) => (
+    <div className="flex items-center justify-center">
+      <button
+        onClick={() => setDetailCustomerId(row.id)}
+        className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+        title="View Details"
+      >
+        View Details
+      </button>
+    </div>
+  ), []);
 
   return (
     <Base
@@ -85,7 +132,7 @@ export default function Customer() {
       initialFilterValues={initialFilters}
       onFiltersChange={handleFilterChange}
     >
-      {/* ── Customer Detail View ── */}
+      {/* ── Customer Detail full-page view ── */}
       {detailCustomerId && (
         <CustomerDetails
           customerId={detailCustomerId}
@@ -97,114 +144,37 @@ export default function Customer() {
 
       {/* ── Customer List ── */}
       {!detailCustomerId && (
-      <div className="space-y-2">
-
-        {/* Page heading */}
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-slate-900">Customers</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Converted leads and active customers</p>
-        </div>
-
-        {/* Card */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-
-          {/* Card header */}
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-800">All Customers</h2>
-            <button
-              onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
-              className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium transition"
-            >
-              + Add Customer
-            </button>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  {["Name", "Phone", "Email", "City", "Converted Date", "Status", "Actions"].map((h) => (
-                    <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading && (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm">
-                      Loading…
-                    </td>
-                  </tr>
-                )}
-                {!loading && error && (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-red-500 text-sm">{error}</td>
-                  </tr>
-                )}
-                {!loading && !error && rows.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm">
-                      No customers found.
-                    </td>
-                  </tr>
-                )}
-                {!loading && rows.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-semibold text-slate-800">{r.name || "—"}</td>
-                    <td className="px-6 py-4 text-slate-600">{r.contact_number ? `+${r.contact_number.replace(/^\+/, "")}` : "—"}</td>
-                    <td className="px-6 py-4 text-slate-600">{r.email || "—"}</td>
-                    <td className="px-6 py-4 text-slate-600">{r.city || "—"}</td>
-                    <td className="px-6 py-4 text-slate-600">{fmtDate(r.updated_at || r.created_at)}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-md text-xs font-semibold border
-                        ${r.is_lead_only
-                          ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                          : "bg-green-50 text-green-700 border-green-200"}`}>
-                        {r.is_lead_only ? "Lead" : "Active"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => setDetailCustomerId(r.id)}
-                        className="px-4 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
-                      >
-                        View Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
-              <span>Page {currentPage} of {totalPages} · {totalCount} total</span>
-              <div className="flex gap-2">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => fetchData(currentPage - 1)}
-                  className="px-3 py-1 rounded border bg-white disabled:opacity-40 hover:bg-slate-50"
-                >
-                  ← Prev
-                </button>
-                <button
-                  disabled={currentPage === totalPages}
-                  onClick={() => fetchData(currentPage + 1)}
-                  className="px-3 py-1 rounded border bg-white disabled:opacity-40 hover:bg-slate-50"
-                >
-                  Next →
-                </button>
+        <div className="space-y-6">
+          <div className="bg-white p-4 rounded-md shadow flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Customer Management</h2>
+              <div className="text-sm text-slate-600">
+                {loading ? "Loading…" : `${totalCount} total • ${rows.length} shown`}
               </div>
             </div>
-          )}
-        </div>
-      </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
+                className="px-4 py-2 rounded-md bg-sky-600 text-white"
+              >
+                + Add
+              </button>
+            </div>
+          </div>
 
+          <TableView
+            columns={columns}
+            rows={rows}
+            loading={loading}
+            error={error}
+            page={currentPage}
+            totalPages={totalPages}
+            onPageChange={(p) => setCurrentPage(p)}
+            pageSize={PAGE_SIZE}
+            actions={actionsRenderer}
+            emptyMessage="No customers found"
+          />
+        </div>
       )} {/* end !detailCustomerId */}
 
       {/* Add / Edit Customer Modal */}

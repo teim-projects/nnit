@@ -11,11 +11,11 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import Customer
 from .serializers import CustomerSearchSerializer
 
-from .models import AMCContract, AMCRenewal, AMCSparePart
+from .models import AMCContract, AMCRenewal  # AMCSparePart removed - inventory dependency
 from .serializers import (
     AMCContractSerializer,
     AMCRenewalSerializer,
-    AMCSparePartSerializer,
+    # AMCSparePartSerializer,  # Inventory module removed
 )
 
 from .models import ServiceManagementRecord, ServiceManagementMaterial
@@ -26,7 +26,7 @@ from .serializers import (
 )
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from inventory.models import InventoryItem
+# from inventory.models import InventoryItem  # Inventory module removed
 
 
 class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
