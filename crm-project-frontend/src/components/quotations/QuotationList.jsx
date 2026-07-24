@@ -62,7 +62,7 @@ function SendModal({ quotation, version, onClose }) {
   const handleEmail = async () => {
     setSending(true);
     try {
-      await api.post(`quotation/quotation/${quotation.id}/send-email/`, {
+      await api.post(`api/quotation/quotation/${quotation.id}/send-email/`, {
         email,
         note,
         version_id: version?.id,
@@ -137,7 +137,7 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
   const fetchQuotations = useCallback((pg = 1) => {
     setLoading(true);
     const qs = buildParams(filters, pg);
-    api.get(`quotation/quotation/?${qs}`)
+    api.get(`api/quotation/quotation/?${qs}`)
       .then((res) => {
         const raw = res.data;
         const data = normalize(raw);
@@ -160,8 +160,8 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
   const openPDF = async (quotationId, versionId, download = false) => {
     try {
       const url = versionId
-        ? `quotation/quotation/${quotationId}/version/${versionId}/pdf/`
-        : `quotation/quotation/${quotationId}/pdf/`;
+        ? `api/quotation/quotation/${quotationId}/version/${versionId}/pdf/`
+        : `api/quotation/quotation/${quotationId}/pdf/`;
       const res = await api.get(url, { responseType: "blob" });
       const blob = new Blob([res.data], { type: "application/pdf" });
       const objUrl = URL.createObjectURL(blob);
@@ -184,8 +184,8 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
   const openPrintPDF = async (quotationId, versionId) => {
     try {
       const url = versionId
-        ? `quotation/quotation/${quotationId}/version/${versionId}/print-pdf/`
-        : `quotation/quotation/${quotationId}/print-pdf/`;
+        ? `api/quotation/quotation/${quotationId}/version/${versionId}/print-pdf/`
+        : `api/quotation/quotation/${quotationId}/print-pdf/`;
       const res = await api.get(url, { responseType: "blob" });
       const blob = new Blob([res.data], { type: "application/pdf" });
       window.open(URL.createObjectURL(blob), "_blank");
@@ -206,7 +206,7 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
     });
     if (!res.isConfirmed) return;
     try {
-      await api.delete(`quotation/quotation/${quotationId}/version/${versionId}/delete/`);
+      await api.delete(`api/quotation/quotation/${quotationId}/version/${versionId}/delete/`);
       Swal.fire({ icon: "success", text: "Version deleted", timer: 1200, showConfirmButton: false });
       fetchQuotations(page);
     } catch {

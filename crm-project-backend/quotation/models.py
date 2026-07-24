@@ -3,6 +3,9 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
+# Import Terms models
+from .terms_models import TermsMaster, QuotationTerms
+
 # Create your models here.
 class Quotation(models.Model):
     quotation_no = models.CharField(max_length=50, unique=True)
@@ -26,12 +29,6 @@ class Quotation(models.Model):
         on_delete=models.PROTECT,
         related_name="quotations",
         null=True,
-        blank=True
-    )
-    
-    terms_conditions = models.ManyToManyField(
-        "inventory.TermsConditions",
-        related_name="quotations",
         blank=True
     )
 

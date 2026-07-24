@@ -460,7 +460,6 @@ def simple_quotation_detail(request, pk):
         "subtotal": float(version.subtotal) if version else 0,
         "gst_amount": float(version.gst_amount) if version else 0,
         "grand_total": float(version.grand_total) if version else 0,
-        "terms_conditions": list(quotation.terms_conditions.values_list("id", flat=True)),
     }
     return Response(data)
 
@@ -474,7 +473,6 @@ def simple_quotation_update(request, pk):
     Creates a new version with updated product/price.
     """
     from parking_products.models import ParkingProduct
-    from inventory.models import TermsConditions as TC
 
     quotation = get_object_or_404(Quotation, pk=pk)
     data = request.data
@@ -483,7 +481,6 @@ def simple_quotation_update(request, pk):
     unit_price = float(data.get("unit_price", 0))
     gst_percent = float(data.get("gst_percent", 18))
     parking_product_id = data.get("parking_product_id")
-    terms_ids = data.get("terms_conditions", [])
 
     parking_product = get_object_or_404(ParkingProduct, pk=parking_product_id) if parking_product_id else None
 
@@ -491,9 +488,6 @@ def simple_quotation_update(request, pk):
     if parking_product:
         quotation.subject = f"{parking_product.product_name} - {parking_product.category.display_name}"
     quotation.save()
-
-    if terms_ids is not None:
-        quotation.terms_conditions.set(TC.objects.filter(id__in=terms_ids))
 
     # Deactivate old version
     old_version = quotation.versions.filter(is_active=True).first()
@@ -556,3 +550,114 @@ def simple_quotation_update(request, pk):
     version.save()
 
     return Response({"id": quotation.id, "quotation_no": quotation.quotation_no, "version": new_version_no})
+
+
+
+# =====================================================
+# TERMS & CONDITIONS VIEWSETS
+# =====================================================
+from .terms_models import TermsMaster, QuotationTerms
+from .serializers import (
+    TermsMasterSerializer,
+    QuotationTermsSerializer,
+    QuotationTermsBulkCreateSerializer
+)
+
+
+class TermsMasterViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing master Terms & Conditions templates
+    """
+    queryset = TermsMaster.objects.all()
+    serializer_class = TermsMasterSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active', 'is_default']
+    search_fields = ['title', 'content']
+    ordering_fields = ['sequence', 'created_at']
+    ordering = ['sequence']
+
+    @action(detail=False, methods=['post'], url_path='reorder')
+    def reorder(self, request):
+        """
+        Reorder terms by providing a list of IDs in desired order
+        POST /api/quotation/terms/reorder/
+        {"term_ids": [3, 1, 5, 2, ...]}
+        """
+        term_ids = request.data.get('term_ids', [])
+        for index, term_id in enumerate(term_ids, start=1):
+            TermsMaster.objects.filter(pk=term_id).update(sequence=index)
+        return Response({"message": "Terms reordered successfully"})
+
+
+class QuotationTermsViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing terms attached to specific quotations
+    """
+    queryset = QuotationTerms.objects.all()
+    serializer_class = QuotationTermsSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['quotation', 'is_customized']
+    ordering = ['sequence']
+
+    @action(detail=False, methods=['post'], url_path='bulk-create')
+    def bulk_create(self, request):
+        """
+        Bulk create/replace terms for a quotation
+        POST /api/quotation/quotation-terms/bulk-create/
+        {
+            "quotation": 1,
+            "terms": [
+                {"master_term": 1, "sequence": 1},
+                {"master_term": 3, "sequence": 2},
+                ...
+            ]
+        }
+        """
+        serializer = QuotationTermsBulkCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            terms = serializer.create(serializer.validated_data)
+            result_serializer = QuotationTermsSerializer(terms, many=True)
+            return Response(result_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='apply-defaults')
+    def apply_defaults(self, request):
+        """
+        Apply all default terms to a quotation
+        POST /api/quotation/quotation-terms/apply-defaults/
+        {"quotation": 1}
+        """
+        quotation_id = request.data.get('quotation')
+        if not quotation_id:
+            return Response(
+                {"error": "quotation field is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        quotation = get_object_or_404(Quotation, pk=quotation_id)
+        
+        # Delete existing terms
+        QuotationTerms.objects.filter(quotation=quotation).delete()
+
+        # Get all default terms
+        default_terms = TermsMaster.objects.filter(is_active=True, is_default=True).order_by('sequence')
+
+        # Create quotation terms from defaults
+        created_terms = []
+        for term in default_terms:
+            qt = QuotationTerms.objects.create(
+                quotation=quotation,
+                master_term=term,
+                title=term.title,
+                content=term.content,
+                sequence=term.sequence,
+                is_customized=False
+            )
+            created_terms.append(qt)
+
+        serializer = QuotationTermsSerializer(created_terms, many=True)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

@@ -15,6 +15,7 @@ const allItems = [
   { key: "quotes", label: "Quotes", icon: QuoteIcon, path: "/quotation" },
   { key: "invoices", label: "Invoices", icon: InvoiceIcon, path: "/invoice" },
   { key: "parking-products", label: "Parking Products", icon: ParkingIcon, path: "/parking-products" },
+  { key: "terms", label: "Terms & Conditions", icon: DocumentIcon, path: "/terms-conditions" },
   { key: "amc", label: "AMC", icon: AmcIcon, path: "/amc" },
 ];
 
@@ -165,6 +166,14 @@ function ParkingIcon(props) {
       <path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M8 8h4a3 3 0 110 6H8V8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M8 8v11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function DocumentIcon(props) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="none">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 2v6h6M9 13h6M9 17h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

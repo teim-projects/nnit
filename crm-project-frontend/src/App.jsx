@@ -27,6 +27,9 @@ import AmcPage from "./pages/Amc";
 // ✅ Parking Products Module
 import ParkingProducts from './pages/ParkingProducts';
 
+// ✅ Terms & Conditions Management
+import TermsManagement from './pages/TermsManagement';
+
 
 function AppRoutes() {
   const location = useLocation();
@@ -105,6 +108,9 @@ function AppRoutes() {
               
               {/* ✅ Parking Products Module */}
               <Route path="/parking-products" element={<ParkingProducts />} />
+              
+              {/* ✅ Terms & Conditions Management */}
+              <Route path="/terms-conditions" element={<TermsManagement />} />
               
               <Route path="/amc" element={<AmcPage/>} />
             </Routes>

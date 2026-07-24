@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    AMCContract, AMCRenewal, AMCSparePart,
+    AMCContract, AMCRenewal,  # AMCSparePart removed - inventory dependency
     ServiceManagementRecord, ServiceManagementMaterial
 )
 from lead_management.models import Customer
@@ -61,26 +61,27 @@ class ServiceManagementMaterialCreateSerializer(serializers.ModelSerializer):
 
 
 # ===== AMC SERIALIZERS =====
-class AMCSparePartSerializer(serializers.ModelSerializer):
-    product_name = serializers.SerializerMethodField()
-    item_id = serializers.IntegerField(source='inventory_item.item_id', read_only=True)
-    stock_available = serializers.DecimalField(
-        source='inventory_item.quantity', max_digits=10, decimal_places=2, read_only=True
-    )
-
-    class Meta:
-        model = AMCSparePart
-        fields = [
-            'id', 'amc_contract', 'inventory_item', 'item_id', 'product_name',
-            'quantity_used', 'unit', 'rate_per_unit', 'gst_percent', 'hsn_sac',
-            'description', 'total_cost', 'invoice', 'stock_available', 'created_at'
-        ]
-        read_only_fields = ['total_cost', 'invoice', 'created_at']
-
-    def get_product_name(self, obj):
-        if obj.inventory_item and obj.inventory_item.item:
-            return obj.inventory_item.item.item_code
-        return 'Unknown'
+# TEMPORARILY DISABLED - Inventory module removed
+# class AMCSparePartSerializer(serializers.ModelSerializer):
+#     product_name = serializers.SerializerMethodField()
+#     item_id = serializers.IntegerField(source='inventory_item.item_id', read_only=True)
+#     stock_available = serializers.DecimalField(
+#         source='inventory_item.quantity', max_digits=10, decimal_places=2, read_only=True
+#     )
+#
+#     class Meta:
+#         model = AMCSparePart
+#         fields = [
+#             'id', 'amc_contract', 'inventory_item', 'item_id', 'product_name',
+#             'quantity_used', 'unit', 'rate_per_unit', 'gst_percent', 'hsn_sac',
+#             'description', 'total_cost', 'invoice', 'stock_available', 'created_at'
+#         ]
+#         read_only_fields = ['total_cost', 'invoice', 'created_at']
+#
+#     def get_product_name(self, obj):
+#         if obj.inventory_item and obj.inventory_item.item:
+#             return obj.inventory_item.item.item_code
+#         return 'Unknown'
 
 
 class AMCContractSerializer(serializers.ModelSerializer):

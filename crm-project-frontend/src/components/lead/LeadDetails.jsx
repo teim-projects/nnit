@@ -58,7 +58,7 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
   const fetchQuotations = () => {
     if (!lead?.customer) return;
     setQuotLoading(true);
-    axios.get(`${baseApi}/quotation/quotation/?customer=${lead.customer}&page_size=50`, {
+    axios.get(`${baseApi}/api/quotation/quotation/?customer=${lead.customer}&page_size=50`, {
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     })
       .then((res) => {

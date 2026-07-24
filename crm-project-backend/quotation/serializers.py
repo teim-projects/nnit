@@ -2,8 +2,6 @@ from rest_framework import serializers
 from django.db import transaction
 import random
 from datetime import datetime
-from inventory.models import TermsConditions
-from inventory.serializers import TermsConditionsSerializer
 
 from .models import (
     Quotation,
@@ -12,6 +10,7 @@ from .models import (
     QuotationLowSideItem,
 )
 from .models import ServiceMaster, QuotationServiceItem
+from .terms_models import TermsMaster, QuotationTerms
 
 # =====================================================
 # HIGH SIDE SERIALIZER - Decoupled
@@ -112,24 +111,17 @@ class QuotationSerializer(serializers.ModelSerializer):
     )
 
     versions = QuotationVersionSerializer(many=True)
-    
-    terms_conditions = serializers.PrimaryKeyRelatedField(
-        queryset=TermsConditions.objects.all(),
-        many=True,
-        required=False,
-        write_only=True
-    )
-
-    terms_conditions_details = TermsConditionsSerializer(
-        source="terms_conditions",
-        many=True,
-        read_only=True
-    )
+    terms = serializers.SerializerMethodField()
 
     class Meta:
         model = Quotation
         fields = "__all__"
         read_only_fields = ("quotation_no",)
+
+    def get_terms(self, obj):
+        """Return terms for this quotation"""
+        terms = QuotationTerms.objects.filter(quotation=obj).order_by('sequence')
+        return QuotationTermsSerializer(terms, many=True).data
 
     # =====================================================
     # 🔥 CORE CALCULATION ENGINE
@@ -213,7 +205,6 @@ class QuotationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         request = self.context.get("request")
         versions_data = validated_data.pop("versions")
-        terms_conditions = validated_data.pop("terms_conditions", [])
     
         version_data = versions_data[0]
         high_items = version_data.pop("high_side_items")
@@ -230,9 +221,6 @@ class QuotationSerializer(serializers.ModelSerializer):
             quotation_no="TEMP",
             **validated_data
         )
-        
-        if terms_conditions:
-            quotation.terms_conditions.set(terms_conditions)
     
         # ======================================
         # STEP 2️⃣ BUILD NUMBER USING DB ID
@@ -275,14 +263,10 @@ class QuotationSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         request = self.context.get("request")
         versions_data = validated_data.pop("versions")
-        terms_conditions = validated_data.pop("terms_conditions", None)
         
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-        
-        if terms_conditions is not None:
-            instance.terms_conditions.set(terms_conditions)
         
         old_version = instance.versions.filter(is_active=True).first()
         
@@ -353,7 +337,12 @@ class SimpleQuotationSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
     unit_price = serializers.DecimalField(max_digits=12, decimal_places=2)
     gst_percent = serializers.DecimalField(max_digits=5, decimal_places=2, default=18)
-    terms_conditions = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
+    terms_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True,
+        help_text="List of term IDs to attach to quotation"
+    )
 
     @transaction.atomic
     def create(self, validated_data):
@@ -366,7 +355,6 @@ class SimpleQuotationSerializer(serializers.Serializer):
         quantity = validated_data["quantity"]
         unit_price = validated_data["unit_price"]
         gst_percent = validated_data.get("gst_percent", 18)
-        terms_ids = validated_data.get("terms_conditions", [])
 
         # Build subject from parking product
         subject = f"{parking_product.product_name} - {parking_product.category.display_name}"
@@ -379,9 +367,6 @@ class SimpleQuotationSerializer(serializers.Serializer):
             site_name="",
             thank_you_note="Thank you for choosing us. We look forward to serving you.",
         )
-
-        if terms_ids:
-            quotation.terms_conditions.set(TermsConditions.objects.filter(id__in=terms_ids))
 
         # Build quotation number
         from datetime import datetime as dt
@@ -441,4 +426,84 @@ class SimpleQuotationSerializer(serializers.Serializer):
         version.grand_total = base_amount + gst_value
         version.save()
 
+        # Create Terms & Conditions for quotation
+        terms_ids = validated_data.get('terms_ids', [])
+        if terms_ids:
+            for idx, term_id in enumerate(terms_ids, start=1):
+                try:
+                    master_term = TermsMaster.objects.get(pk=term_id, is_active=True)
+                    QuotationTerms.objects.create(
+                        quotation=quotation,
+                        master_term=master_term,
+                        title=master_term.title,
+                        content=master_term.content,
+                        sequence=idx,
+                        is_customized=False
+                    )
+                except TermsMaster.DoesNotExist:
+                    pass  # Skip invalid term IDs
+
         return quotation
+
+
+# =====================================================
+# TERMS & CONDITIONS SERIALIZERS
+# =====================================================
+class TermsMasterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TermsMaster
+        fields = '__all__'
+        read_only_fields = ('created_by', 'created_at', 'updated_at')
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user:
+            validated_data['created_by'] = request.user
+        return super().create(validated_data)
+
+
+class QuotationTermsSerializer(serializers.ModelSerializer):
+    master_term_title = serializers.CharField(source='master_term.title', read_only=True)
+    
+    class Meta:
+        model = QuotationTerms
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at')
+
+
+class QuotationTermsBulkCreateSerializer(serializers.Serializer):
+    """
+    Serializer for bulk-creating quotation terms
+    """
+    quotation = serializers.IntegerField()
+    terms = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="List of {master_term: id, sequence: int}"
+    )
+
+    def create(self, validated_data):
+        quotation_id = validated_data['quotation']
+        terms_data = validated_data['terms']
+        
+        # Delete existing terms for this quotation
+        QuotationTerms.objects.filter(quotation_id=quotation_id).delete()
+        
+        # Created new terms
+        created_terms = []
+        for term_data in terms_data:
+            master_term_id = term_data.get('master_term')
+            sequence = term_data.get('sequence', 1)
+            
+            if master_term_id:
+                master_term = TermsMaster.objects.get(pk=master_term_id)
+                qt = QuotationTerms.objects.create(
+                    quotation_id=quotation_id,
+                    master_term=master_term,
+                    title=master_term.title,
+                    content=master_term.content,
+                    sequence=sequence,
+                    is_customized=False
+                )
+                created_terms.append(qt)
+        
+        return created_terms

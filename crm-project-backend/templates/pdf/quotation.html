@@ -324,5 +324,67 @@
   </div>
 
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- TERMS & CONDITIONS PAGE (New Page)                                   -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+{% if terms %}
+<div class="page" style="page-break-before: always;">
+
+  <!-- HEADER (Same as first page) -->
+  <div class="header">
+    <div class="logo-box">
+      <div class="logo-top">NNIT</div>
+      <div class="logo-sub">CAR PARKING<br>SYSTEMS<br>PVT. LTD.<br><span style="font-size:4.5px;">CARS. CARE. CONVENIENCE.</span></div>
+    </div>
+    <div class="header-info">
+      <div class="company-name">NNIT Car Parking Systems Pvt. Ltd.</div>
+      <div class="company-subtitle">(NILESH NIRMAN INNOVATIVE TECHNOLOGIES)</div>
+      <div class="company-address">
+        Office: Survey No 37, Ground Floor, Flat No 1, Ruturaj Society,<br>
+        Nr. Vitthal Mandir, Karve Nagar, Pune - 52.
+      </div>
+      <div class="header-contact">
+        &#9742; +91 9518377159 &nbsp;&nbsp;
+        &#127760; www.nnitcarparking.in &nbsp;&nbsp;
+        &#9993; info@nnitcarparking.in
+      </div>
+    </div>
+  </div>
+
+  <!-- TERMS TITLE -->
+  <div class="annexure-title">Terms & Conditions</div>
+
+  <!-- TERMS CONTENT -->
+  <div style="font-size: 9.5px; line-height: 1.8; padding: 0 8px;">
+    {% for term in terms %}
+    <div style="margin-bottom: 14px; page-break-inside: avoid;">
+      <div style="font-weight: bold; font-size: 10px; margin-bottom: 4px; color: #c8600a;">
+        {{ term.sequence }}. {{ term.title }}
+        {% if term.is_customized %}
+        <span style="font-size: 7px; background: #e0d4ff; padding: 1px 4px; border-radius: 3px; color: #6b21a8; font-weight: normal;">[CUSTOMIZED]</span>
+        {% endif %}
+      </div>
+      <div style="text-align: justify; padding-left: 12px; color: #333;">
+        {{ term.content|linebreaksbr }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- FOOTER FOR TERMS PAGE -->
+  <div class="footer">
+    <div>
+      <div class="sig-line">Customer's Seal &amp; Signature</div>
+    </div>
+    <div style="text-align:right;">
+      <strong>For NNIT Car Parking Systems Pvt. Ltd.</strong>
+      <div class="sig-line" style="text-align:center;">Authorized Signatory</div>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
 </body>
 </html>

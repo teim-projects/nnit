@@ -124,6 +124,12 @@ def _build_simple_quotation_context(quotation, version):
 
     project_name = quotation.site_name or (quotation.site.site_name if quotation.site else None) or quotation.subject or "—"
 
+    # Get Terms & Conditions for this quotation
+    from quotation.terms_models import QuotationTerms
+    quotation_terms = QuotationTerms.objects.filter(
+        quotation=quotation
+    ).order_by('sequence')
+
     return {
         'quotation': quotation,
         'version': version,
@@ -141,6 +147,7 @@ def _build_simple_quotation_context(quotation, version):
         'igst_fmt': _fmt_inr(igst),
         'grand_total_fmt': _fmt_inr(grand_total),
         'amount_in_words': _amount_in_words(grand_total),
+        'terms': quotation_terms,  # Add terms to context
     }
 
 
@@ -209,6 +216,12 @@ def generate_quotation_print_pdf(quotation, version, base_url=None):
     gst_amount = (subtotal * gst_pct) / Decimal('100')
     grand_total = subtotal + gst_amount
 
+    # Get Terms & Conditions for this quotation
+    from quotation.terms_models import QuotationTerms
+    quotation_terms = QuotationTerms.objects.filter(
+        quotation=quotation
+    ).order_by('sequence')
+
     context = {
         'quotation': quotation,
         'version': version,
@@ -217,6 +230,7 @@ def generate_quotation_print_pdf(quotation, version, base_url=None):
         'gst_amount': gst_amount,
         'grand_total': grand_total,
         'gst_percentage': gst_pct,
+        'terms': quotation_terms,  # Add terms to context
     }
 
     html_string = render_to_string('pdf/quotation_print.html', context)

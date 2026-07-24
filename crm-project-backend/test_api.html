@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quotation API Tester</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        .result { background: #f8f9fa; padding: 10px; margin-top: 10px; border-radius: 4px; white-space: pre-wrap; font-family: monospace; max-height: 400px; overflow-y: auto; }
+        .success { color: green; }
+        .error { color: red; }
+        input { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        h2 { color: #333; margin-top: 0; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Quotation API Tester</h1>
+    
+    <div class="section">
+        <h2>🔑 Step 1: Enter JWT Token</h2>
+        <input type="text" id="token" placeholder="Paste your JWT token here" />
+        <p style="font-size: 12px; color: #666;">
+            Get token from: POST http://127.0.0.1:8000/auth/login/ <br>
+            Or check browser DevTools → Application → Local Storage → token
+        </p>
+    </div>
+
+    <div class="section">
+        <h2>👥 Test 1: Get All Customers</h2>
+        <button onclick="testCustomers()">Fetch Customers</button>
+        <div id="customerResult" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>🚗 Test 2: Get All Products</h2>
+        <button onclick="testProducts()">Fetch Products</button>
+        <div id="productResult" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>📝 Test 3: Create Quotation</h2>
+        <input type="number" id="customerId" placeholder="Customer ID" />
+        <input type="number" id="productId" placeholder="Product ID" />
+        <input type="number" id="quantity" placeholder="Quantity" value="1" />
+        <input type="number" id="unitPrice" placeholder="Unit Price" value="500000" />
+        <button onclick="testCreateQuotation()">Create Quotation</button>
+        <div id="quotationResult" class="result"></div>
+    </div>
+
+    <script>
+        const baseUrl = 'http://127.0.0.1:8000';
+
+        function getToken() {
+            return document.getElementById('token').value.trim();
+        }
+
+        function getHeaders() {
+            const token = getToken();
+            if (!token) {
+                alert('Please enter JWT token first!');
+                return null;
+            }
+            return {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        async function testCustomers() {
+            const resultDiv = document.getElementById('customerResult');
+            resultDiv.innerHTML = '⏳ Loading...';
+
+            const headers = getHeaders();
+            if (!headers) return;
+
+            try {
+                const response = await fetch(`${baseUrl}/quotation/customer/`, { headers });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<span class="success">✅ Success! Found ${data.length} customers</span>\n\n`;
+                    resultDiv.innerHTML += JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.innerHTML = `<span class="error">❌ Error ${response.status}</span>\n\n`;
+                    resultDiv.innerHTML += JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ Network Error: ${error.message}</span>`;
+            }
+        }
+
+        async function testProducts() {
+            const resultDiv = document.getElementById('productResult');
+            resultDiv.innerHTML = '⏳ Loading...';
+
+            const headers = getHeaders();
+            if (!headers) return;
+
+            try {
+                const response = await fetch(`${baseUrl}/quotation/products/`, { headers });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<span class="success">✅ Success! Found ${data.length} products</span>\n\n`;
+                    resultDiv.innerHTML += JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.innerHTML = `<span class="error">❌ Error ${response.status}</span>\n\n`;
+                    resultDiv.innerHTML += JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ Network Error: ${error.message}</span>`;
+            }
+        }
+
+        async function testCreateQuotation() {
+            const resultDiv = document.getElementById('quotationResult');
+            resultDiv.innerHTML = '⏳ Creating...';
+
+            const headers = getHeaders();
+            if (!headers) return;
+
+            const payload = {
+                customer: parseInt(document.getElementById('customerId').value),
+                parking_product_id: parseInt(document.getElementById('productId').value),
+                quantity: parseInt(document.getElementById('quantity').value),
+                unit_price: document.getElementById('unitPrice').value,
+                gst_percent: 18
+            };
+
+            try {
+                const response = await fetch(`${baseUrl}/quotation/simple-quotation/`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<span class="success">✅ Quotation Created!</span>\n\n`;
+                    resultDiv.innerHTML += JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.innerHTML = `<span class="error">❌ Error ${response.status}</span>\n\n`;
+                    resultDiv.innerHTML += JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ Network Error: ${error.message}</span>`;
+            }
+        }
+    </script>
+</body>
+</html>

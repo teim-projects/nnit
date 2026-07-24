@@ -12,8 +12,8 @@ class Migration(migrations.Migration):
     dependencies = [
         ('amc', '0001_initial'),
         ('api', '0001_initial'),
-        ('inventory', '0001_initial'),
-        ('invoice', '0001_initial'),
+        # ('inventory', '0001_initial'),  # Inventory module removed
+        # ('invoice', '0001_initial'),  # Invoice module removed
         ('lead_management', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
