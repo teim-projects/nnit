@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { MdClose, MdArrowBack } from 'react-icons/md';
+import { MdArrowBack } from 'react-icons/md';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
 export default function AddProductForm({ open, onClose, onSuccess, product, categories, baseApi, token }) {
   const [formData, setFormData] = useState({
     product_name: '',
-    product_code: '',
     category_id: '',
-    description: '',
     levels: '',
     operation_type: '',
     automation_type: '',
@@ -18,9 +16,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
     min_width: '',
     min_length: '',
     car_capacity: '',
-    base_price: '',
-    features: [],
-    is_active: true
+    base_price: ''
   });
   
   const [loading, setLoading] = useState(false);
@@ -29,10 +25,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
     if (product) {
       setFormData({
         product_name: product.product_name || '',
-        product_code: product.product_code || '',
-        // product.category is the category ID (read‑only PK)
         category_id: product.category || '',
-        description: product.description || '',
         levels: product.levels || '',
         operation_type: product.operation_type || '',
         automation_type: product.automation_type || '',
@@ -42,9 +35,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
         min_width: product.min_width || '',
         min_length: product.min_length || '',
         car_capacity: product.car_capacity || '',
-        base_price: product.base_price || '',
-        features: product.features || [],
-        is_active: product.is_active !== undefined ? product.is_active : true
+        base_price: product.base_price || ''
       });
     }
   }, [product]);
@@ -84,7 +75,6 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
 
     setLoading(true);
     try {
-      // Build payload – category_id is what the serializer expects (write‑only)
       const payload = {
         ...formData,
         category_id: parseInt(formData.category_id),

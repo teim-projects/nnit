@@ -4,6 +4,8 @@ import TableView from "../components/TableView";
 import Swal from "sweetalert2";
 import AddCustomerForm from "../components/customers/AddCustomerForm";
 import CustomerDetails from "../components/customers/CustomerDetails";
+import { IoLogoWhatsapp } from "react-icons/io5";
+import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd } from "react-icons/md";
 
 export default function Customer() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
@@ -119,18 +121,92 @@ export default function Customer() {
     { key: "status", label: "Status", render: (r) => r.is_lead_only ? "lead" : "active" },
   ];
 
-  // Actions renderer (centered by TableView) - exactly like Lead.jsx
-  const actionsRenderer = useCallback((row) => (
-    <div className="flex items-center justify-center">
-      <button
-        onClick={() => setDetailCustomerId(row.id)}
-        className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-        title="View Details"
-      >
-        View Details
-      </button>
-    </div>
-  ), []);
+  // Actions renderer with WhatsApp, Email, Delete, View
+  const actionsRenderer = useCallback((row) => {
+    const handleWhatsApp = (e) => {
+      e.stopPropagation();
+      const contact = row.contact_number;
+      if (!contact) {
+        Swal.fire({ icon: 'warning', title: 'No Contact', text: 'No contact number available' });
+        return;
+      }
+      const cleanNumber = contact.replace(/[^0-9]/g, '');
+      const whatsappNumber = cleanNumber.startsWith('91') ? cleanNumber : `91${cleanNumber}`;
+      window.open(`https://wa.me/${whatsappNumber}`, '_blank');
+    };
+
+    const handleEmail = (e) => {
+      e.stopPropagation();
+      const email = row.email;
+      if (!email) {
+        Swal.fire({ icon: 'warning', title: 'No Email', text: 'No email address available' });
+        return;
+      }
+      window.location.href = `mailto:${email}`;
+    };
+
+    const handleDeleteClick = async (e) => {
+      e.stopPropagation();
+      const res = await Swal.fire({
+        title: "Delete Customer?",
+        text: "This action cannot be undone",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Delete",
+        confirmButtonColor: "#EF4444"
+      });
+      if (!res.isConfirmed) return;
+
+      try {
+        const resp = await fetch(`${API_URL}${row.id}/`, {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+        Swal.fire({ icon: "success", text: "Customer deleted successfully", timer: 1500, showConfirmButton: false });
+        fetchData(currentPage);
+      } catch (err) {
+        Swal.fire({ icon: "error", title: "Delete failed", text: err.message });
+      }
+    };
+
+    return (
+      <div className="flex items-center justify-center gap-1">
+        <button
+          onClick={handleWhatsApp}
+          className="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
+          title="Send WhatsApp"
+        >
+          <IoLogoWhatsapp className="w-3.5 h-3.5" />
+        </button>
+        
+        <button
+          onClick={handleEmail}
+          className="inline-flex items-center px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+          title="Send Email"
+        >
+          <MdEmail className="w-3.5 h-3.5" />
+        </button>
+        
+        <button
+          onClick={handleDeleteClick}
+          className="inline-flex items-center px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+          title="Delete"
+        >
+          <MdDelete className="w-3.5 h-3.5" />
+        </button>
+        
+        <button
+          onClick={() => setDetailCustomerId(row.id)}
+          className="inline-flex items-center px-2 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs font-medium transition-colors"
+          title="View Details"
+        >
+          <MdRemoveRedEye className="w-3.5 h-3.5" />
+          <span className="ml-1">View</span>
+        </button>
+      </div>
+    );
+  }, [currentPage, API_URL, token]);
 
   return (
     <Base
@@ -162,9 +238,10 @@ export default function Customer() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
-                className="px-4 py-2 rounded-md bg-sky-600 text-white"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-orange-600 hover:bg-orange-700 text-white font-medium transition-colors shadow-sm"
               >
-                + Add
+                <MdAdd className="w-5 h-5" />
+                Add Customer
               </button>
             </div>
           </div>

@@ -1,0 +1,313 @@
+/* ===================================================================
+   CRM UI Theme Updates - Orange & Blue Mix
+   Copy these styles to your main CSS file (index.css or App.css)
+   =================================================================== */
+
+/* ============================================
+   1. COLOR VARIABLES (Orange & Blue Theme)
+   ============================================ */
+:root {
+  /* Primary Orange */
+  --orange-50: #FFF4ED;
+  --orange-100: #FFE6D5;
+  --orange-200: #FFCCA7;
+  --orange-500: #FF8C42;
+  --orange-600: #FF6B35;
+  --orange-700: #E85A2B;
+  
+  /* Primary Blue */
+  --blue-50: #EFF6FF;
+  --blue-100: #DBEAFE;
+  --blue-200: #BFDBFE;
+  --blue-500: #3B82F6;
+  --blue-600: #2563EB;
+  --blue-700: #1E40AF;
+  
+  /* Success Green (for WhatsApp) */
+  --green-600: #25D366;
+  --green-700: #1DA851;
+  
+  /* Danger Red */
+  --red-600: #EF4444;
+  --red-700: #DC2626;
+}
+
+/* ============================================
+   2. ACTION BUTTONS (WhatsApp, Email, Delete, View)
+   ============================================ */
+.action-btn {
+  @apply inline-flex items-center px-2 py-1 rounded text-xs font-medium transition-all duration-200;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+}
+
+.action-btn-whatsapp {
+  background-color: var(--green-600);
+  color: white;
+}
+
+.action-btn-whatsapp:hover {
+  background-color: var(--green-700);
+}
+
+.action-btn-email {
+  background-color: var(--blue-600);
+  color: white;
+}
+
+.action-btn-email:hover {
+  background-color: var(--blue-700);
+}
+
+.action-btn-delete {
+  background-color: var(--red-600);
+  color: white;
+}
+
+.action-btn-delete:hover {
+  background-color: var(--red-700);
+}
+
+.action-btn-view {
+  background-color: var(--orange-600);
+  color: white;
+}
+
+.action-btn-view:hover {
+  background-color: var(--orange-700);
+}
+
+/* ============================================
+   3. SIDEBAR UPDATES (Orange & Blue Theme)
+   ============================================ */
+.sidebar-item {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 transition-all duration-200;
+}
+
+.sidebar-item:hover {
+  background-color: var(--orange-50);
+  color: var(--orange-700);
+}
+
+.sidebar-item-active {
+  background: linear-gradient(135deg, var(--orange-600) 0%, var(--orange-500) 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+}
+
+.sidebar-item-active .sidebar-icon {
+  color: white;
+}
+
+.sidebar-icon {
+  transition: color 0.2s;
+}
+
+/* ============================================
+   4. PRIMARY BUTTONS (Orange Theme)
+   ============================================ */
+.btn-primary {
+  @apply px-4 py-2 rounded-md font-medium transition-all duration-200;
+  background: var(--orange-600);
+  color: white;
+  box-shadow: 0 1px 3px 0 rgba(255, 107, 53, 0.2);
+}
+
+.btn-primary:hover {
+  background: var(--orange-700);
+  box-shadow: 0 4px 6px -1px rgba(255, 107, 53, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* ============================================
+   5. SECONDARY BUTTONS (Blue Theme)
+   ============================================ */
+.btn-secondary {
+  @apply px-4 py-2 rounded-md font-medium transition-all duration-200;
+  background: white;
+  color: var(--blue-600);
+  border: 1px solid var(--blue-200);
+}
+
+.btn-secondary:hover {
+  background: var(--blue-50);
+  border-color: var(--blue-600);
+}
+
+/* ============================================
+   6. FOLLOW-UP MODE BUTTONS (Compact Design)
+   ============================================ */
+.followup-mode-btn {
+  @apply px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200;
+  border: 1px solid #E5E7EB;
+}
+
+.followup-mode-btn-inactive {
+  background: white;
+  color: #6B7280;
+}
+
+.followup-mode-btn-inactive:hover {
+  background: var(--orange-50);
+  border-color: var(--orange-200);
+  color: var(--orange-700);
+}
+
+.followup-mode-btn-active {
+  background: var(--orange-600);
+  color: white;
+  border-color: var(--orange-600);
+  box-shadow: 0 2px 4px rgba(255, 107, 53, 0.2);
+}
+
+/* ============================================
+   7. CLIENT RESPONSE BUTTONS (Color-coded)
+   ============================================ */
+.response-btn {
+  @apply px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200;
+  border: 1px solid #E5E7EB;
+}
+
+.response-btn-inactive {
+  background: white;
+  color: #6B7280;
+}
+
+.response-btn-inactive:hover {
+  background: #F3F4F6;
+}
+
+/* Very Positive - Green */
+.response-btn-very-positive {
+  background: #10B981;
+  color: white;
+  border-color: #10B981;
+}
+
+/* Positive - Light Green */
+.response-btn-positive {
+  background: #34D399;
+  color: white;
+  border-color: #34D399;
+}
+
+/* Neutral - Gray */
+.response-btn-neutral {
+  background: #6B7280;
+  color: white;
+  border-color: #6B7280;
+}
+
+/* Negative - Red */
+.response-btn-negative {
+  background: #EF4444;
+  color: white;
+  border-color: #EF4444;
+}
+
+/* No Response - Light Gray */
+.response-btn-no-response {
+  background: #9CA3AF;
+  color: white;
+  border-color: #9CA3AF;
+}
+
+/* Call Back Later - Blue */
+.response-btn-callback {
+  background: var(--blue-600);
+  color: white;
+  border-color: var(--blue-600);
+}
+
+/* ============================================
+   8. TABLE ENHANCEMENTS
+   ============================================ */
+.table-header {
+  @apply bg-gradient-to-r from-orange-50 to-blue-50;
+}
+
+.table-row-hover:hover {
+  @apply bg-orange-50 transition-colors duration-150;
+}
+
+/* ============================================
+   9. STATUS BADGES (Orange/Blue themed)
+   ============================================ */
+.status-badge {
+  @apply px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.status-badge-open {
+  background: var(--blue-100);
+  color: var(--blue-700);
+}
+
+.status-badge-in-process {
+  background: var(--orange-100);
+  color: var(--orange-700);
+}
+
+.status-badge-closed {
+  background: #E5E7EB;
+  color: #4B5563;
+}
+
+/* ============================================
+   10. CARDS & CONTAINERS
+   ============================================ */
+.card-header-primary {
+  @apply bg-gradient-to-r from-orange-600 to-orange-500 text-white;
+}
+
+.card-header-secondary {
+  @apply bg-gradient-to-r from-blue-600 to-blue-500 text-white;
+}
+
+/* ============================================
+   11. FOCUS STATES (Orange Theme)
+   ============================================ */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--orange-600);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+}
+
+/* ============================================
+   12. SCROLLBAR STYLING
+   ============================================ */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #F3F4F6;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--orange-600);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--orange-700);
+}
+
+/* ============================================
+   END OF THEME UPDATES
+   ============================================ */

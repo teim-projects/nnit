@@ -18,7 +18,7 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("followups"); 
+  const [activeTab, setActiveTab] = useState("followups");
   const [showFollowUpForm, setShowFollowUpForm] = useState(false);
   const [converting, setConverting] = useState(false);
 
@@ -222,9 +222,15 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                   <HiCheckCircle className="w-5 h-5" />
                   {converting ? "Converting..." : lead.is_converted ? "Already Converted ✓" : "Convert to Customer"}
                 </button>
-                <button className="w-full py-3 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm text-sm" onClick={() => setShowFollowUpForm(true)}>
+
+                {/* Follow-up Button (only old form) */}
+                <button 
+                  className="w-full py-3 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm text-sm" 
+                  onClick={() => setShowFollowUpForm(true)}
+                >
                   <FiPlus className="w-5 h-5 text-gray-500" /> Add Follow-up
                 </button>
+
                 {lead.is_converted && lead.converted_at && (
                   <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
                     <HiCheckCircle className="w-4 h-4 shrink-0" />
@@ -244,18 +250,121 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
               <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex-1">
                 {activeTab === "followups" ? (
                   <div className="space-y-6">
-                    <h3 className="text-lg font-bold text-gray-900">Follow-up History &amp; Timeline</h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-bold text-gray-900">Follow-up History &amp; Timeline</h3>
+                      <button
+                        onClick={() => setShowFollowUpForm(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#1c64f2] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow transition-all"
+                      >
+                        <FiPlus className="w-4 h-4" />
+                        Add Follow-up
+                      </button>
+                    </div>
                     {lead.followups && lead.followups.length > 0 ? (
                       <div className="relative pl-6 border-l-2 border-[#1c64f2]/15 space-y-8">
                         {lead.followups.map((fu, idx) => (
                           <div key={fu.id || idx} className="relative">
                             <span className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-[#1c64f2] border-4 border-white shadow-sm ring-2 ring-[#1c64f2]/15"></span>
+                            
                             <div className="flex items-center gap-3 flex-wrap mb-3">
-                              <span className="px-3 py-1 bg-[#1c64f2] text-white rounded-lg text-xs font-bold">{getOrdinal(idx + 1)} Follow-up</span>
+                              <span className="px-3 py-1 bg-[#1c64f2] text-white rounded-lg text-xs font-bold uppercase">
+                                {fu.interaction_type === 'call' ? '📞 LEAD ENTRY' : 
+                                 fu.interaction_type === 'email' ? '✉️ EMAIL' :
+                                 fu.interaction_type === 'whatsapp' ? '💬 WHATSAPP' :
+                                 fu.interaction_type === 'video_call' ? '📹 VIDEO CALL' :
+                                 fu.interaction_type === 'in_person' ? '🤝 IN-PERSON' :
+                                 fu.interaction_type === 'demo' ? '🎯 DEMO' :
+                                 fu.interaction_type === 'site_visit' ? '🏗️ SITE VISIT' : 'LEAD ENTRY'}
+                              </span>
+                              <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold capitalize">
+                                {fu.interaction_type?.replace('_', ' ') || 'Call'}
+                              </span>
                               <span className="text-gray-500 font-bold text-sm">{fu.followup_date || "—"}</span>
-                              <span className="ml-auto px-2.5 py-0.5 text-xs font-bold bg-[#DEF7EC] text-[#03543F] rounded-full uppercase">{fu.status?.replace('_', ' ') || "OPEN"}</span>
+                              {fu.client_response && (
+                                <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full uppercase ml-auto ${
+                                  fu.client_response === 'very_positive' || fu.client_response === 'positive' ? 'bg-green-100 text-green-700' :
+                                  fu.client_response === 'negative' ? 'bg-red-100 text-red-700' :
+                                  fu.client_response === 'no_response' ? 'bg-gray-100 text-gray-600' :
+                                  fu.client_response === 'call_back_later' ? 'bg-blue-100 text-blue-700' :
+                                  'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {fu.client_response === 'very_positive' ? 'Very Positive' :
+                                   fu.client_response === 'positive' ? 'Positive' :
+                                   fu.client_response === 'negative' ? 'Negative' :
+                                   fu.client_response === 'no_response' ? 'No Response' :
+                                   fu.client_response === 'call_back_later' ? 'Call Back Later' :
+                                   'Neutral'}
+                                </span>
+                              )}
+                              <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full uppercase ${
+                                fu.followup_status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                fu.followup_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                {fu.followup_status || 'Completed'}
+                              </span>
                             </div>
-                            <p className="text-sm text-gray-500 mb-5 font-medium leading-relaxed">{fu.remarks || fu.discussion_notes || "No discussion notes recorded."}</p>
+
+                            {(fu.created_by_full_name || fu.contacted_person) && (
+                              <p className="text-xs text-gray-400 mb-3">
+                                {fu.created_by_full_name && <span>By <strong className="text-gray-600">{fu.created_by_full_name}</strong></span>}
+                                {fu.created_by_full_name && fu.contacted_person && <span> · </span>}
+                                {fu.contacted_person && <span>Contacted: <strong className="text-gray-600">{fu.contacted_person}</strong></span>}
+                              </p>
+                            )}
+
+                            <p className="text-sm text-gray-700 mb-5 font-medium leading-relaxed">{fu.remarks || fu.discussion_notes || "No discussion notes recorded."}</p>
+
+                            {(fu.client_commitment || fu.our_commitment) && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                                {fu.client_commitment && (
+                                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                                    <h5 className="text-xs font-bold text-green-700 uppercase mb-2">CLIENT COMMITMENT</h5>
+                                    <p className="text-sm text-green-900 font-medium">{fu.client_commitment}</p>
+                                  </div>
+                                )}
+                                {fu.our_commitment && (
+                                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                    <h5 className="text-xs font-bold text-blue-700 uppercase mb-2">OUR COMMITMENT</h5>
+                                    <p className="text-sm text-blue-900 font-medium">{fu.our_commitment}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {(fu.previous_stage || fu.current_stage) && (
+                              <div className="flex items-center gap-3 mb-5 text-sm flex-wrap">
+                                <span className="text-gray-400 font-medium">Stage:</span>
+                                {fu.previous_stage && (
+                                  <>
+                                    <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-lg font-bold text-xs">{fu.previous_stage}</span>
+                                    <span className="text-gray-400">→</span>
+                                  </>
+                                )}
+                                {fu.current_stage && (
+                                  <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg font-bold text-xs">{fu.current_stage}</span>
+                                )}
+                                {fu.next_followup_date && (
+                                  <>
+                                    <span className="text-gray-400 ml-2">Next:</span>
+                                    <span className="font-bold text-gray-700">{fu.next_followup_date}</span>
+                                    {fu.interaction_type && <span className="text-gray-400 text-xs">via {fu.interaction_type}</span>}
+                                  </>
+                                )}
+                              </div>
+                            )}
+
+                            {fu.requirement_info && (
+                              <div className="mb-5">
+                                <button 
+                                  onClick={() => onCreateQuotation && onCreateQuotation(lead)}
+                                  className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                  <AiOutlineFileText className="w-4 h-4" />
+                                  Quote from this follow-up
+                                </button>
+                              </div>
+                            )}
                             {fu.qualifying_info && (
                               <div className="bg-[#f8fafc]/80 border border-gray-100 rounded-2xl p-5 mb-5">
                                 <h4 className="text-sm font-bold text-gray-900 mb-4">Qualifying Information</h4>
@@ -393,6 +502,7 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
           </div>
         )}
 
+        {/* OLD Follow-up Form for Inline View */}
         {showFollowUpForm && (
           <AddLeadFollowUpForm
             open={showFollowUpForm}
@@ -535,6 +645,8 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                     : "Convert to Customer"
                   }
                 </button>
+                
+                {/* Follow-up Button (only old form) */}
                 <button 
                   className="w-full py-3 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition-all text-sm"
                   onClick={() => setShowFollowUpForm(true)}
@@ -584,7 +696,16 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
               <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex-1">
                 {activeTab === "followups" ? (
                   <div className="space-y-6">
-                    <h3 className="text-lg font-bold text-gray-900">Follow-up History & Timeline</h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-bold text-gray-900">Follow-up History & Timeline</h3>
+                      <button
+                        onClick={() => setShowFollowUpForm(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#1c64f2] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow transition-all"
+                      >
+                        <FiPlus className="w-4 h-4" />
+                        Add Follow-up
+                      </button>
+                    </div>
 
                     {lead.followups && lead.followups.length > 0 ? (
                       <div className="relative pl-6 border-l-2 border-[#1c64f2]/15 space-y-8">
@@ -596,8 +717,17 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                             
                             {/* Timeline Node Header */}
                             <div className="flex items-center gap-3 flex-wrap mb-3">
-                              <span className="px-3 py-1 bg-[#1c64f2] text-white rounded-lg text-xs font-bold">
-                                {getOrdinal(idx + 1)} Follow-up
+                              <span className="px-3 py-1 bg-[#1c64f2] text-white rounded-lg text-xs font-bold uppercase">
+                                {fu.interaction_type === 'call' ? '📞 LEAD ENTRY' : 
+                                 fu.interaction_type === 'email' ? '✉️ EMAIL' :
+                                 fu.interaction_type === 'whatsapp' ? '💬 WHATSAPP' :
+                                 fu.interaction_type === 'video_call' ? '📹 VIDEO CALL' :
+                                 fu.interaction_type === 'in_person' ? '🤝 IN-PERSON' :
+                                 fu.interaction_type === 'demo' ? '🎯 DEMO' :
+                                 fu.interaction_type === 'site_visit' ? '🏗️ SITE VISIT' : 'LEAD ENTRY'}
+                              </span>
+                              <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold capitalize">
+                                {fu.interaction_type?.replace('_', ' ') || 'Call'}
                               </span>
                               <span className="text-gray-500 font-bold text-sm">
                                 {fu.followup_date || "—"}
@@ -607,15 +737,98 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                                   {fu.followup_time}
                                 </span>
                               )}
-                              <span className="ml-auto px-2.5 py-0.5 text-xs font-bold bg-[#DEF7EC] text-[#03543F] rounded-full uppercase">
-                                {fu.status?.replace('_', ' ') || "OPEN"}
+                              {fu.client_response && (
+                                <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full uppercase ml-auto ${
+                                  fu.client_response === 'very_positive' || fu.client_response === 'positive' ? 'bg-green-100 text-green-700' :
+                                  fu.client_response === 'negative' ? 'bg-red-100 text-red-700' :
+                                  fu.client_response === 'no_response' ? 'bg-gray-100 text-gray-600' :
+                                  fu.client_response === 'call_back_later' ? 'bg-blue-100 text-blue-700' :
+                                  'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {fu.client_response === 'very_positive' ? 'Very Positive' :
+                                   fu.client_response === 'positive' ? 'Positive' :
+                                   fu.client_response === 'negative' ? 'Negative' :
+                                   fu.client_response === 'no_response' ? 'No Response' :
+                                   fu.client_response === 'call_back_later' ? 'Call Back Later' :
+                                   'Neutral'}
+                                </span>
+                              )}
+                              <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full uppercase ${
+                                fu.followup_status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                fu.followup_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                {fu.followup_status || 'Completed'}
                               </span>
                             </div>
 
-                            {/* Remarks */}
-                            <p className="text-sm text-gray-500 mb-5 font-medium leading-relaxed">
+                            {/* Created By and Contacted Person */}
+                            {(fu.created_by_full_name || fu.contacted_person) && (
+                              <p className="text-xs text-gray-400 mb-3">
+                                {fu.created_by_full_name && <span>By <strong className="text-gray-600">{fu.created_by_full_name}</strong></span>}
+                                {fu.created_by_full_name && fu.contacted_person && <span> · </span>}
+                                {fu.contacted_person && <span>Contacted: <strong className="text-gray-600">{fu.contacted_person}</strong></span>}
+                              </p>
+                            )}
+
+                            {/* Remarks/Discussion Notes */}
+                            <p className="text-sm text-gray-700 mb-5 font-medium leading-relaxed">
                               {fu.remarks || fu.discussion_notes || "No discussion notes recorded."}
                             </p>
+
+                            {/* Commitments Section */}
+                            {(fu.client_commitment || fu.our_commitment) && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                                {fu.client_commitment && (
+                                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                                    <h5 className="text-xs font-bold text-green-700 uppercase mb-2">CLIENT COMMITMENT</h5>
+                                    <p className="text-sm text-green-900 font-medium">{fu.client_commitment}</p>
+                                  </div>
+                                )}
+                                {fu.our_commitment && (
+                                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                    <h5 className="text-xs font-bold text-blue-700 uppercase mb-2">OUR COMMITMENT</h5>
+                                    <p className="text-sm text-blue-900 font-medium">{fu.our_commitment}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Stage Progression */}
+                            {(fu.previous_stage || fu.current_stage) && (
+                              <div className="flex items-center gap-3 mb-5 text-sm">
+                                <span className="text-gray-400 font-medium">Stage:</span>
+                                {fu.previous_stage && (
+                                  <>
+                                    <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-lg font-bold text-xs">{fu.previous_stage}</span>
+                                    <span className="text-gray-400">→</span>
+                                  </>
+                                )}
+                                {fu.current_stage && (
+                                  <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg font-bold text-xs">{fu.current_stage}</span>
+                                )}
+                                {fu.next_followup_date && (
+                                  <>
+                                    <span className="text-gray-400 ml-2">Next:</span>
+                                    <span className="font-bold text-gray-700">{fu.next_followup_date}</span>
+                                    {fu.interaction_type && <span className="text-gray-400 text-xs">via {fu.interaction_type}</span>}
+                                  </>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Quote Button */}
+                            {fu.requirement_info && (
+                              <div className="mb-5">
+                                <button 
+                                  onClick={() => onCreateQuotation && onCreateQuotation(lead)}
+                                  className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                  <AiOutlineFileText className="w-4 h-4" />
+                                  Quote from this follow-up
+                                </button>
+                              </div>
+                            )}
 
                             {/* Subcard 1: Qualifying Info */}
                             {fu.qualifying_info && (
@@ -891,7 +1104,7 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
         )}
       </div>
 
-      {/* Dynamic Modal Form popup */}
+      {/* Dynamic Modal Form popup - OLD FORM */}
       {showFollowUpForm && (
         <AddLeadFollowUpForm
           open={showFollowUpForm}

@@ -13,7 +13,7 @@ const allItems = [
   { key: "accounts", label: "Accounts", icon: BuildingIcon, path: "/accounts" }, // <-- Item to hide
  
   { key: "quotes", label: "Quotes", icon: QuoteIcon, path: "/quotation" },
-  { key: "invoices", label: "Invoices", icon: InvoiceIcon, path: "/invoice" },
+  
   { key: "parking-products", label: "Parking Products", icon: ParkingIcon, path: "/parking-products" },
   { key: "terms", label: "Terms & Conditions", icon: DocumentIcon, path: "/terms-conditions" },
   { key: "amc", label: "AMC", icon: AmcIcon, path: "/amc" },
@@ -58,7 +58,7 @@ export default function Sidebar() {
 
 
   return (
-    <aside className="w-55 bg-white border-r border-slate-100 min-h-screen px-3 py-4">
+    <aside className="w-55 bg-gradient-to-b from-white via-orange-50 to-blue-50 border-r border-orange-100 min-h-screen px-3 py-4">
       <nav className="space-y-1">
         {/* 4. ✅ Render the filtered items */}
         {filteredItems.map((it) => (
@@ -76,8 +76,10 @@ function isActive(itemPath, currentPath) {
 }
 
 function SidebarItem({ item, active }) {
-  const baseClasses = "sidebar-item text-sm";
-  const activeClasses = active ? "sidebar-item-active" : "";
+  const baseClasses = "sidebar-item text-sm flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200";
+  const activeClasses = active 
+    ? "bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-md shadow-orange-200" 
+    : "text-gray-700 hover:bg-orange-50 hover:text-orange-700";
 
   return (
     <Link
@@ -85,15 +87,15 @@ function SidebarItem({ item, active }) {
       className={`${baseClasses} ${activeClasses}`}
       aria-current={active ? "page" : undefined}
     >
-      <span className={`sidebar-icon ${active ? "text-primary-700" : "text-gray-400"}`}>
+      <span className={active ? "text-white" : "text-gray-400"}>
         <item.icon className="w-5 h-5" />
       </span>
 
-      <span className="flex-1">{item.label}</span>
+      <span className="flex-1 font-medium">{item.label}</span>
 
       {active && (
-        <span className="w-6 h-6 flex items-center justify-center rounded-full">
-          <svg className="w-4 h-4 text-gray-800" viewBox="0 0 24 24" fill="none">
+        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-white bg-opacity-20">
+          <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
             <circle cx="5" cy="12" r="1.5" fill="currentColor" />
             <circle cx="12" cy="12" r="1.5" fill="currentColor" />
             <circle cx="19" cy="12" r="1.5" fill="currentColor" />

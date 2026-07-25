@@ -19,11 +19,28 @@
   --color-primary-800: #1e40af;
   --color-primary-900: #1e3a8a;
 
+  /* Orange Theme Colors */
+  --color-orange-50: #fff4ed;
+  --color-orange-100: #ffe6d5;
+  --color-orange-200: #ffcca7;
+  --color-orange-300: #ffb380;
+  --color-orange-400: #ff9a59;
+  --color-orange-500: #ff8c42;
+  --color-orange-600: #ff6b35;
+  --color-orange-700: #e85a2b;
+  --color-orange-800: #d14921;
+  --color-orange-900: #b03819;
+
   /* Success Colors */
   --color-success-50: #f0fdf4;
   --color-success-100: #dcfce7;
   --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
   --color-success-700: #15803d;
+
+  /* WhatsApp Green */
+  --color-whatsapp: #25d366;
+  --color-whatsapp-dark: #1da851;
 
   /* Warning Colors */
   --color-warning-50: #fff7ed;
@@ -35,7 +52,8 @@
   --color-error-50: #fef2f2;
   --color-error-100: #fee2e2;
   --color-error-500: #ef4444;
-  --color-error-700: #dc2626;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
 
   /* Gray Scale */
   --color-gray-50: #f9fafb;
