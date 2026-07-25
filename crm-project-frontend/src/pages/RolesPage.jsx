@@ -3,8 +3,12 @@ import AddRoleForm from "../components/accounts/AddRoleForm";
 import { MdEdit , MdDelete } from "react-icons/md";
 import Swal from "sweetalert2";
 export default function RolePage({ baseApi, onClose, open = true }) {
-  const DEFAULT_API = "http://127.0.0.1:8000";
-  const BASE_API = baseApi ?? import.meta.env.VITE_BASE_API_URL ?? DEFAULT_API;
+  const BASE_API = baseApi || import.meta.env.VITE_BASE_API_URL;
+  console.log("RolesPage BASE_API =", BASE_API);
+
+  if (!BASE_API) {
+    console.error("RolesPage: VITE_BASE_API_URL is not defined!");
+  }
 
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);

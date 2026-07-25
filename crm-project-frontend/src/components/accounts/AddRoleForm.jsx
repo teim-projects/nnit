@@ -17,7 +17,12 @@ export default function AddRoleForm({ open, onClose, onSuccess, baseApi, initial
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const BASE_API = baseApi ?? "http://127.0.0.1:8000";
+  const BASE_API = baseApi || import.meta.env.VITE_BASE_API_URL;
+  console.log("AddRoleForm BASE_API =", BASE_API);
+
+  if (!BASE_API) {
+    console.error("AddRoleForm: VITE_BASE_API_URL is not defined!");
+  }
 
   const token = useMemo(() => {
     return (

@@ -3,7 +3,12 @@ import axios from "axios";
 import Swal from "sweetalert2";
 import QuotationTermsSelector from "../QuotationTermsSelector";
 
-const BASE_API = import.meta.env.VITE_BASE_API_URL ?? "http://127.0.0.1:8000";
+const BASE_API = import.meta.env.VITE_BASE_API_URL;
+console.log("AddQuotation BASE_API =", BASE_API);
+
+if (!BASE_API) {
+  console.error("AddQuotation: VITE_BASE_API_URL is not defined!");
+}
 
 const api = axios.create({ baseURL: `${BASE_API}/` });
 api.interceptors.request.use((cfg) => {

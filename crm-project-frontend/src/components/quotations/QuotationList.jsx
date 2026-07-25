@@ -10,7 +10,12 @@ import {
 } from "react-icons/md";
 import { FaWhatsapp } from "react-icons/fa";
 
-const BASE_API = import.meta.env.VITE_BASE_API_URL ?? "http://127.0.0.1:8000";
+const BASE_API = import.meta.env.VITE_BASE_API_URL;
+console.log("QuotationList BASE_API =", BASE_API);
+
+if (!BASE_API) {
+  console.error("QuotationList: VITE_BASE_API_URL is not defined!");
+}
 
 const api = axios.create({ baseURL: `${BASE_API}/` });
 api.interceptors.request.use((config) => {

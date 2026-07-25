@@ -12,7 +12,15 @@ import {
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
-const API_BASE_URL = 'http://localhost:8000/api/quotation';
+const API_BASE_URL = import.meta.env.VITE_BASE_API_URL 
+  ? `${import.meta.env.VITE_BASE_API_URL}/api/quotation`
+  : '/api/quotation';
+
+console.log("TermsManagement API_BASE_URL =", API_BASE_URL);
+
+if (!import.meta.env.VITE_BASE_API_URL) {
+  console.error("TermsManagement: VITE_BASE_API_URL is not defined!");
+}
 
 const TermsManagement = () => {
   const [terms, setTerms] = useState([]);

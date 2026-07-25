@@ -29,7 +29,13 @@ import {
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
 export default function Dashboard() {
-  const BASE_API = import.meta.env.VITE_BASE_API_URL ?? "http://127.0.0.1:8000";
+  const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  
+  console.log("Dashboard BASE_API =", BASE_API);
+  
+  if (!BASE_API) {
+    console.error("❌ VITE_BASE_API_URL is not defined in environment variables!");
+  }
   const [stats, setStats] = useState({
     totalLeads: 0,
     totalCustomers: 0,

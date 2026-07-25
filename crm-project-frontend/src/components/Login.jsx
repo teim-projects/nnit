@@ -650,7 +650,8 @@ function ParkingModel() {
 
 // ── MAIN APP ───────────────────────────────────────────────────────────
 export default function App() {
-  const BASE_API = "http://127.0.0.1:8000";
+  const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  console.log("Login BASE_API =", BASE_API);
 
   const [form, setForm] = useState({ email_or_mobile: "", password: "" });
   const [error, setError] = useState("");

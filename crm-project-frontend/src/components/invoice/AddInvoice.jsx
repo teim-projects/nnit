@@ -6,15 +6,16 @@ import useTermTypes from "../../hooks/useTermTypes";
 import ReusableForm from "../Form";
 import Swal from "sweetalert2";
 
+const BASE_API = import.meta.env.VITE_BASE_API_URL;
+console.log("AddInvoice BASE_API =", BASE_API);
 
-const BASE_API =
-  import.meta.env.VITE_BASE_API_URL;
+if (!BASE_API) {
+  console.error("AddInvoice: VITE_BASE_API_URL is not defined!");
+}
 
 const api = axios.create({
   baseURL: `${BASE_API}/`,
 });
-
-
 
 api.interceptors.request.use((config) => {
   const token =

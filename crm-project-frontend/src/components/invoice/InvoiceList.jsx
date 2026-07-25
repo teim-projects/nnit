@@ -3,8 +3,12 @@ import axios from "axios";
 import { FaWhatsapp } from "react-icons/fa";
 import { MdRemoveRedEye, MdDownload, MdEdit, MdDelete, MdEmail, MdHistory } from "react-icons/md";
 
-const BASE_API =
-  import.meta.env.VITE_BASE_API_URL;
+const BASE_API = import.meta.env.VITE_BASE_API_URL;
+console.log("InvoiceList BASE_API =", BASE_API);
+
+if (!BASE_API) {
+  console.error("InvoiceList: VITE_BASE_API_URL is not defined!");
+}
 
 const api = axios.create({
   baseURL: `${BASE_API}/`,

@@ -8,6 +8,12 @@ import TableView from "../components/TableView"; // <-- reusable table
 
 export default function Accounts() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  console.log("Accounts BASE_API =", BASE_API);
+
+  if (!BASE_API) {
+    console.error("Accounts: VITE_BASE_API_URL is not defined!");
+  }
+
   const initialFilters = useMemo(() => ({ search: "", role: "" }), []);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
 

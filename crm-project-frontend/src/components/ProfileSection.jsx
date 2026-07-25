@@ -3,6 +3,13 @@ import { useNavigate } from "react-router-dom";
 
 const ProfileSection = () => {
   const navigate = useNavigate();
+  const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  console.log("ProfileSection BASE_API =", BASE_API);
+
+  if (!BASE_API) {
+    console.error("ProfileSection: VITE_BASE_API_URL is not defined!");
+  }
+
   const [user, setUser] = useState({
     full_name: "",
     email: "",
@@ -23,7 +30,7 @@ const ProfileSection = () => {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_BASE_API_URL}/auth/dj-rest-auth/user/`,
+        `${BASE_API}/auth/dj-rest-auth/user/`,
         {
           method: "GET",
           headers: {
@@ -62,7 +69,7 @@ const ProfileSection = () => {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_BASE_API_URL}/auth/dj-rest-auth/user/`,
+        `${BASE_API}/auth/dj-rest-auth/user/`,
         {
           method: "PATCH",
           headers: {

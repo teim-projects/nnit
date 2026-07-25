@@ -19,7 +19,7 @@ export default function AddCategoryModal({ open, onClose, onSuccess, baseApi, to
     { value: 'pit_parking', label: 'Pit Parking', icon: '⬇️' },
     { value: 'cantilever', label: 'Cantilever Parking', icon: '🔧' },
   ];
-  const DEFAULT_API = "http://127.0.0.1:8000";
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     

@@ -87,7 +87,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'krishna_air.urls'
-CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS")
+CORS_ALLOW_ALL_ORIGINS = (
+    os.getenv("CORS_ALLOW_ALL_ORIGINS", "False").lower() == "true"
+)
 
 
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "")
@@ -176,7 +178,7 @@ DATABASES = {
         "NAME": "k_crm_db",
         "USER": "root",
         "PASSWORD": "",          # XAMPP default password is blank
-        "HOST": "127.0.0.1",
+        "HOST": "localhost",
         "PORT": "3306",
     }
 }

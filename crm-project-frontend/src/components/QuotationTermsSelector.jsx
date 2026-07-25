@@ -2,7 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, Plus, Trash2, Edit2, Check, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/quotation';
+const API_BASE_URL = import.meta.env.VITE_BASE_API_URL 
+  ? `${import.meta.env.VITE_BASE_API_URL}/api/quotation`
+  : '/api/quotation';
+
+console.log("QuotationTermsSelector API_BASE_URL =", API_BASE_URL);
+
+if (!import.meta.env.VITE_BASE_API_URL) {
+  console.error("QuotationTermsSelector: VITE_BASE_API_URL is not defined!");
+}
 
 const QuotationTermsSelector = ({ quotationId, onTermsChange }) => {
   const [masterTerms, setMasterTerms] = useState([]);
