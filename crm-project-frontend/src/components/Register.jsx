@@ -37,7 +37,12 @@ function ParkingBg() {
 
 export default function Register() {
   const navigate = useNavigate();
-  const BASE_API = import.meta.env.VITE_BASE_API_URL ?? "http://127.0.0.1:8000";
+  const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  console.log("Register BASE_API =", BASE_API);
+
+  if (!BASE_API) {
+    console.error("Register: VITE_BASE_API_URL is not defined!");
+  }
 
   const [form, setForm] = useState({ email: "", mobile_no: "", password1: "", password2: "" });
   const [error, setError] = useState("");

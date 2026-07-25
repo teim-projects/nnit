@@ -5,6 +5,12 @@ import ServiceManagementList from "../components/amc/ServiceManagementList";
 
 export default function AmcPage() {
   const baseApi = import.meta.env.VITE_BASE_API_URL;
+  console.log("AmcPage baseApi =", baseApi);
+
+  if (!baseApi) {
+    console.error("AmcPage: VITE_BASE_API_URL is not defined!");
+  }
+
   const [activeTab, setActiveTab] = useState("contracts");
   const [filters, setFilters] = useState({});
 

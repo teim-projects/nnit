@@ -24,9 +24,17 @@ const Navbar = ({ onMenuClick }) => {
     const token = localStorage.getItem("access");
     if (!token) return setIsAuthenticated(false);
 
+    const BASE_API = import.meta.env.VITE_BASE_API_URL;
+    console.log("Navbar BASE_API =", BASE_API);
+
+    if (!BASE_API) {
+      console.error("Navbar: VITE_BASE_API_URL is not defined!");
+      return handleLogout();
+    }
+
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_BASE_API_URL}/auth/dj-rest-auth/user/`,
+        `${BASE_API}/auth/dj-rest-auth/user/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

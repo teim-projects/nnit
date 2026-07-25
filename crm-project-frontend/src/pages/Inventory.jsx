@@ -13,6 +13,12 @@ import DeliveryChallan from '../components/inventory/DeliveryChallan';
 
 const Inventory = () => {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  console.log("Inventory BASE_API =", BASE_API);
+
+  if (!BASE_API) {
+    console.error("Inventory: VITE_BASE_API_URL is not defined!");
+  }
+
   const [activeTab, setActiveTab] = useState('vendor');
   const [filters, setFilters] = useState({});
 

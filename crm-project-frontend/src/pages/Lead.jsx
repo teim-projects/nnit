@@ -11,7 +11,14 @@ import AddQuotation from "../components/quotations/AddQuotation";
 
 
 export default function Lead() {
-  const BASE_API = import.meta.env.VITE_BASE_API_URL ?? "http://127.0.0.1:8000";
+  const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  
+  console.log("Lead BASE_API =", BASE_API);
+  
+  if (!BASE_API) {
+    console.error("❌ VITE_BASE_API_URL is not defined!");
+  }
+  
   const API_URL = `${BASE_API}/lead/lead/`;
 
   // ✅ Called hook to get user role

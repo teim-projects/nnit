@@ -148,8 +148,12 @@ export default function AddLeadFollowUpForm({
   leadId,
   followup = null,
 }) {
-  const DEFAULT_API = "http://127.0.0.1:8000";
-  const BASE_API = baseApi ?? DEFAULT_API;
+  const BASE_API = baseApi || import.meta.env.VITE_BASE_API_URL;
+  console.log("AddLeadFollowUpForm BASE_API =", BASE_API);
+
+  if (!BASE_API) {
+    console.error("AddLeadFollowUpForm: VITE_BASE_API_URL is not defined!");
+  }
 
   // Form state
   const [followupDate, setFollowupDate] = useState(followup?.followup_date ?? "");

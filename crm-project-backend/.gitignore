@@ -10,7 +10,7 @@ venv/
 .venv
 
 # Environment variables
-.env
+
 
 # Logs
 *.log

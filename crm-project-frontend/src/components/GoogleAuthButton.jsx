@@ -5,6 +5,11 @@ import { useNavigate } from "react-router-dom";
 const GoogleAuthButton = ({ endpoint, onSuccessNavigate }) => {
   const [message, setMessage] = useState("");
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  console.log("GoogleAuthButton BASE_API =", BASE_API);
+
+  if (!BASE_API) {
+    console.error("GoogleAuthButton: VITE_BASE_API_URL is not defined!");
+  }
 
   // Unified Google handler for login/register
   const handleGoogleSuccess = async (credentialResponse) => {

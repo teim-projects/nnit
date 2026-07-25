@@ -2,6 +2,12 @@ import React, { useState } from "react";
 
 const ForgotPassword = () => {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  console.log("ForgotPassword BASE_API =", BASE_API);
+
+  if (!BASE_API) {
+    console.error("ForgotPassword: VITE_BASE_API_URL is not defined!");
+  }
+
   const RESET_ENDPOINT = `${BASE_API}/auth/password-reset/`;
 
   const [email, setEmail] = useState("");

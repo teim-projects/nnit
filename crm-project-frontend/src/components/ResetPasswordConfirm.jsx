@@ -6,6 +6,12 @@ const ResetPasswordConfirm = () => {
   const navigate = useNavigate();
 
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  console.log("ResetPasswordConfirm BASE_API =", BASE_API);
+
+  if (!BASE_API) {
+    console.error("ResetPasswordConfirm: VITE_BASE_API_URL is not defined!");
+  }
+
   const CONFIRM_ENDPOINT = `${BASE_API}/auth/password-reset-confirm/`;
 
   const [newPassword, setNewPassword] = useState("");

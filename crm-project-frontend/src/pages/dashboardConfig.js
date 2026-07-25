@@ -1,4 +1,9 @@
 const BASE_API = import.meta.env.VITE_BASE_API_URL;
+console.log("dashboardConfig BASE_API =", BASE_API);
+
+if (!BASE_API) {
+  console.error("dashboardConfig: VITE_BASE_API_URL is not defined!");
+}
 
 export const dashboardConfig = [
   // Lead Count

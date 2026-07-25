@@ -34,7 +34,15 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/quotation';
+const API_BASE_URL = import.meta.env.VITE_BASE_API_URL 
+  ? `${import.meta.env.VITE_BASE_API_URL}/api/quotation`
+  : '/api/quotation';
+
+console.log("TermsConditions API_BASE_URL =", API_BASE_URL);
+
+if (!import.meta.env.VITE_BASE_API_URL) {
+  console.error("TermsConditions: VITE_BASE_API_URL is not defined!");
+}
 
 const TermsConditions = () => {
   const [terms, setTerms] = useState([]);

@@ -23,9 +23,13 @@ export default function Sidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
 
-  // NOTE: baseApi must be defined, assuming it's imported from environment or props
-  // We'll define it here based on common patterns:
-  const baseApi = import.meta.env.VITE_BASE_API_URL ?? "http://127.0.0.1:8000";
+  // Get BASE_API from environment
+  const baseApi = import.meta.env.VITE_BASE_API_URL;
+  console.log("Sidebar BASE_API =", baseApi);
+
+  if (!baseApi) {
+    console.error("Sidebar: VITE_BASE_API_URL is not defined!");
+  }
 
   // 2. ✅ Get the user role
   // Assuming useUserRole returns { userRole: { name: 'sales' }, ... }
