@@ -6,7 +6,7 @@ import { IoLogoWhatsapp } from "react-icons/io5";
 import { HiOutlineMail, HiOutlineUserGroup, HiOutlineClipboardList } from "react-icons/hi";
 
 // ----------------------------------------------------------------------
-// History Modal - SIMPLE WHITE WITH SOFT COLORS
+// History Modal - UPDATED WITH PROPER SIZE & SORTING
 // ----------------------------------------------------------------------
 const FollowupHistoryModal = ({ open, onClose, lead }) => {
   if (!open || !lead) return null;
@@ -15,22 +15,27 @@ const FollowupHistoryModal = ({ open, onClose, lead }) => {
   const sortedFollowups = [...(lead.followups || [])].sort((a, b) => {
     const dateA = new Date(a.followup_date);
     const dateB = new Date(b.followup_date);
-    return dateB - dateA;
+    return dateB - dateA; // Latest first
   });
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[10000]">
       <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-        {/* Header - Simple White */}
-        <div className="bg-white px-6 py-4 flex justify-between items-center border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Followup History</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+        {/* Header */}
+        <div className="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-10">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Followup History</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
             <MdClose className="w-6 h-6" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 bg-gray-50">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
           {sortedFollowups.length > 0 ? (
             <div className="space-y-4">
               {sortedFollowups.map((fu, idx) => {
@@ -42,215 +47,107 @@ const FollowupHistoryModal = ({ open, onClose, lead }) => {
                   fu.interaction_type === 'in_person' ? 'In-Person' :
                   fu.interaction_type === 'demo' ? 'Demo' :
                   fu.interaction_type === 'site_visit' ? 'Site Visit' : 'Call';
+                
+                const clientResponseLabel =
+                  fu.client_response === 'very_positive' ? 'Very Positive' :
+                  fu.client_response === 'positive' ? 'Positive' :
+                  fu.client_response === 'negative' ? 'Negative' :
+                  fu.client_response === 'no_response' ? 'No Response' :
+                  fu.client_response === 'call_back_later' ? 'Call Back Later' :
+                  'Neutral';
 
-                const hasQualifying = fu.qualifying_info && (
-                  fu.qualifying_info.site_location || 
-                  fu.qualifying_info.cars_required || 
-                  fu.qualifying_info.car_type || 
-                  fu.qualifying_info.budget_range ||
-                  fu.qualifying_info.installation_timeline ||
-                  fu.qualifying_info.basement_available ||
-                  fu.qualifying_info.pit_possible ||
-                  fu.qualifying_info.site_challenges
-                );
-
-                const hasRequirement = fu.requirement_info && (
-                  fu.requirement_info.site_length || 
-                  fu.requirement_info.site_width || 
-                  fu.requirement_info.site_height ||
-                  fu.requirement_info.preferred_parking_type ||
-                  fu.requirement_info.automation_required
-                );
+                const statusLabel = 
+                  fu.followup_status === 'completed' ? 'Completed' :
+                  fu.followup_status === 'pending' ? 'Pending' :
+                  'Completed';
 
                 return (
-                  <div key={fu.id || idx} className="bg-white border-2 border-gray-300 rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                    {/* Header */}
-                    <div className="px-6 py-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-gray-900 text-xl">{fu.followup_date || '—'}</span>
+                  <div key={fu.id || idx} className="border border-gray-300 rounded-xl p-5 bg-white">
+                    {/* Header Row */}
+                    <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="font-bold text-gray-900 text-lg">{fu.followup_date || '—'}</span>
                           <span className="text-gray-400">•</span>
-                          <span className="text-gray-600 font-medium">{interactionLabel}</span>
+                          <span className="text-gray-600 font-medium capitalize">{interactionLabel}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {fu.client_response && (
-                            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
-                              fu.client_response === 'very_positive' ? 'bg-green-100 text-green-700' :
-                              fu.client_response === 'positive' ? 'bg-green-100 text-green-700' :
-                              fu.client_response === 'negative' ? 'bg-red-100 text-red-700' :
-                              fu.client_response === 'call_back_later' ? 'bg-blue-100 text-blue-700' :
-                              'bg-gray-200 text-gray-700'
-                            }`}>
-                              {fu.client_response === 'very_positive' ? 'Very Positive' :
-                               fu.client_response === 'positive' ? 'Positive' :
-                               fu.client_response === 'negative' ? 'Negative' :
-                               fu.client_response === 'no_response' ? 'No Response' :
-                               fu.client_response === 'call_back_later' ? 'Call Back Later' : 'Neutral'}
-                            </span>
-                          )}
-                          <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-600 text-white">
-                            {fu.followup_status === 'completed' ? 'Completed' :
-                             fu.followup_status === 'pending' ? 'Pending' : 'Completed'}
-                          </span>
-                        </div>
+                        {(fu.created_by_full_name || fu.conducted_by || fu.contacted_person) && (
+                          <p className="text-sm text-gray-400">
+                            {(fu.created_by_full_name || fu.conducted_by) && (
+                              <span>By <strong className="text-gray-600">{fu.created_by_full_name || fu.conducted_by}</strong></span>
+                            )}
+                            {(fu.created_by_full_name || fu.conducted_by) && fu.contacted_person && <span> · </span>}
+                            {fu.contacted_person && <span>Contact: <strong className="text-gray-600">{fu.contacted_person}</strong></span>}
+                          </p>
+                        )}
                       </div>
-                      
-                      {(fu.created_by_full_name || fu.conducted_by || fu.contacted_person) && (
-                        <p className="text-sm text-gray-500 mb-3">
-                          {(fu.created_by_full_name || fu.conducted_by) && (
-                            <span>By <strong className="text-gray-700">{fu.created_by_full_name || fu.conducted_by}</strong></span>
-                          )}
-                          {(fu.created_by_full_name || fu.conducted_by) && fu.contacted_person && <span> · Contact </span>}
-                          {fu.contacted_person && <strong className="text-gray-700">{fu.contacted_person}</strong>}
-                        </p>
-                      )}
-
-                      {fu.faq_answers && fu.faq_answers.length > 0 && fu.faq_answers[0].answer && (
-                        <p className="text-sm text-blue-600 font-semibold mb-3">F001</p>
-                      )}
-
-                      {/* Discussion */}
-                      {(fu.remarks || fu.discussion_notes || fu.followup_summary) && (
-                        <p className="text-sm text-gray-700 leading-relaxed mb-4">
-                          {fu.remarks || fu.discussion_notes || fu.followup_summary}
-                        </p>
-                      )}
-
-                      {/* Commitments */}
-                      {(fu.client_commitment || fu.our_commitment) && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          {fu.client_commitment && (
-                            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                              <h5 className="text-xs font-bold text-green-700 uppercase mb-2">CLIENT COMMITMENT</h5>
-                              <p className="text-sm text-gray-800">{fu.client_commitment}</p>
-                            </div>
-                          )}
-                          {fu.our_commitment && (
-                            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                              <h5 className="text-xs font-bold text-blue-700 uppercase mb-2">OUR COMMITMENT</h5>
-                              <p className="text-sm text-gray-800">{fu.our_commitment}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Stage Progression */}
-                      {(fu.previous_stage || fu.current_stage) && (
-                        <div className="flex items-center gap-3 mb-4 text-sm">
-                          <span className="text-gray-500">Stage:</span>
-                          {fu.previous_stage && (
-                            <>
-                              <span className="text-gray-600 font-medium">{fu.previous_stage}</span>
-                              <span className="text-gray-400">→</span>
-                            </>
-                          )}
-                          {fu.current_stage && (
-                            <span className="text-blue-600 font-bold">{fu.current_stage}</span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-md text-xs font-semibold ${
+                          fu.client_response === 'very_positive' || fu.client_response === 'positive' ? 'bg-green-100 text-green-700' :
+                          fu.client_response === 'negative' ? 'bg-red-100 text-red-700' :
+                          fu.client_response === 'no_response' ? 'bg-gray-100 text-gray-600' :
+                          fu.client_response === 'call_back_later' ? 'bg-blue-100 text-blue-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {clientResponseLabel}
+                        </span>
+                        <span className={`px-3 py-1 rounded-md text-xs font-semibold ${
+                          fu.followup_status === 'completed' ? 'bg-gray-100 text-gray-700' :
+                          fu.followup_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {statusLabel}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Qualifying Info */}
-                    {hasQualifying && (
-                      <div className="mx-6 mb-4 bg-purple-50 rounded-xl p-4 border border-purple-200">
-                        <h5 className="text-sm font-bold text-purple-700 mb-3 flex items-center gap-2">
-                          <span className="w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs font-bold">Q</span>
-                          Qualifying Information
-                        </h5>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-sm">
-                          {fu.qualifying_info.site_location && (
-                            <div>
-                              <span className="text-purple-600 text-xs font-semibold block mb-1">Site Location</span>
-                              <span className="text-gray-900 font-medium">{fu.qualifying_info.site_location}</span>
-                            </div>
-                          )}
-                          {fu.qualifying_info.cars_required && (
-                            <div>
-                              <span className="text-purple-600 text-xs font-semibold block mb-1">Cars Required</span>
-                              <span className="text-gray-900 font-medium">{fu.qualifying_info.cars_required}</span>
-                            </div>
-                          )}
-                          {fu.qualifying_info.car_type && (
-                            <div>
-                              <span className="text-purple-600 text-xs font-semibold block mb-1">Car Type</span>
-                              <span className="text-gray-900 font-medium capitalize">{fu.qualifying_info.car_type}</span>
-                            </div>
-                          )}
-                          {fu.qualifying_info.budget_range && (
-                            <div>
-                              <span className="text-purple-600 text-xs font-semibold block mb-1">Budget Range</span>
-                              <span className="text-gray-900 font-medium">{fu.qualifying_info.budget_range}</span>
-                            </div>
-                          )}
-                          {fu.qualifying_info.installation_timeline && (
-                            <div>
-                              <span className="text-purple-600 text-xs font-semibold block mb-1">Timeline</span>
-                              <span className="text-gray-900 font-medium">{fu.qualifying_info.installation_timeline}</span>
-                            </div>
-                          )}
-                          {fu.qualifying_info.basement_available && (
-                            <div>
-                              <span className="text-purple-600 text-xs font-semibold block mb-1">Basement</span>
-                              <span className="text-gray-900 font-medium capitalize">{fu.qualifying_info.basement_available}</span>
-                            </div>
-                          )}
-                          {fu.qualifying_info.pit_possible && (
-                            <div>
-                              <span className="text-purple-600 text-xs font-semibold block mb-1">Pit Possible</span>
-                              <span className="text-gray-900 font-medium capitalize">{fu.qualifying_info.pit_possible}</span>
-                            </div>
-                          )}
-                          {fu.qualifying_info.site_challenges && (
-                            <div className="col-span-2 md:col-span-3">
-                              <span className="text-purple-600 text-xs font-semibold block mb-1">Site Challenges</span>
-                              <span className="text-gray-900 font-medium">{fu.qualifying_info.site_challenges}</span>
-                            </div>
-                          )}
-                        </div>
+                    {fu.faq_answers && fu.faq_answers.length > 0 && fu.faq_answers[0].answer && (
+                      <p className="text-sm text-gray-500 mb-1 uppercase tracking-wide font-medium">F001</p>
+                    )}
+
+                    {/* Discussion */}
+                    <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+                      {fu.remarks || fu.discussion_notes || fu.followup_summary || "No discussion notes recorded."}
+                    </p>
+
+                    {/* Commitments */}
+                    {(fu.client_commitment || fu.our_commitment) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        {fu.client_commitment && (
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <h5 className="text-xs font-bold text-green-700 uppercase mb-2">CLIENT COMMITMENT</h5>
+                            <p className="text-sm text-gray-700 font-medium">{fu.client_commitment}</p>
+                          </div>
+                        )}
+                        {fu.our_commitment && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h5 className="text-xs font-bold text-blue-700 uppercase mb-2">OUR COMMITMENT</h5>
+                            <p className="text-sm text-gray-700 font-medium">{fu.our_commitment}</p>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* Requirement Info */}
-                    {hasRequirement && (
-                      <div className="mx-6 mb-4 bg-orange-50 rounded-xl p-4 border border-orange-200">
-                        <h5 className="text-sm font-bold text-orange-700 mb-3 flex items-center gap-2">
-                          <span className="w-6 h-6 bg-orange-600 text-white rounded-full flex items-center justify-center text-xs font-bold">R</span>
-                          Requirement Details
-                        </h5>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-sm">
-                          {fu.requirement_info.site_length && (
-                            <div>
-                              <span className="text-orange-600 text-xs font-semibold block mb-1">Dimensions</span>
-                              <span className="text-gray-900 font-medium">
-                                {fu.requirement_info.site_length} × {fu.requirement_info.site_width || '—'} × {fu.requirement_info.site_height || '—'} ft
-                              </span>
-                            </div>
-                          )}
-                          {fu.requirement_info.preferred_parking_type && (
-                            <div>
-                              <span className="text-orange-600 text-xs font-semibold block mb-1">Parking Type</span>
-                              <span className="text-gray-900 font-medium">{fu.requirement_info.preferred_parking_type}</span>
-                            </div>
-                          )}
-                          {fu.requirement_info.automation_required && (
-                            <div>
-                              <span className="text-orange-600 text-xs font-semibold block mb-1">Automation</span>
-                              <span className="text-gray-900 font-medium">{fu.requirement_info.automation_required}</span>
-                            </div>
+                    {/* Stage Progression */}
+                    {(fu.previous_stage || fu.current_stage || fu.next_followup_date) && (
+                      <div className="flex items-center justify-between text-sm flex-wrap pt-3 border-t border-gray-200">
+                        <div className="flex items-center gap-3">
+                          {fu.previous_stage && fu.current_stage && (
+                            <>
+                              <span className="text-gray-400 font-medium">Stage:</span>
+                              <span className="text-gray-500 font-medium">{fu.previous_stage}</span>
+                              <span className="text-gray-400">→</span>
+                              <span className="text-blue-600 font-semibold">{fu.current_stage}</span>
+                            </>
                           )}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Next Follow-up */}
-                    {fu.next_followup_date && (
-                      <div className="px-6 pb-4 flex items-center justify-between text-sm border-t border-gray-100 pt-3">
-                        <span className="text-gray-500">Next Follow-up:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-gray-900">{fu.next_followup_date}</span>
-                          <span className="text-gray-400 text-xs">via {interactionLabel.toLowerCase()}</span>
-                        </div>
+                        {fu.next_followup_date && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400 font-medium">Next:</span>
+                            <span className="font-bold text-gray-700">{fu.next_followup_date}</span>
+                            <span className="text-gray-400 text-xs">via {interactionLabel.toLowerCase()}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -258,7 +155,7 @@ const FollowupHistoryModal = ({ open, onClose, lead }) => {
               })}
             </div>
           ) : (
-            <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-300">
+            <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-xl">
               <p className="text-sm text-gray-400 font-semibold">No follow-ups recorded yet.</p>
             </div>
           )}

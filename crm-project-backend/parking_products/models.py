@@ -135,7 +135,7 @@ class ParkingProduct(models.Model):
     is_featured = models.BooleanField(default=False)
     
     # Images
-    image_url = models.URLField(blank=True, null=True)
+    image_url = models.URLField(blank=True, null=True, help_text="External image URL (optional)")
     brochure_url = models.URLField(blank=True, null=True)
     
     # Metadata

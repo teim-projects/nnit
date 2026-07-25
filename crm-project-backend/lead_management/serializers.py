@@ -65,6 +65,7 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
         source="created_by.first_name",
         read_only=True
     )
+    created_by_full_name = serializers.SerializerMethodField()
 
     class Meta:
         model = LeadFollowUp
@@ -73,20 +74,43 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
             "lead",
             "lead_customer_name",
             "followup_date",
+            "followup_time",
             "next_followup_date",
             "remarks",
             "discussion_notes",
+            # Interaction details
+            "interaction_type",
+            "client_response",
+            "followup_status",
+            # People
+            "conducted_by",
+            "contacted_person",
+            # Summary and commitments
+            "followup_summary",
+            "client_commitment",
+            "our_commitment",
+            # Stage
+            "previous_stage",
+            "current_stage",
+            # Status and solutions
             "status",
             "suggested_solution",
             "qualifying_info",
             "requirement_info",
+            # Meta
             "created_by",
             "created_by_name",
+            "created_by_full_name",
             "created_at",
             "updated_at",
             "faq_answers",
         ]
         read_only_fields = ["id", "created_by", "created_at", "updated_at"]
+
+    def get_created_by_full_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
+        return None
 
     @transaction.atomic
     def create(self, validated_data):
