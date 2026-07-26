@@ -30,10 +30,15 @@ class CustomerViewsets(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Only show REAL customers (is_lead_only=False).
-        Customers created from leads (is_lead_only=True) are hidden here
-        until they are explicitly converted via "Convert to Customer".
+        For list/filter: only show REAL customers (is_lead_only=False).
+        For detail actions (retrieve, update, partial_update, destroy):
+        show ALL customers so lead-only customers can be updated.
         """
+        # Detail actions need access to ALL customers (including lead-only)
+        if self.action in ('retrieve', 'update', 'partial_update', 'destroy',
+                           'customer_leads', 'followup_history'):
+            return Customer.objects.all().order_by('-id')
+        # List/filter: only real customers
         return Customer.objects.filter(is_lead_only=False).order_by('-id')
 
     @action(detail=False, methods=['get'], url_path='lookup')
@@ -114,6 +119,29 @@ class LeadViewSet(viewsets.ModelViewSet):
 
         serializer.save(**data)
 
+    def perform_update(self, serializer):
+        """
+        Explicit partial update — passes partial=True so missing fields
+        are not treated as required. Also catches Django ValidationError
+        from model.clean() and converts it to a DRF-friendly 400 response.
+        """
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+        try:
+            serializer.save()
+        except DjangoValidationError as exc:
+            raise DRFValidationError(detail=exc.message_dict if hasattr(exc, 'message_dict') else exc.messages)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """Delete lead and return 204."""
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     def get_queryset(self):
         user = self.request.user
         today = timezone.localdate()
@@ -176,13 +204,15 @@ class LeadViewSet(viewsets.ModelViewSet):
 
         # Mark customer as a real customer (visible in Customers page)
         customer.is_lead_only = False
-        customer.save(update_fields=['is_lead_only'])
+        Customer.objects.filter(pk=customer.pk).update(is_lead_only=False)
 
         # Mark lead as converted
-        lead.is_converted = True
-        lead.converted_at = timezone.now()
-        lead.status = 'closed'
-        lead.save(update_fields=['is_converted', 'converted_at', 'status'])
+        lead_management.objects.filter(pk=lead.pk).update(
+            is_converted=True,
+            converted_at=timezone.now(),
+            status='closed',
+        )
+        lead.refresh_from_db()
 
         return Response(
             {

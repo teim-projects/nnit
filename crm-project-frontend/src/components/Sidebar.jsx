@@ -7,19 +7,18 @@ import { useUserRole } from "../hooks/useAuth";
    1. Define items (moved inside component setup scope for clarity/safety)
    ---------------------- */
 const allItems = [
-  { key: "home", label: "Home", icon: HomeIcon, path: "/dashboard" },
-  { key: "leads", label: "Leads", icon: TargetIcon, path: "/leads" },
-  { key: "contacts", label: "Contacts", icon: UserIcon, path: "/customer" },
-  { key: "accounts", label: "Accounts", icon: BuildingIcon, path: "/accounts" }, // <-- Item to hide
- 
-  { key: "quotes", label: "Quotes", icon: QuoteIcon, path: "/quotation" },
-  
+  { key: "home",       label: "Home",              icon: HomeIcon,     path: "/dashboard" },
+  { key: "leads",      label: "Leads",             icon: TargetIcon,   path: "/leads" },
+  { key: "followups",  label: "Follow-up Mgmt",    icon: FollowupIcon, path: "/followup-management" },
+  { key: "contacts",   label: "Contacts",          icon: UserIcon,     path: "/customer" },
+  { key: "accounts",   label: "Accounts",          icon: BuildingIcon, path: "/accounts" },
+  { key: "quotes",     label: "Quotes",            icon: QuoteIcon,    path: "/quotation" },
   { key: "parking-products", label: "Parking Products", icon: ParkingIcon, path: "/parking-products" },
-  { key: "terms", label: "Terms & Conditions", icon: DocumentIcon, path: "/terms-conditions" },
-  { key: "amc", label: "AMC", icon: AmcIcon, path: "/amc" },
+  { key: "terms",      label: "Terms & Conditions",icon: DocumentIcon, path: "/terms-conditions" },
+  { key: "amc",        label: "AMC",               icon: AmcIcon,      path: "/amc" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }) {
   const location = useLocation();
   const currentPath = location.pathname;
 
@@ -48,7 +47,11 @@ export default function Sidebar() {
 
       // Rule: Hide 'accounts' if the user role is 'sales'
       if (item.key === 'accounts' && roleName === 'sales') {
-        return false; // Exclude this item
+        return false;
+      }
+      if (item.key === 'followups' && roleName === 'sales') {
+        // sales can see followup management
+        return true;
       }
 
       // Include all other items
@@ -58,11 +61,10 @@ export default function Sidebar() {
 
 
   return (
-    <aside className="w-55 bg-gradient-to-b from-white via-orange-50 to-blue-50 border-r border-orange-100 min-h-screen px-3 py-4">
-      <nav className="space-y-1">
-        {/* 4. ✅ Render the filtered items */}
+    <aside className="w-full bg-white border-r border-slate-100 h-full px-4 py-4">
+      <nav className="space-y-0.5">
         {filteredItems.map((it) => (
-          <SidebarItem key={it.key} item={it} active={isActive(it.path, currentPath)} />
+          <SidebarItem key={it.key} item={it} active={isActive(it.path, currentPath)} onNavigate={onNavigate} />
         ))}
       </nav>
     </aside>
@@ -75,32 +77,27 @@ function isActive(itemPath, currentPath) {
   return currentPath === itemPath || currentPath.startsWith(itemPath + "/");
 }
 
-function SidebarItem({ item, active }) {
-  const baseClasses = "sidebar-item text-sm flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200";
-  const activeClasses = active 
-    ? "bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-md shadow-orange-200" 
-    : "text-gray-700 hover:bg-orange-50 hover:text-orange-700";
+function SidebarItem({ item, active, onNavigate }) {
+  const baseClasses = "sidebar-item text-sm flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150";
+  const activeClasses = active
+    ? "bg-indigo-50 text-indigo-700 font-semibold"
+    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900";
 
   return (
     <Link
       to={item.path || "#"}
+      onClick={onNavigate}
       className={`${baseClasses} ${activeClasses}`}
       aria-current={active ? "page" : undefined}
     >
-      <span className={active ? "text-white" : "text-gray-400"}>
-        <item.icon className="w-5 h-5" />
+      <span className={active ? "text-indigo-500" : "text-slate-400"}>
+        <item.icon className="w-4.5 h-4.5" />
       </span>
 
       <span className="flex-1 font-medium">{item.label}</span>
 
       {active && (
-        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-white bg-opacity-20">
-          <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
-            <circle cx="5" cy="12" r="1.5" fill="currentColor" />
-            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-            <circle cx="19" cy="12" r="1.5" fill="currentColor" />
-          </svg>
-        </span>
+        <span className="w-1.5 h-4 bg-indigo-500 rounded-full" />
       )}
     </Link>
   );
@@ -147,6 +144,15 @@ function QuoteIcon(props) {
   return (
     <svg {...props} viewBox="0 0 24 24" fill="none">
       <path d="M9 7h6v6H9zM3 7h6v6H3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function FollowupIcon(props) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="none">
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 12h6M9 16h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }

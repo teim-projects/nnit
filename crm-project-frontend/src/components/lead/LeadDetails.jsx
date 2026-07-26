@@ -518,7 +518,7 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
 
   // ── Modal (original) wrapper ──────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 md:p-6 lg:p-8 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4 md:p-6 lg:p-8 backdrop-blur-sm">
       {/* Container wrapper keeping modal to comfortable, responsive sizes */}
       <div className="bg-[#f8fafc] rounded-2xl shadow-2xl w-full max-w-7xl h-full max-h-[92vh] flex flex-col overflow-hidden text-gray-800 border border-gray-100">
         

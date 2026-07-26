@@ -1,9 +1,30 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 /* ===================================
-   NNIT CRM - Custom Design Tokens
-   Tailwind CSS v4 - CSS-first Configuration
+   NNIT CRM — Global Base
    =================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: #1e293b;
+  background-color: #f8fafc;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Ensure all modals sit above the navbar (z-[1000]) ── */
+[class*="z-[1050]"],
+[class*="z-[9999]"] {
+  z-index: 1050 !important;
+}
+
+
 
 /* Custom Theme Variables */
 @theme {

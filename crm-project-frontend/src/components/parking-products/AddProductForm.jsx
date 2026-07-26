@@ -124,7 +124,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-100 z-50 overflow-y-auto">
+    <div className="fixed inset-0 bg-gray-100 z-[1050] overflow-y-auto">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-4">

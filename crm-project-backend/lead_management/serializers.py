@@ -146,7 +146,7 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
 class LeadSerializer(serializers.ModelSerializer):
     FIXED_SOURCES = [
         'google_ads', 'indiamart', 'bni', 'justdial', 'reference',
-        'architect/interior_designe', 'builder', 'existing_customer',
+        'architect/interior_designer', 'builder', 'existing_customer',
         'scgt', 'ka_staff', 'other',
     ]
 
@@ -232,9 +232,23 @@ class LeadSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        changed_fields = []
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        instance.save()
+            changed_fields.append(attr)
+
+        # Always include updated_at
+        changed_fields.append('updated_at')
+
+        try:
+            instance.save(update_fields=changed_fields)
+        except DjangoValidationError as exc:
+            raise DRFValidationError(
+                detail=exc.message_dict if hasattr(exc, 'message_dict') else exc.messages
+            )
         return instance
 
     def validate_lead_source(self, value):

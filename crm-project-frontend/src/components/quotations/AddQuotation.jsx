@@ -177,8 +177,8 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 overflow-y-auto py-6">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg my-auto">
+    <div className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 px-4 overflow-y-auto py-20">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-auto">
 
         <div className="px-6 pt-6 pb-1">
           <h2 className="text-xl font-semibold text-slate-800">

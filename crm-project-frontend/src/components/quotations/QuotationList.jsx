@@ -82,7 +82,7 @@ function SendModal({ quotation, version, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute right-3 top-3 text-slate-500 hover:text-slate-900"><MdClose size={20} /></button>
         <h3 className="text-lg font-bold mb-4">Send Quotation</h3>

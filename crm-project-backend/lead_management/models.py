@@ -105,7 +105,10 @@ class lead_management(models.Model):
             raise ValidationError({"followup_date": "followup_date cannot be before date."})
 
     def save(self, *args, **kwargs):
-        self.full_clean()
+        # Only run full_clean on new instances (create), not on updates
+        # Updates are validated at the serializer level
+        if not self.pk:
+            self.full_clean()
         super().save(*args, **kwargs)
 
 
@@ -261,7 +264,13 @@ class LeadFollowUp(models.Model):
         lead.followup_date = self.next_followup_date or self.followup_date
         if self.remarks:
             lead.remarks = self.remarks
-        lead.save(update_fields=["status", "followup_date", "last_followup_date", "remarks"])
+        # Use update_fields to bypass full_clean on the lead model
+        lead_management.objects.filter(pk=lead.pk).update(
+            status=lead.status,
+            last_followup_date=lead.last_followup_date,
+            followup_date=lead.followup_date,
+            remarks=lead.remarks,
+        )
 
 
 # Lead FAQ

@@ -5,7 +5,7 @@ import Swal from "sweetalert2";
 import AddCustomerForm from "../components/customers/AddCustomerForm";
 import CustomerDetails from "../components/customers/CustomerDetails";
 import { IoLogoWhatsapp } from "react-icons/io5";
-import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd } from "react-icons/md";
+import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd, MdEdit } from "react-icons/md";
 
 export default function Customer() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
@@ -174,35 +174,47 @@ export default function Customer() {
       <div className="flex items-center justify-center gap-1">
         <button
           onClick={handleWhatsApp}
-          className="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
+          className="inline-flex items-center px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium transition-colors"
           title="Send WhatsApp"
         >
           <IoLogoWhatsapp className="w-3.5 h-3.5" />
         </button>
-        
+
         <button
           onClick={handleEmail}
-          className="inline-flex items-center px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+          className="inline-flex items-center px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-medium transition-colors"
           title="Send Email"
         >
           <MdEmail className="w-3.5 h-3.5" />
         </button>
-        
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditingCustomer(row);
+            setShowCustomerForm(true);
+          }}
+          className="inline-flex items-center px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-xs font-medium transition-colors"
+          title="Edit Customer"
+        >
+          <MdEdit className="w-3.5 h-3.5" />
+        </button>
+
         <button
           onClick={handleDeleteClick}
-          className="inline-flex items-center px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+          className="inline-flex items-center px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-medium transition-colors"
           title="Delete"
         >
           <MdDelete className="w-3.5 h-3.5" />
         </button>
-        
+
         <button
           onClick={() => setDetailCustomerId(row.id)}
-          className="inline-flex items-center px-2 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs font-medium transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-medium transition-colors"
           title="View Details"
         >
           <MdRemoveRedEye className="w-3.5 h-3.5" />
-          <span className="ml-1">View</span>
+          <span>View</span>
         </button>
       </div>
     );
@@ -238,7 +250,7 @@ export default function Customer() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-orange-600 hover:bg-orange-700 text-white font-medium transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm"
               >
                 <MdAdd className="w-5 h-5" />
                 Add Customer
