@@ -130,7 +130,14 @@ export default function Sidebar({ onNavigate }) {
           { key: "amc", label: "AMC & Renewals", icon: AmcIcon, path: "/amc" },
         ],
       },
-      // FINANCE removed
+      // *** NEW FINANCE SECTION with Accounts ***
+      {
+        key: "USER MANAGEMENT",
+        label: "USER MANAGEMENT",
+        children: [
+          { key: "accounts", label: "Accounts", icon: BuildingIcon, path: "/accounts" },
+        ],
+      },
       {
         key: "intelligence",
         label: "INTELLIGENCE",
@@ -152,6 +159,7 @@ export default function Sidebar({ onNavigate }) {
       .map((section) => ({
         ...section,
         children: section.children.filter((child) => {
+          // Hide Accounts for sales role
           if (child.key === 'accounts' && roleName === 'sales') return false;
           return true;
         }),
@@ -189,7 +197,6 @@ export default function Sidebar({ onNavigate }) {
           const sectionActive = isSectionActive(section);
           return (
             <div key={section.key} className="mt-3 first:mt-1">
-              {/* Section heading – now larger and bolder */}
               <div className="flex items-center gap-2 px-3 py-1.5">
                 <span
                   className={`text-sm font-bold uppercase tracking-wider ${
@@ -200,8 +207,6 @@ export default function Sidebar({ onNavigate }) {
                 </span>
                 <span className="flex-1 h-px bg-slate-200/50" />
               </div>
-
-              {/* Children */}
               <div className="ml-1 space-y-0.5">
                 {section.children.map((child) => (
                   <SidebarItem
