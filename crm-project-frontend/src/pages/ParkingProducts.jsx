@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MdAdd, MdCategory } from 'react-icons/md';
+import { MdAdd, MdCategory, MdSearch, MdEdit, MdDelete } from 'react-icons/md';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import Base from '../components/Base';
@@ -38,21 +38,16 @@ export default function ParkingProducts() {
     fetchProducts();
   }, []);
 
-  // ✅ FIXED: handle paginated response
   const fetchCategories = async () => {
     try {
       const response = await axios.get(`${BASE_API}/parking/categories/`, { headers });
-      console.log("Categories API:", response.data); // debug log
-
-      // If response.data is an array, use it directly; otherwise extract results
       const data = Array.isArray(response.data)
         ? response.data
         : response.data.results || [];
-
       setCategories(data);
     } catch (error) {
       console.error('Error fetching categories:', error);
-      setCategories([]); // fallback to empty array
+      setCategories([]);
     }
   };
 
@@ -117,18 +112,18 @@ export default function ParkingProducts() {
     <Base title="Parking Products">
       <div className="space-y-6">
         {/* Header */}
-        <div className="bg-white p-6 rounded-lg shadow-sm">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Parking Products</h2>
-              <p className="text-sm text-gray-600 mt-1">Manage parking solution catalog</p>
+              <h2 className="text-2xl font-black text-gray-900">Parking Products</h2>
+              <p className="text-sm font-semibold text-gray-500 mt-1">Manage parking solution catalog</p>
             </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowCategoryModal(true)}
-                className="btn-secondary flex items-center gap-2"
+                className="btn-secondary flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-bold text-sm transition"
               >
-                <MdCategory className="w-4 h-4" />
+                <MdCategory className="w-5 h-5" />
                 Add Category
               </button>
               <button
@@ -136,7 +131,7 @@ export default function ParkingProducts() {
                   setEditingProduct(null);
                   setShowProductForm(true);
                 }}
-                className="btn-primary flex items-center gap-2"
+                className="btn-primary flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition shadow-sm"
               >
                 <MdAdd className="w-5 h-5" />
                 Add Product
@@ -145,23 +140,23 @@ export default function ParkingProducts() {
           </div>
         </div>
 
-        {/* Category Cards – now safe even if categories is not an array */}
+        {/* Category Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {Array.isArray(categories) && categories.length > 0 ? (
             categories.map((category) => (
               <div
                 key={category.id}
-                className="bg-white p-5 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                className="bg-white p-5 rounded-xl border border-gray-200 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
+                  <div className="w-11 h-11 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
                     <span className="text-2xl">{category.icon || '🏗️'}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 text-sm truncate">
+                    <h3 className="font-bold text-gray-900 text-sm truncate">
                       {category.display_name}
                     </h3>
-                    <p className="text-2xl font-bold text-primary-600 mt-1">
+                    <p className="text-2xl font-black text-blue-600 mt-0.5">
                       {getCategoryCount(category.display_name)}
                     </p>
                   </div>
@@ -169,140 +164,159 @@ export default function ParkingProducts() {
               </div>
             ))
           ) : (
-            <div className="col-span-full text-center py-6 text-gray-500">
+            <div className="col-span-full text-center py-6 text-gray-500 bg-white rounded-xl border border-gray-200 font-medium">
               No categories found. Add a category to get started.
             </div>
           )}
         </div>
 
-        {/* Product Catalog Table */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Product Catalog</h3>
+        {/* Product Catalog - Enhanced Larger & Bold Cards */}
+        <div>
+          <div className="mb-5">
+            <h3 className="text-xl font-bold text-gray-900">Product Catalog</h3>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Product Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Capacity
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Levels
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Operation
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Automation
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Pit Required
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Min. Dimensions
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Price
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {loading ? (
-                  <tr>
-                    <td colSpan="10" className="px-6 py-8 text-center text-gray-500">
-                      Loading products...
-                    </td>
-                  </tr>
-                ) : products.length === 0 ? (
-                  <tr>
-                    <td colSpan="10" className="px-6 py-8 text-center text-gray-500">
-                      No products found. Add your first parking product!
-                    </td>
-                  </tr>
-                ) : (
-                  products.map((product) => (
-                    <tr key={product.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{product.product_name}</div>
-                        {product.product_code && (
-                          <div className="text-xs text-gray-500">{product.product_code}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          product.category_name === 'Stack Parking' ? 'bg-blue-100 text-blue-700' :
-                          product.category_name === 'Puzzle Parking' ? 'bg-purple-100 text-purple-700' :
-                          product.category_name === 'Tower Parking' ? 'bg-green-100 text-green-700' :
-                          product.category_name === 'Pit Parking' ? 'bg-orange-100 text-orange-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {product.category_name}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        <span className="flex items-center gap-1">
-                          🚗 {product.car_capacity} cars
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {product.levels}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 capitalize">
-                        {product.operation_type}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 capitalize">
-                        {product.automation_type?.replace('_', ' ')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded ${
-                          product.pit_required
-                            ? 'bg-black text-white'
-                            : 'bg-gray-200 text-gray-700'
-                        }`}>
-                          {product.pit_required ? 'Yes' : 'No'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {product.min_length}m × {product.min_width}m × {product.min_height}m
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {product.base_price
-                          ? `₹${parseFloat(product.base_price).toFixed(2)}L`
-                          : '—'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleEditProduct(product)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProduct(product.id)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium"
-                          >
-                            Delete
-                          </button>
+          {loading ? (
+            <div className="bg-white p-12 text-center text-gray-500 rounded-2xl shadow-sm border border-gray-100 font-semibold">
+              Loading products...
+            </div>
+          ) : products.length === 0 ? (
+            <div className="bg-white p-12 text-center text-gray-500 rounded-2xl shadow-sm border border-gray-100 font-semibold">
+              No products found. Add your first parking product!
+            </div>
+          ) : (
+            /* Reduced to maximum 2 columns on extra-large screens to increase card size */
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+              {products.map((product) => (
+                <div
+                  key={product.id}
+                  className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between"
+                >
+                  {/* Top Section with Larger Padding */}
+                  <div className="p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        {/* Enlarged Image / Thumbnail Placeholder */}
+                        <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200 shadow-inner">
+                          {product.display_image || product.image || product.image_url ? (
+                            <img
+                              src={product.display_image || product.image || product.image_url}
+                              alt={product.product_name}
+                              className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                            />
+                          ) : (
+                            <span className="text-3xl">🚗</span>
+                          )}
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+
+                        {/* Title & Code */}
+                        <div className="space-y-0.5">
+                          <h4 className="font-bold text-gray-900 text-base leading-snug">
+                            {product.product_name}
+                          </h4>
+                          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+                            CODE: {product.product_code || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Status & Category Badges */}
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <span className="px-2.5 py-0.5 text-xs font-semibold tracking-wide text-emerald-700 bg-emerald-100/80 rounded-full uppercase">
+                          ACTIVE
+                        </span>
+                        {product.category_name && (
+                          <span className="px-2.5 py-0.5 text-xs font-semibold tracking-wide text-blue-700 bg-blue-100/80 rounded-full">
+                            {product.category_name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Specification Text */}
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      {product.description ? (
+                        <p className="text-sm font-normal text-gray-600 leading-relaxed line-clamp-3">
+                          {product.description}
+                        </p>
+                      ) : (
+                        <p className="text-sm font-normal text-gray-600 leading-relaxed">
+                          <span className="font-medium text-gray-900">Capacity:</span> <strong className="font-semibold text-blue-700">{product.car_capacity} cars</strong> | 
+                          <span className="font-medium text-gray-900"> Levels:</span> <strong className="font-semibold text-gray-800">{product.levels}</strong> | 
+                          <span className="font-medium text-gray-900"> Operation:</span> <strong className="font-semibold text-gray-800">{product.operation_type}</strong> | 
+                          <span className="font-medium text-gray-900"> Pit:</span> <strong className="font-semibold text-gray-800">{product.pit_required ? 'Yes' : 'No'}</strong>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Bottom Stats & Action Bar */}
+                  <div className="py-3.5 px-6 border-t border-gray-100 bg-slate-50/80 flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      {/* Base Price */}
+                      <div>
+                        <span className="block text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
+                          PRICE
+                        </span>
+                        <span className="text-sm font-bold text-gray-900">
+                          {product.base_price
+                            ? `₹${parseFloat(product.base_price).toFixed(2)}L`
+                            : '—'}
+                        </span>
+                      </div>
+
+                      {/* Capacity */}
+                      <div>
+                        <span className="block text-[10px] font-black tracking-widest text-gray-400 uppercase">
+                          CAPACITY
+                        </span>
+                        <span className="text-sm font-bold text-gray-800">
+                          {product.car_capacity} Cars
+                        </span>
+                      </div>
+
+                      {/* Dimensions */}
+                      <div>
+                        <span className="block text-[10px] font-black tracking-widest text-gray-400 uppercase">
+                          MIN. DIM (LxWxH)
+                        </span>
+                        <span className="text-sm font-bold text-gray-800">
+                          {product.min_length && product.min_width && product.min_height
+                            ? `${product.min_length}x${product.min_width}x${product.min_height}m`
+                            : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 text-gray-500">
+                      <button
+                        onClick={() => handleEditProduct(product)}
+                        title="View Details"
+                        className="hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        <MdSearch className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleEditProduct(product)}
+                        title="Edit Product"
+                        className="hover:text-slate-900 p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
+                      >
+                        <MdEdit className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product.id)}
+                        title="Delete Product"
+                        className="hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <MdDelete className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -334,7 +348,7 @@ export default function ParkingProducts() {
             setEditingProduct(null);
           }}
           product={editingProduct}
-          categories={categories} // now always an array
+          categories={categories}
           baseApi={BASE_API}
           token={token}
         />

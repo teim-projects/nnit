@@ -105,12 +105,57 @@ class lead_management(models.Model):
             raise ValidationError({"followup_date": "followup_date cannot be before date."})
 
     def save(self, *args, **kwargs):
-        self.full_clean()
+        # Only run full_clean on new instances (create), not on updates
+        # Updates are validated at the serializer level
+        if not self.pk:
+            self.full_clean()
         super().save(*args, **kwargs)
 
 
 # ❌ REMOVED: lead_product model (no longer needed)
 # ❌ REMOVED: LeadFollowUpProduct model (no longer needed)
+
+# Interaction type choices
+class InteractionType(models.TextChoices):
+    CALL = 'call', 'Call'
+    WHATSAPP = 'whatsapp', 'WhatsApp'
+    EMAIL = 'email', 'Email'
+    VIDEO_CALL = 'video_call', 'Video Call'
+    IN_PERSON = 'in_person', 'In-Person'
+    DEMO = 'demo', 'Demo'
+    SITE_VISIT = 'site_visit', 'Site Visit'
+
+
+# Client Response/Sentiment choices
+class ClientResponseType(models.TextChoices):
+    VERY_POSITIVE = 'very_positive', 'Very Positive'
+    POSITIVE = 'positive', 'Positive'
+    NEUTRAL = 'neutral', 'Neutral'
+    NEGATIVE = 'negative', 'Negative'
+    NO_RESPONSE = 'no_response', 'No Response'
+    CALL_BACK_LATER = 'call_back_later', 'Call Back Later'
+
+
+# Follow-up status
+class FollowUpStatus(models.TextChoices):
+    COMPLETED = 'completed', 'Completed'
+    PENDING = 'pending', 'Pending'
+    SCHEDULED = 'scheduled', 'Scheduled'
+
+
+# Car type choices
+class CarType(models.TextChoices):
+    SEDAN = 'sedan', 'Sedan'
+    SUV = 'suv', 'SUV'
+    HATCHBACK = 'hatchback', 'Hatchback'
+    MIXED = 'mixed', 'Mixed'
+
+
+# Yes/No choices
+class YesNoChoice(models.TextChoices):
+    YES = 'yes', 'Yes'
+    NO = 'no', 'No'
+
 
 # Lead Followup
 class LeadFollowUp(models.Model):
@@ -120,20 +165,81 @@ class LeadFollowUp(models.Model):
         related_name='followups'
     )
     followup_date = models.DateField()
+    followup_time = models.TimeField(blank=True, null=True)
     next_followup_date = models.DateField(blank=True, null=True)
     remarks = models.TextField(blank=True, null=True)
     discussion_notes = models.TextField(blank=True, null=True)
+    
+    # Interaction details - matching form exactly
+    interaction_type = models.CharField(
+        max_length=20,
+        choices=InteractionType.choices,
+        default=InteractionType.CALL,
+        help_text="Follow-up mode: Call, WhatsApp, Email, Video Call, In-Person, Demo, Site Visit"
+    )
+    client_response = models.CharField(
+        max_length=20,
+        choices=ClientResponseType.choices,
+        default=ClientResponseType.NEUTRAL,
+        help_text="Client's response sentiment"
+    )
+    followup_status = models.CharField(
+        max_length=20,
+        choices=FollowUpStatus.choices,
+        default=FollowUpStatus.COMPLETED
+    )
+    
+    # Conducted by and contacted person
+    conducted_by = models.CharField(max_length=200, blank=True, null=True, help_text="Team member who conducted the follow-up")
+    contacted_person = models.CharField(max_length=200, blank=True, null=True, help_text="Person contacted during follow-up")
+    
+    # Follow-up summary and commitments
+    followup_summary = models.TextField(blank=True, null=True, help_text="Key discussion points and summary")
+    client_commitment = models.TextField(blank=True, null=True, help_text="What the client committed to do")
+    our_commitment = models.TextField(blank=True, null=True, help_text="What we committed to do")
+    
+    # Stage information
+    previous_stage = models.CharField(max_length=100, blank=True, null=True)
+    current_stage = models.CharField(max_length=100, blank=True, null=True)
+    
     status = models.CharField(
         max_length=200,
         choices=LeadStatus.choices,
         default=LeadStatus.OPEN,
     )
+    
     # Store product suggestions
     suggested_solution = models.JSONField(blank=True, null=True)
+    
     # Store qualifying information from follow-up
-    qualifying_info = models.JSONField(blank=True, null=True, help_text="Qualifying questions: site location, cars required, car type, budget, etc.")
+    # qualifying_info structure:
+    # {
+    #   "decision_maker": "text",
+    #   "budget_status": "text", 
+    #   "timeline": "text",
+    #   "competition": "text",
+    #   "site_location": "text",
+    #   "cars_required": "text",
+    #   "car_type": "sedan|suv|hatchback|mixed",
+    #   "budget_range": "text",
+    #   "basement_available": "yes|no",
+    #   "pit_possible": "yes|no",
+    #   "installation_timeline": "text",
+    #   "site_challenges": "text"
+    # }
+    qualifying_info = models.JSONField(blank=True, null=True, help_text="Qualifying questions: decision maker, budget, timeline, site details, etc.")
+    
     # Store requirement information (optional)
+    # requirement_info structure:
+    # {
+    #   "site_length": "text",
+    #   "site_width": "text",
+    #   "site_height": "text",
+    #   "preferred_parking_type": "text",
+    #   "automation_required": "text"
+    # }
     requirement_info = models.JSONField(blank=True, null=True, help_text="Site requirements: length, width, height, parking type, automation")
+    
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -158,7 +264,13 @@ class LeadFollowUp(models.Model):
         lead.followup_date = self.next_followup_date or self.followup_date
         if self.remarks:
             lead.remarks = self.remarks
-        lead.save(update_fields=["status", "followup_date", "last_followup_date", "remarks"])
+        # Use update_fields to bypass full_clean on the lead model
+        lead_management.objects.filter(pk=lead.pk).update(
+            status=lead.status,
+            last_followup_date=lead.last_followup_date,
+            followup_date=lead.followup_date,
+            remarks=lead.remarks,
+        )
 
 
 # Lead FAQ

@@ -176,177 +176,185 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 overflow-y-auto py-6">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg my-auto">
+    <div className="fixed inset-0 z-[1050] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
 
-        <div className="px-6 pt-6 pb-1">
-          <h2 className="text-xl font-semibold text-slate-800">
-            {id ? "Edit Quotation" : "Create New Quotation"}
-          </h2>
+        {/* Modal Header */}
+        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-white shrink-0">
+          <div>
+            <h2 className="text-xl font-extrabold text-slate-900">
+              {id ? "Edit Quotation" : "Create New Quotation"}
+            </h2>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">
+              Fill in customer, product, pricing, and terms details below
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center font-bold text-sm transition"
+          >
+            ✕
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 pb-6 pt-5 space-y-5">
+        {/* Form Container */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
 
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
-              {error}
-            </div>
-          )}
+          {/* Inner Scrollable Body */}
+          <div className="p-6 overflow-y-auto flex-1 space-y-5">
 
-          {/* Select Customer */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Select Customer <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                disabled={refLoading}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 appearance-none pr-10"
-              >
-                <option value="">Choose customer</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}{c.contact_number ? ` — ${c.contact_number}` : ""}
-                  </option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">▾</span>
-            </div>
-          </div>
-
-          {/* Select Product */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Select Product <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <select
-                value={productId}
-                onChange={(e) => setProductId(e.target.value)}
-                disabled={refLoading}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 appearance-none pr-10"
-              >
-                <option value="">Choose product</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.product_name} - {p.category_name} ({p.car_capacity} cars)
-                    {p.base_price ? ` - ${fmtL(p.base_price)}` : ""}
-                  </option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">▾</span>
-            </div>
-          </div>
-
-          {/* Quantity + Total Capacity */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Quantity / Units <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Total Capacity</label>
-              <div className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 text-sm select-none">
-                {totalCars > 0 ? `${totalCars} cars` : "0 cars"}
+            {error && (
+              <div className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                {error}
               </div>
-            </div>
-          </div>
-
-          {/* Unit Price in Lakhs */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Unit Price (Lakhs ₹) <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min={0}
-                step={0.1}
-                value={unitPriceLakhs}
-                onChange={(e) => setUnitPriceLakhs(e.target.value)}
-                placeholder="e.g. 6.5"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 pr-16"
-              />
-              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium">
-                Lakhs
-              </span>
-            </div>
-            {priceL > 0 && (
-              <p className="mt-1 text-xs text-slate-400">
-                = ₹{(priceL * 100000).toLocaleString("en-IN")}
-              </p>
             )}
-          </div>
 
-          <hr className="border-slate-100" />
-
-          {/* Subtotal / GST */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm text-slate-500">
-              <span>Subtotal:</span>
-              <span className="font-medium text-slate-700">{fmtLakhs(subtotalL)}</span>
-            </div>
-            <div className="flex justify-between text-sm text-slate-500">
-              <span>GST ({gst}%):</span>
-              <span className="font-medium text-slate-700">{fmtLakhs(gstL)}</span>
-            </div>
-          </div>
-
-          {/* Total Amount */}
-          <div className="flex justify-between items-center bg-blue-50 rounded-xl px-4 py-3 border border-blue-100">
-            <span className="text-sm font-semibold text-slate-700">Total Amount:</span>
-            <span className="text-xl font-bold text-blue-600">{fmtLakhs(totalL)}</span>
-          </div>
-
-          {/* Terms & Conditions */}
-          {termsOptions.length > 0 && (
+            {/* Select Customer */}
             <div>
-              <p className="text-sm font-semibold text-slate-700 mb-2">Terms &amp; Conditions</p>
-              <div className="bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 space-y-1.5 max-h-44 overflow-y-auto">
-                {termsOptions.map((t, i) => (
-                  <p key={t.id} className="text-sm text-slate-600">
-                    {i + 1}. {t.terms}
-                  </p>
-                ))}
+              <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                Select Customer <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={customerId}
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  disabled={refLoading}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none pr-10"
+                >
+                  <option value="">Choose customer</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.contact_number ? ` — ${c.contact_number}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-base">▾</span>
               </div>
             </div>
-          )}
 
-          {/* Terms & Conditions Selector - NEW! */}
-          <QuotationTermsSelector
-            quotationId={id}
-            onTermsChange={(terms) => setSelectedTerms(terms)}
-          />
+            {/* Select Product */}
+            <div>
+              <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                Select Product <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={productId}
+                  onChange={(e) => setProductId(e.target.value)}
+                  disabled={refLoading}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none pr-10"
+                >
+                  <option value="">Choose product</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.product_name} - {p.category_name} ({p.car_capacity} cars)
+                      {p.base_price ? ` - ${fmtL(p.base_price)}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-base">▾</span>
+              </div>
+            </div>
 
-          {/* Buttons */}
-          <div className="flex gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={loading || refLoading}
-              className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50 transition"
-            >
-              {loading
-                ? id ? "Updating…" : "Creating…"
-                : id ? "Update Quotation" : "Create Quotation"}
-            </button>
+            {/* Quantity + Total Capacity */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                  Quantity / Units <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">Total Capacity</label>
+                <div className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 text-sm font-bold select-none">
+                  {totalCars > 0 ? `${totalCars} cars` : "0 cars"}
+                </div>
+              </div>
+            </div>
+
+            {/* Unit Price in Lakhs */}
+            <div>
+              <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                Unit Price (Lakhs ₹) <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  value={unitPriceLakhs}
+                  onChange={(e) => setUnitPriceLakhs(e.target.value)}
+                  placeholder="e.g. 6.5"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 pr-16"
+                />
+                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">
+                  Lakhs
+                </span>
+              </div>
+              {priceL > 0 && (
+                <p className="mt-1.5 text-xs font-semibold text-blue-600">
+                  = ₹{(priceL * 100000).toLocaleString("en-IN")}
+                </p>
+              )}
+            </div>
+
+            <hr className="border-slate-200 my-2" />
+
+            {/* Subtotal / GST Summary Card */}
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-2">
+              <div className="flex justify-between text-sm text-slate-600 font-semibold">
+                <span>Basic Subtotal:</span>
+                <span className="font-bold text-slate-800">{fmtLakhs(subtotalL)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-slate-600 font-semibold">
+                <span>GST ({gst}%):</span>
+                <span className="font-bold text-slate-800">{fmtLakhs(gstL)}</span>
+              </div>
+            </div>
+
+            {/* Total Amount Card */}
+            <div className="flex justify-between items-center bg-blue-50 rounded-xl px-5 py-3.5 border border-blue-200">
+              <span className="text-base font-extrabold text-slate-800">Total Amount:</span>
+              <span className="text-2xl font-black text-blue-700">{fmtLakhs(totalL)}</span>
+            </div>
+
+            {/* Terms & Conditions Selector */}
+            <div className="pt-2">
+              <QuotationTermsSelector
+                quotationId={id}
+                onTermsChange={(terms) => setSelectedTerms(terms)}
+              />
+            </div>
+
+          </div>
+
+          {/* Sticky Modal Action Footer */}
+          <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 shrink-0 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={onBack}
               disabled={loading}
-              className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 hover:bg-slate-50 transition"
+              className="btn-secondary px-6 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 hover:bg-slate-100 transition"
             >
               Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || refLoading}
+              className="btn-primary px-8 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold shadow-sm transition disabled:opacity-50"
+            >
+              {loading
+                ? id ? "Updating…" : "Creating…"
+                : id ? "Update Quotation" : "Create Quotation"}
             </button>
           </div>
 

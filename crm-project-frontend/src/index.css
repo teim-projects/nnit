@@ -1,9 +1,103 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 /* ===================================
-   NNIT CRM - Custom Design Tokens
-   Tailwind CSS v4 - CSS-first Configuration
+   NNIT CRM — Global Base
    =================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  color: #1e293b;
+  background-color: #f8fafc;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===================================
+   NNIT CRM — Balanced Content Typography
+   =================================== */
+
+/* Base body text & Utility classes */
+p {
+  font-size: 0.9375rem; /* ~14px - 15px */
+  line-height: 1.5;
+}
+
+.text-xs {
+  font-size: 0.78rem !important; /* ~12px */
+  line-height: 1.4;
+}
+
+.text-sm {
+  font-size: 0.875rem !important; /* ~13.5px - 14px */
+  line-height: 1.5;
+}
+
+.text-base {
+  font-size: 0.975rem !important; /* ~15px */
+  line-height: 1.5;
+}
+
+.text-lg {
+  font-size: 1.125rem !important; /* ~17.5px */
+  line-height: 1.4;
+}
+
+.text-xl {
+  font-size: 1.3rem !important; /* ~20px */
+  line-height: 1.35;
+}
+
+.text-2xl {
+  font-size: 1.6rem !important; /* ~25px */
+  line-height: 1.3;
+}
+
+.text-3xl {
+  font-size: 2rem !important; /* ~30px */
+  line-height: 1.2;
+}
+
+/* Table Text & Header Styling */
+table th {
+  font-size: 0.875rem !important; /* ~14px */
+  font-weight: 600 !important;
+}
+
+table td {
+  font-size: 0.875rem !important; /* ~14px */
+  font-weight: 400 !important;
+}
+
+/* Form Controls & Inputs */
+input, select, textarea {
+  font-size: 0.875rem !important; /* ~14px */
+  font-weight: 400 !important;
+}
+
+label {
+  font-size: 0.85rem !important; /* ~13px */
+  font-weight: 600 !important;
+}
+
+/* Buttons */
+button, .btn {
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+}
+
+/* ── Ensure all modals sit above the navbar (z-[1000]) ── */
+[class*="z-[1050]"],
+[class*="z-[9999]"] {
+  z-index: 1050 !important;
+}
+
+
 
 /* Custom Theme Variables */
 @theme {
@@ -19,11 +113,28 @@
   --color-primary-800: #1e40af;
   --color-primary-900: #1e3a8a;
 
+  /* Orange Theme Colors */
+  --color-orange-50: #fff4ed;
+  --color-orange-100: #ffe6d5;
+  --color-orange-200: #ffcca7;
+  --color-orange-300: #ffb380;
+  --color-orange-400: #ff9a59;
+  --color-orange-500: #ff8c42;
+  --color-orange-600: #ff6b35;
+  --color-orange-700: #e85a2b;
+  --color-orange-800: #d14921;
+  --color-orange-900: #b03819;
+
   /* Success Colors */
   --color-success-50: #f0fdf4;
   --color-success-100: #dcfce7;
   --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
   --color-success-700: #15803d;
+
+  /* WhatsApp Green */
+  --color-whatsapp: #25d366;
+  --color-whatsapp-dark: #1da851;
 
   /* Warning Colors */
   --color-warning-50: #fff7ed;
@@ -35,7 +146,8 @@
   --color-error-50: #fef2f2;
   --color-error-100: #fee2e2;
   --color-error-500: #ef4444;
-  --color-error-700: #dc2626;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
 
   /* Gray Scale */
   --color-gray-50: #f9fafb;

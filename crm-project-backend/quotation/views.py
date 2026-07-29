@@ -577,6 +577,7 @@ class TermsMasterViewSet(viewsets.ModelViewSet):
     search_fields = ['title', 'content']
     ordering_fields = ['sequence', 'created_at']
     ordering = ['sequence']
+    pagination_class = None  # Disable pagination to show all terms
 
     @action(detail=False, methods=['post'], url_path='reorder')
     def reorder(self, request):
@@ -602,6 +603,7 @@ class QuotationTermsViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['quotation', 'is_customized']
     ordering = ['sequence']
+    pagination_class = None  # Disable pagination to show all quotation terms
 
     @action(detail=False, methods=['post'], url_path='bulk-create')
     def bulk_create(self, request):

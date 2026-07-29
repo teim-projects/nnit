@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { MdClose, MdArrowBack } from 'react-icons/md';
+import { MdArrowBack } from 'react-icons/md';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
 export default function AddProductForm({ open, onClose, onSuccess, product, categories, baseApi, token }) {
   const [formData, setFormData] = useState({
     product_name: '',
-    product_code: '',
     category_id: '',
-    description: '',
     levels: '',
     operation_type: '',
     automation_type: '',
@@ -19,8 +17,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
     min_length: '',
     car_capacity: '',
     base_price: '',
-    features: [],
-    is_active: true
+    image_url: ''
   });
   
   const [loading, setLoading] = useState(false);
@@ -29,10 +26,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
     if (product) {
       setFormData({
         product_name: product.product_name || '',
-        product_code: product.product_code || '',
-        // product.category is the category ID (read‑only PK)
         category_id: product.category || '',
-        description: product.description || '',
         levels: product.levels || '',
         operation_type: product.operation_type || '',
         automation_type: product.automation_type || '',
@@ -43,11 +37,26 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
         min_length: product.min_length || '',
         car_capacity: product.car_capacity || '',
         base_price: product.base_price || '',
-        features: product.features || [],
-        is_active: product.is_active !== undefined ? product.is_active : true
+        image_url: product.image_url || product.display_image || product.image || ''
+      });
+    } else {
+      setFormData({
+        product_name: '',
+        category_id: '',
+        levels: '',
+        operation_type: '',
+        automation_type: '',
+        pit_required: '',
+        load_capacity: '',
+        min_height: '',
+        min_width: '',
+        min_length: '',
+        car_capacity: '',
+        base_price: '',
+        image_url: ''
       });
     }
-  }, [product]);
+  }, [product, open]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -55,6 +64,20 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleImageFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({
+          ...prev,
+          image_url: reader.result
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const validate = () => {
@@ -84,7 +107,6 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
 
     setLoading(true);
     try {
-      // Build payload – category_id is what the serializer expects (write‑only)
       const payload = {
         ...formData,
         category_id: parseInt(formData.category_id),
@@ -134,32 +156,34 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-100 z-50 overflow-y-auto">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={onClose}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <MdArrowBack className="w-5 h-5" />
-              <span className="font-medium">Back to Products</span>
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="fixed inset-0 z-[1050] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
 
-      {/* Form Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-8 py-6 border-b border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-900">
+        {/* Modal Header */}
+        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-white shrink-0">
+          <div>
+            <h2 className="text-xl font-extrabold text-slate-900">
               {product ? 'Edit Parking Product' : 'Add New Parking Product'}
             </h2>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">
+              Fill in product specifications, capacity, pricing, and image details
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center font-bold text-sm transition"
+          >
+            ✕
+          </button>
+        </div>
 
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        {/* Form Container */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+
+          {/* Inner Scrollable Body */}
+          <div className="p-6 overflow-y-auto flex-1 space-y-6">
+
             {/* Basic Information */}
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -187,20 +211,26 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
                     onChange={handleChange}
                     className="followup-form-select"
                   >
-                    <option value="">Select category</option>
-                    {categories.map((cat) => (
+                    <option value="">Select Category</option>
+
+                    {Array.isArray(categories) && categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
-                        {cat.icon} {cat.display_name}
+                        {cat.display_name}
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
+            </div>
 
-              <div className="grid grid-cols-3 gap-4">
+            {/* Specifications */}
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Technical Specifications</h3>
+              
+              <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="followup-form-field mb-0">
                   <label className="followup-form-label">
-                    Number of Levels <span className="text-red-500">*</span>
+                    Levels <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -215,38 +245,6 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
 
                 <div className="followup-form-field mb-0">
                   <label className="followup-form-label">
-                    Car Capacity <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="car_capacity"
-                    value={formData.car_capacity}
-                    onChange={handleChange}
-                    className="followup-form-input"
-                    placeholder="e.g., 4"
-                    min="1"
-                  />
-                </div>
-
-                <div className="followup-form-field mb-0">
-                  <label className="followup-form-label">
-                    Load Capacity <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="load_capacity"
-                    value={formData.load_capacity}
-                    onChange={handleChange}
-                    className="followup-form-input"
-                    placeholder="e.g., 2000 kg"
-                    step="0.01"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="followup-form-field mb-0">
-                  <label className="followup-form-label">
                     Operation Type <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -255,7 +253,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
                     onChange={handleChange}
                     className="followup-form-select"
                   >
-                    <option value="">Select type</option>
+                    <option value="">Select Type</option>
                     <option value="hydraulic">Hydraulic</option>
                     <option value="mechanical">Mechanical</option>
                     <option value="hybrid">Hybrid</option>
@@ -272,34 +270,67 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
                     onChange={handleChange}
                     className="followup-form-select"
                   >
-                    <option value="">Select type</option>
-                    <option value="fully_automatic">Fully Automatic</option>
+                    <option value="">Select Automation</option>
                     <option value="semi_automatic">Semi Automatic</option>
+                    <option value="fully_automatic">Fully Automatic</option>
                     <option value="manual">Manual</option>
                   </select>
                 </div>
               </div>
 
-              <div className="followup-form-field mb-0">
-                <label className="followup-form-label">
-                  Pit Required <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="pit_required"
-                  value={formData.pit_required}
-                  onChange={handleChange}
-                  className="followup-form-select"
-                >
-                  <option value="">Select option</option>
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="followup-form-field mb-0">
+                  <label className="followup-form-label">
+                    Pit Required? <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="pit_required"
+                    value={formData.pit_required}
+                    onChange={handleChange}
+                    className="followup-form-select"
+                  >
+                    <option value="">Select</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </div>
+
+                <div className="followup-form-field mb-0">
+                  <label className="followup-form-label">
+                    Load Capacity (KG) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="load_capacity"
+                    value={formData.load_capacity}
+                    onChange={handleChange}
+                    className="followup-form-input"
+                    placeholder="e.g., 2000"
+                    step="0.01"
+                  />
+                </div>
+
+                <div className="followup-form-field mb-0">
+                  <label className="followup-form-label">
+                    Car Capacity <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="car_capacity"
+                    value={formData.car_capacity}
+                    onChange={handleChange}
+                    className="followup-form-input"
+                    placeholder="e.g., 2"
+                    min="1"
+                  />
+                </div>
               </div>
             </div>
 
             {/* Minimum Site Requirements */}
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Minimum Site Requirements</h3>
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Minimum Site Requirements</h3>
+              
               <div className="grid grid-cols-3 gap-4">
                 <div className="followup-form-field mb-0">
                   <label className="followup-form-label">
@@ -348,42 +379,93 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
               </div>
             </div>
 
-            {/* Price */}
-            <div className="followup-form-field mb-0">
-              <label className="followup-form-label">
-                Price (₹) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                name="base_price"
-                value={formData.base_price}
-                onChange={handleChange}
-                className="followup-form-input"
-                placeholder="e.g., 350000"
-                step="0.01"
-              />
+            {/* Price & Image */}
+            <div className="border-t border-gray-200 pt-6 space-y-4">
+              {/* Price */}
+              <div className="followup-form-field">
+                <label className="followup-form-label">
+                  Price (₹)
+                </label>
+                <input
+                  type="number"
+                  name="base_price"
+                  value={formData.base_price}
+                  onChange={handleChange}
+                  className="followup-form-input"
+                  placeholder="e.g., 350000"
+                  step="0.01"
+                />
+              </div>
+
+              {/* Product Image Field */}
+              <div className="followup-form-field">
+                <label className="followup-form-label">
+                  Product Image (Upload File or URL)
+                </label>
+                <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileChange}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 transition cursor-pointer"
+                    />
+                  </div>
+                  <div className="text-xs font-black text-gray-400 text-center uppercase tracking-widest">— OR PASTE IMAGE URL —</div>
+                  <input
+                    type="text"
+                    name="image_url"
+                    value={formData.image_url}
+                    onChange={handleChange}
+                    className="followup-form-input"
+                    placeholder="Paste Image URL (https://... or data:image/...)"
+                  />
+                  {formData.image_url && (
+                    <div className="mt-2 flex items-center gap-4">
+                      <div className="relative w-28 h-28 rounded-xl overflow-hidden border-2 border-blue-500 shadow-md">
+                        <img
+                          src={formData.image_url}
+                          alt="Product Preview"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, image_url: '' }))}
+                          className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold hover:bg-red-700 shadow"
+                          title="Remove Image"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <span className="text-xs font-semibold text-emerald-600">✓ Image Preview Loaded</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn-secondary px-8"
-                disabled={loading}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn-primary px-8"
-                disabled={loading}
-              >
-                {loading ? 'Saving...' : product ? 'Update Product' : 'Add Product'}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+
+          {/* Sticky Modal Action Footer */}
+          <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 shrink-0 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-secondary px-6 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 hover:bg-slate-100 transition"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary px-8 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold shadow-sm transition disabled:opacity-50"
+              disabled={loading}
+            >
+              {loading ? 'Saving...' : product ? 'Update Product' : 'Add Product'}
+            </button>
+          </div>
+
+        </form>
       </div>
     </div>
   );

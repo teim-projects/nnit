@@ -5,176 +5,403 @@
   <head>
     <meta charset="utf-8" />
     <style>
+      @page {
+        size: A4 portrait;
+        margin-top: 52mm;
+        margin-bottom: 20mm;
+        margin-left: 15mm;
+        margin-right: 15mm;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
-        font-family: Arial, sans-serif;
-        font-size: 12px;
+        font-family: 'Calibri', 'Arial', sans-serif;
+        font-size: 17px;
+        margin: 0;
+        padding: 0;
+        line-height: 1.5;
+        color: #000;
+        background: #fff;
+      }
+
+      .page {
+        position: relative;
+        width: 100%;
+      }
+
+      /* FIXED HEADER – REPEATS ON ALL PAGES IN TOP MARGIN */
+      .fixed-header {
+        position: fixed;
+        top: -52mm;
+        left: -15mm;
+        right: -15mm;
+        width: 210mm;
+        background: #fff;
+        z-index: 1000;
+      }
+
+      .header-image {
+        width: 100%;
+        padding: 0;
+        margin: 0;
+        background: #fff;
+      }
+
+      .header-image img {
+        width: 100%;
+        height: auto;
+        display: block;
         margin: 0;
         padding: 0;
       }
 
-      .page-border {
-        border: 1px solid #000;
-        padding: 10px;
-        min-height: 1050px;
-      }
-
-      .company-header {
+      .header-image .fallback {
         width: 100%;
-        position: relative;
+        height: 120px;
+        background: linear-gradient(to bottom, #fff 0%, #f5f5f5 100%);
         display: flex;
         align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        font-weight: bold;
+        color: #d97706;
       }
 
-      .company-header img {
-        width: 110px;
+      /* FOOTER STRIPS – REPEATS ON ALL PAGES IN BOTTOM MARGIN */
+      .footer-strips {
+        position: fixed;
+        bottom: -20mm;
+        left: -15mm;
+        right: -15mm;
+        width: 210mm;
+        height: 11mm;
+        z-index: 1000;
+      }
+
+      .footer-orange {
+        width: 100%;
+        height: 8px;
+        background: #d97706;
+        margin: 0;
+      }
+
+      .footer-blue {
+        width: 100%;
+        height: 3px;
+        background: #123b73;
+        margin: 0;
+      }
+
+      /* WATERMARK BACKGROUND FOR ANNEXURE I */
+      .watermark-container {
+        position: absolute;
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 480px;
+        opacity: 0.10;
+        z-index: 1;
+        pointer-events: none;
+        text-align: center;
+      }
+
+      .watermark-container img {
+        width: 100%;
         height: auto;
+        display: block;
+      }
+
+      .content {
+        padding: 0;
+        margin: 0;
+        position: relative;
+        z-index: 5;
       }
 
       .doc-title {
-        position: absolute;
-        margin-top: 35px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-weight: bold;
-        font-size: 16px;
         text-align: center;
+        font-weight: bold;
+        font-size: 31px;
+        margin: 0 0 20px 0;
+        padding: 0;
+        text-transform: uppercase;
+        color: #000;
+        letter-spacing: 2px;
       }
 
       .info-table {
         width: 100%;
-        margin-top: 20px;
+        margin-top: 15px;
         border-collapse: collapse;
+        background: rgba(255, 255, 255, 0.95);
       }
 
       .info-table td {
-        border: 1px solid #000;
-        padding: 4px;
+        border: 2px solid #000;
+        padding: 10px 12px;
         vertical-align: top;
+        font-size: 17px;
+        line-height: 1.5;
       }
 
       .items-table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 15px;
+        background: rgba(255, 255, 255, 0.95);
       }
 
       .items-table th,
       .items-table td {
-        border: 1px solid #000;
-        padding: 4px;
+        border: 2px solid #000;
+        padding: 10px 8px;
+        font-size: 17px;
       }
 
       .items-table th {
         text-align: center;
-        background: #f5f5f5;
+        background: #fff;
+        font-weight: bold;
+      }
+
+      .items-table tfoot td {
+        background: #fff;
+        font-weight: bold;
       }
 
       .right {
         text-align: right;
       }
-
       .center {
         text-align: center;
       }
 
-      @page {
-        size: A4;
-        margin: 20px;
+      /* ============================================================
+         OFFER HEADER BOX AT TOP OF PAGE 1
+      ============================================================ */
+      .offer-header-box {
+          margin-bottom: 25px;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+      }
+
+      .offer-header-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 17px;
+          line-height: 1.6;
+      }
+
+      .offer-header-table td.lbl {
+          font-weight: bold;
+          width: 30%;
+          padding: 3px 0;
+          color: #000;
+          vertical-align: top;
+      }
+
+      .offer-header-table td.val {
+          width: 70%;
+          padding: 3px 0;
+          color: #000;
+          vertical-align: top;
+      }
+
+      /* TERMS & CONDITIONS STYLING */
+      .terms-section {
+        font-size: 17px;
+        line-height: 1.5;
+        color: #000;
+      }
+
+      .term-item {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        break-inside: avoid-page !important;
+        display: block !important;
+        margin-bottom: 20px !important;
+        width: 100% !important;
+      }
+
+      .term-title {
+        font-weight: bold;
+        font-size: 20px;
+        margin-bottom: 6px;
+        color: #000;
+        line-height: 1.4;
+        display: block;
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+
+      .term-content {
+        color: #000;
+        text-align: justify;
+        line-height: 1.5;
+        font-size: 17px;
+        display: block;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      .terms-section p,
+      .terms-section div,
+      .terms-section li,
+      .terms-section ol,
+      .terms-section ul {
+        margin: 0 0 8px 0;
+        padding: 0;
+        text-align: justify;
+        line-height: 1.5;
+        font-size: 17px;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      .terms-section ol,
+      .terms-section ul {
+        margin-left: 15px;
+      }
+
+      .terms-section li {
+        margin-bottom: 4px;
+      }
+
+      /* Print-specific overrides */
+      @media print {
+        .term-item {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="page-border">
-      <div class="company-header">
-        <img src="file:///app/static/images/ka-logo.png" alt="Logo" />
-        <div class="doc-title">Quotation</div>
+
+    <!-- FIXED HEADER – REPEATS ON EVERY PAGE -->
+    <div class="fixed-header">
+      <div class="header-image">
+        {% if base64_logo %}
+        <img src="data:image/jpeg;base64,{{ base64_logo }}" alt="NNIT Header">
+        {% else %}
+        <div class="fallback">NNIT CAR PARKING SYSTEMS PVT. LTD.</div>
+        {% endif %}
       </div>
-
-      <table class="info-table">
-        <tr>
-          <td width="50%">
-            <b>Customer:</b> {{ quotation.customer.name|default:"-" }}<br />
-            <b>Contact:</b> {{ quotation.customer.contact_number|default:"-" }}<br />
-            <b>Site:</b> {{ quotation.site.name|default:quotation.site_name|default:"-" }}<br />
-            <b>Subject:</b> {{ quotation.subject|default:"-" }}
-          </td>
-          <td width="50%">
-            <b>Quotation No:</b> {{ quotation.quotation_no }}<br />
-            <b>Date:</b> {{ version.created_at|date:"d-m-Y" }}<br />
-            <b>Version:</b> {{ version.version_no|default:"1" }}<br />
-            <b>GST:</b> {{ gst_percentage|floatformat:0 }}%
-          </td>
-        </tr>
-      </table>
-
-      <!-- Dummy table for design stage -->
-      <table class="items-table">
-        <thead>
-          <tr>
-            <th width="5%">Sr</th>
-            <th width="40%">Description</th>
-            <th width="10%">Qty</th>
-            <th width="10%">Unit</th>
-            <th width="15%">Rate (₹)</th>
-            <th width="20%">Amount (₹)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in dummy_rows %}
-          <tr>
-            <td class="center">{{ row.sr }}</td>
-            <td>{{ row.description }}</td>
-            <td class="center">{{ row.qty }}</td>
-            <td class="center">{{ row.unit }}</td>
-            <td class="right">{{ row.rate|floatformat:2|intcomma }}</td>
-            <td class="right">{{ row.amount|floatformat:2|intcomma }}</td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="6" class="center">No items</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colspan="5" class="right"><b>Sub Total</b></td>
-            <td class="right"><b>{{ subtotal|floatformat:2|intcomma }}</b></td>
-          </tr>
-          <tr>
-            <td colspan="5" class="right"><b>GST</b></td>
-            <td class="right"><b>{{ gst_amount|floatformat:2|intcomma }}</b></td>
-          </tr>
-          <tr>
-            <td colspan="5" class="right"><b>Grand Total</b></td>
-            <td class="right"><b>{{ grand_total|floatformat:2|intcomma }}</b></td>
-          </tr>
-        </tfoot>
-      </table>
-
-      <!-- TERMS & CONDITIONS SECTION -->
-      {% if terms %}
-      <div style="margin-top: 25px; page-break-inside: avoid;">
-        <h3 style="font-size: 14px; font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 12px;">
-          Terms & Conditions
-        </h3>
-        <div style="font-size: 10px; line-height: 1.7;">
-          {% for term in terms %}
-          <div style="margin-bottom: 12px; page-break-inside: avoid;">
-            <div style="font-weight: bold; margin-bottom: 3px;">
-              {{ term.sequence }}. {{ term.title }}
-              {% if term.is_customized %}
-              <span style="font-size: 7px; background: #e0d4ff; padding: 1px 4px; border-radius: 2px; color: #6b21a8;">[CUSTOM]</span>
-              {% endif %}
-            </div>
-            <div style="padding-left: 12px; text-align: justify;">
-              {{ term.content|linebreaksbr }}
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
     </div>
+
+    <!-- FOOTER STRIPS – REPEATS ON EVERY PAGE -->
+    <div class="footer-strips">
+      <div class="footer-orange"></div>
+      <div class="footer-blue"></div>
+    </div>
+
+    <div class="page">
+
+      <!-- WATERMARK BACKGROUND -->
+      <div class="watermark-container">
+        {% if base64_logo %}
+        <img src="data:image/jpeg;base64,{{ base64_logo }}" alt="NNIT Watermark">
+        {% endif %}
+      </div>
+
+      <div class="content">
+        <div class="doc-title">Annexure I</div>
+
+        <table class="info-table">
+          <tr>
+            <td width="50%">
+              <b>Customer:</b> {{ quotation.customer.name|default:"-" }}<br />
+              <b>Contact:</b> {{ quotation.customer.contact_number|default:"-" }}<br />
+              <b>Site:</b> {{ quotation.site.name|default:quotation.site_name|default:"-" }}<br />
+              <b>Subject:</b> {{ quotation.subject|default:"-" }}
+            </td>
+            <td width="50%">
+              <b>Quotation No:</b> {{ quotation.quotation_no }}<br />
+              <b>Date:</b> {{ version.created_at|date:"d-m-Y" }}<br />
+              <b>Version:</b> {{ version.version_no|default:"1" }}<br />
+              <b>GST:</b> {{ gst_percentage|floatformat:0 }}%
+            </td>
+          </tr>
+        </table>
+
+        <!-- Dummy table for design stage -->
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th width="5%">Sr</th>
+              <th width="40%">Description</th>
+              <th width="10%">Qty</th>
+              <th width="10%">Unit</th>
+              <th width="15%">Rate (₹)</th>
+              <th width="20%">Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in dummy_rows %}
+            <tr>
+              <td class="center">{{ row.sr }}</td>
+              <td>{{ row.description }}</td>
+              <td class="center">{{ row.qty }}</td>
+              <td class="center">{{ row.unit }}</td>
+              <td class="right">{{ row.rate|floatformat:2|intcomma }}</td>
+              <td class="right">{{ row.amount|floatformat:2|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="center">No items</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5" class="right"><b>Sub Total</b></td>
+              <td class="right"><b>{{ subtotal|floatformat:2|intcomma }}</b></td>
+            </tr>
+            <tr>
+              <td colspan="5" class="right"><b>GST</b></td>
+              <td class="right"><b>{{ gst_amount|floatformat:2|intcomma }}</b></td>
+            </tr>
+            <tr>
+              <td colspan="5" class="right"><b>Grand Total</b></td>
+              <td class="right"><b>{{ grand_total|floatformat:2|intcomma }}</b></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <!-- TERMS & CONDITIONS SECTION -->
+        {% if terms %}
+        <div style="margin-top: 30px;">
+          <h3 style="font-size: 31px; font-weight: bold; margin: 0 0 20px 0; padding: 0; color: #000; letter-spacing: 2px; text-align: center; text-transform: uppercase;">
+            TERMS & CONDITIONS
+          </h3>
+          <div class="terms-section">
+            {% for term in terms %}
+            <div class="term-item">
+              <div class="term-title">
+                {{ term.sequence }}. {{ term.title }}:
+                {% if term.is_customized %}
+                <span style="font-size: 10px; background: #e0d4ff; padding: 1px 4px; border-radius: 2px; color: #6b21a8; font-weight: normal; margin-left: 3px;">[CUSTOMIZED]</span>
+                {% endif %}
+              </div>
+              <div class="term-content">
+                {% autoescape off %}
+                {{ term.content|safe }}
+                {% endautoescape %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
   </body>
 </html>
+
+
+

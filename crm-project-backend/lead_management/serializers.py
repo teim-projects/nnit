@@ -65,6 +65,7 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
         source="created_by.first_name",
         read_only=True
     )
+    created_by_full_name = serializers.SerializerMethodField()
 
     class Meta:
         model = LeadFollowUp
@@ -73,20 +74,43 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
             "lead",
             "lead_customer_name",
             "followup_date",
+            "followup_time",
             "next_followup_date",
             "remarks",
             "discussion_notes",
+            # Interaction details
+            "interaction_type",
+            "client_response",
+            "followup_status",
+            # People
+            "conducted_by",
+            "contacted_person",
+            # Summary and commitments
+            "followup_summary",
+            "client_commitment",
+            "our_commitment",
+            # Stage
+            "previous_stage",
+            "current_stage",
+            # Status and solutions
             "status",
             "suggested_solution",
             "qualifying_info",
             "requirement_info",
+            # Meta
             "created_by",
             "created_by_name",
+            "created_by_full_name",
             "created_at",
             "updated_at",
             "faq_answers",
         ]
         read_only_fields = ["id", "created_by", "created_at", "updated_at"]
+
+    def get_created_by_full_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
+        return None
 
     @transaction.atomic
     def create(self, validated_data):
@@ -122,7 +146,7 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
 class LeadSerializer(serializers.ModelSerializer):
     FIXED_SOURCES = [
         'google_ads', 'indiamart', 'bni', 'justdial', 'reference',
-        'architect/interior_designe', 'builder', 'existing_customer',
+        'architect/interior_designer', 'builder', 'existing_customer',
         'scgt', 'ka_staff', 'other',
     ]
 
@@ -208,9 +232,23 @@ class LeadSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        changed_fields = []
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        instance.save()
+            changed_fields.append(attr)
+
+        # Always include updated_at
+        changed_fields.append('updated_at')
+
+        try:
+            instance.save(update_fields=changed_fields)
+        except DjangoValidationError as exc:
+            raise DRFValidationError(
+                detail=exc.message_dict if hasattr(exc, 'message_dict') else exc.messages
+            )
         return instance
 
     def validate_lead_source(self, value):

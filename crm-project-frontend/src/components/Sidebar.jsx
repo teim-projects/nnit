@@ -1,113 +1,11 @@
 // Sidebar.jsx
-import React from "react";
+import React, { useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useUserRole } from "../hooks/useAuth";
 
 /* ----------------------
-   1. Define items (moved inside component setup scope for clarity/safety)
+   Icons (same as before)
    ---------------------- */
-const allItems = [
-  { key: "home", label: "Home", icon: HomeIcon, path: "/dashboard" },
-  { key: "leads", label: "Leads", icon: TargetIcon, path: "/leads" },
-  { key: "contacts", label: "Contacts", icon: UserIcon, path: "/customer" },
-  { key: "accounts", label: "Accounts", icon: BuildingIcon, path: "/accounts" }, // <-- Item to hide
- 
-  { key: "quotes", label: "Quotes", icon: QuoteIcon, path: "/quotation" },
-  { key: "invoices", label: "Invoices", icon: InvoiceIcon, path: "/invoice" },
-  { key: "parking-products", label: "Parking Products", icon: ParkingIcon, path: "/parking-products" },
-  { key: "terms", label: "Terms & Conditions", icon: DocumentIcon, path: "/terms-conditions" },
-  { key: "amc", label: "AMC", icon: AmcIcon, path: "/amc" },
-];
-
-export default function Sidebar() {
-  const location = useLocation();
-  const currentPath = location.pathname;
-
-  // Get BASE_API from environment
-  const baseApi = import.meta.env.VITE_BASE_API_URL;
-  console.log("Sidebar BASE_API =", baseApi);
-
-  if (!baseApi) {
-    console.error("Sidebar: VITE_BASE_API_URL is not defined!");
-  }
-
-  // 2. ✅ Get the user role
-  // Assuming useUserRole returns { userRole: { name: 'sales' }, ... }
-  const { userRole, isLoading: loadingRole } = useUserRole(baseApi);
-
-  // 3. ✅ Filter the sidebar items based on the user role
-  const filteredItems = React.useMemo(() => {
-    // Wait until role is loaded to ensure correct filtering
-    if (loadingRole) {
-      return [];
-    }
-
-    return allItems.filter(item => {
-      // Check for the role object and the name property safely
-      const roleName = userRole?.name?.toLowerCase();
-
-      // Rule: Hide 'accounts' if the user role is 'sales'
-      if (item.key === 'accounts' && roleName === 'sales') {
-        return false; // Exclude this item
-      }
-
-      // Include all other items
-      return true;
-    });
-  }, [userRole, loadingRole, baseApi]);
-
-
-  return (
-    <aside className="w-55 bg-white border-r border-slate-100 min-h-screen px-3 py-4">
-      <nav className="space-y-1">
-        {/* 4. ✅ Render the filtered items */}
-        {filteredItems.map((it) => (
-          <SidebarItem key={it.key} item={it} active={isActive(it.path, currentPath)} />
-        ))}
-      </nav>
-    </aside>
-  );
-}
-
-function isActive(itemPath, currentPath) {
-  if (!itemPath) return false;
-  // exact match or startsWith (for nested routes)
-  return currentPath === itemPath || currentPath.startsWith(itemPath + "/");
-}
-
-function SidebarItem({ item, active }) {
-  const baseClasses = "sidebar-item text-sm";
-  const activeClasses = active ? "sidebar-item-active" : "";
-
-  return (
-    <Link
-      to={item.path || "#"}
-      className={`${baseClasses} ${activeClasses}`}
-      aria-current={active ? "page" : undefined}
-    >
-      <span className={`sidebar-icon ${active ? "text-primary-700" : "text-gray-400"}`}>
-        <item.icon className="w-5 h-5" />
-      </span>
-
-      <span className="flex-1">{item.label}</span>
-
-      {active && (
-        <span className="w-6 h-6 flex items-center justify-center rounded-full">
-          <svg className="w-4 h-4 text-gray-800" viewBox="0 0 24 24" fill="none">
-            <circle cx="5" cy="12" r="1.5" fill="currentColor" />
-            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-            <circle cx="19" cy="12" r="1.5" fill="currentColor" />
-          </svg>
-        </span>
-      )}
-    </Link>
-  );
-}
-
-/* ----------------------
-   Inline SVG icons (included for completeness)
-   ---------------------- */
-
 function HomeIcon(props) {
   return (
     <svg {...props} viewBox="0 0 24 24" fill="none">
@@ -148,6 +46,15 @@ function QuoteIcon(props) {
     </svg>
   );
 }
+function FollowupIcon(props) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="none">
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 12h6M9 16h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
 function InvoiceIcon(props) {
   return (
     <svg {...props} viewBox="0 0 24 24" fill="none">
@@ -179,5 +86,179 @@ function DocumentIcon(props) {
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M14 2v6h6M9 13h6M9 17h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+function ReportIcon(props) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="10" width="4" height="11" rx="1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="10" y="6" width="4" height="15" rx="1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="17" y="2" width="4" height="19" rx="1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/* ----------------------
+   Sidebar Component
+   ---------------------- */
+export default function Sidebar({ onNavigate }) {
+  const location = useLocation();
+  const currentPath = location.pathname;
+  const baseApi = import.meta.env.VITE_BASE_API_URL;
+  const { userRole, isLoading: loadingRole } = useUserRole(baseApi);
+
+  const sectionsData = useMemo(() => {
+    if (loadingRole) return [];
+    const roleName = userRole?.name?.toLowerCase();
+
+    const sections = [
+      {
+        key: "sales",
+        label: "SALES",
+        children: [
+          { key: "leads", label: "Lead Management", icon: TargetIcon, path: "/leads" },
+          { key: "followups", label: "Follow-up Management", icon: FollowupIcon, path: "/followup-management" },
+          { key: "quotes", label: "Quotations", icon: QuoteIcon, path: "/quotation" },
+          { key: "products", label: "Product Master", icon: ParkingIcon, path: "/parking-products" },
+          { key: "customers", label: "Customers", icon: UserIcon, path: "/customer" },
+        ],
+      },
+      {
+        key: "operations",
+        label: "OPERATIONS",
+        children: [
+          { key: "amc", label: "AMC & Renewals", icon: AmcIcon, path: "/amc" },
+        ],
+      },
+      // FINANCE removed
+      {
+        key: "intelligence",
+        label: "INTELLIGENCE",
+        children: [
+          { key: "reports", label: "Reports & Analytics", icon: ReportIcon, path: "/reports" },
+        ],
+      },
+      {
+        key: "system",
+        label: "SYSTEM",
+        children: [
+          { key: "terms", label: "Terms & Conditions", icon: DocumentIcon, path: "/terms-conditions" },
+        ],
+      },
+    ];
+
+    // Role‑based filtering (preserved)
+    const filteredSections = sections
+      .map((section) => ({
+        ...section,
+        children: section.children.filter((child) => {
+          if (child.key === 'accounts' && roleName === 'sales') return false;
+          return true;
+        }),
+      }))
+      .filter((section) => section.children.length > 0);
+
+    return filteredSections;
+  }, [userRole, loadingRole]);
+
+  const isActivePath = (itemPath, currentPath) => {
+    if (!itemPath) return false;
+    return currentPath === itemPath || currentPath.startsWith(itemPath + "/");
+  };
+
+  const isSectionActive = (section) => {
+    return section.children.some((child) => isActivePath(child.path, currentPath));
+  };
+
+  if (loadingRole) return <div className="p-4">Loading sidebar...</div>;
+
+  return (
+    <aside className="w-full bg-white border-r border-slate-200/70 h-full px-3 py-4 shadow-sm">
+      <nav className="space-y-0.5">
+        {/* Dashboard */}
+        <div className="mb-2">
+          <SidebarItem
+            item={{ key: "home", label: "Dashboard", icon: HomeIcon, path: "/dashboard" }}
+            active={isActivePath("/dashboard", currentPath)}
+            onNavigate={onNavigate}
+            isDashboard
+          />
+        </div>
+
+        {sectionsData.map((section) => {
+          const sectionActive = isSectionActive(section);
+          return (
+            <div key={section.key} className="mt-3 first:mt-1">
+              {/* Section heading – now larger and bolder */}
+              <div className="flex items-center gap-2 px-3 py-1.5">
+                <span
+                  className={`text-sm font-bold uppercase tracking-wider ${
+                    sectionActive ? "text-indigo-600" : "text-slate-600"
+                  }`}
+                >
+                  {section.label}
+                </span>
+                <span className="flex-1 h-px bg-slate-200/50" />
+              </div>
+
+              {/* Children */}
+              <div className="ml-1 space-y-0.5">
+                {section.children.map((child) => (
+                  <SidebarItem
+                    key={child.key}
+                    item={child}
+                    active={isActivePath(child.path, currentPath)}
+                    onNavigate={onNavigate}
+                    depth={1}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+/* ----------------------
+   SidebarItem – Enhanced UI
+   ---------------------- */
+function SidebarItem({ item, active, onNavigate, depth = 0, isDashboard = false }) {
+  const baseClasses = `
+    sidebar-item group relative flex items-center gap-3.5 px-3.5 py-2.5 
+    rounded-xl transition-all duration-200 ease-out
+    ${depth > 0 ? "ml-3" : ""}
+    ${isDashboard ? "mt-1" : ""}
+  `;
+
+  const activeClasses = active
+    ? "bg-indigo-50/80 text-indigo-700 font-bold shadow-sm ring-1 ring-indigo-100/50"
+    : "text-slate-600 hover:bg-slate-50/80 hover:text-slate-900 hover:shadow-sm";
+
+  const accentBar = active && (
+    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-indigo-500 rounded-r-full" />
+  );
+
+  const iconClasses = active
+    ? "text-indigo-500"
+    : "text-slate-400 group-hover:text-slate-600";
+
+  return (
+    <Link
+      to={item.path || "#"}
+      onClick={onNavigate}
+      className={`${baseClasses} ${activeClasses}`}
+      aria-current={active ? "page" : undefined}
+    >
+      {accentBar}
+      <span className={`${iconClasses} transition-colors duration-200`}>
+        <item.icon className="w-5 h-5" />
+      </span>
+      <span className="flex-1 text-[14px] tracking-tight">{item.label}</span>
+      {active && (
+        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+      )}
+    </Link>
   );
 }

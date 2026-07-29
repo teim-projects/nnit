@@ -2,9 +2,10 @@
 import Base from "../components/Base";
 import TableView from "../components/TableView";
 import LeadDetails from "../components/lead/LeadDetails";
-import AddLeadFollowUpForm from "../components/lead/AddLeadFollowUpForm";
+import AddLeadFollowUpFormNew from "../components/lead/AddLeadFollowUpForm";
 import AddLeadForm from "../components/lead/AddLeadForm";
-import { MdEdit, MdDelete, MdOutlineRemoveRedEye, MdEditDocument, MdAdd } from "react-icons/md";
+import { IoLogoWhatsapp } from "react-icons/io5";
+import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd, MdEdit } from "react-icons/md";
 import Swal from "sweetalert2";
 import { useUserRole } from '../hooks/useAuth';
 import AddQuotation from "../components/quotations/AddQuotation";
@@ -402,25 +403,89 @@ export default function Lead() {
       : [])
   ];
 
-  // actions renderer (centered by TableView)
-  const actionsRenderer = useCallback((row) => (
-    <div className="flex items-center justify-center">
-      <button
-        onClick={() => {
-          setLeadDetailsId(row.id);
-          setShowLeadDetails(true);
-        }}
-        className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-        title="View Details"
-      >
-        View Details
-      </button>
-    </div>
-  ), []);
+  // actions renderer with WhatsApp, Email, Delete, View
+  const actionsRenderer = useCallback((row) => {
+    const handleWhatsApp = (e) => {
+      e.stopPropagation();
+      const contact = row.customer_contact;
+      if (!contact) {
+        Swal.fire({ icon: 'warning', title: 'No Contact', text: 'No contact number available' });
+        return;
+      }
+      const cleanNumber = contact.replace(/[^0-9]/g, '');
+      const whatsappNumber = cleanNumber.startsWith('91') ? cleanNumber : `91${cleanNumber}`;
+      window.open(`https://wa.me/${whatsappNumber}`, '_blank');
+    };
+
+    const handleEmail = (e) => {
+      e.stopPropagation();
+      const email = row.customer_email;
+      if (!email) {
+        Swal.fire({ icon: 'warning', title: 'No Email', text: 'No email address available' });
+        return;
+      }
+      window.location.href = `mailto:${email}`;
+    };
+
+    return (
+      <div className="flex items-center justify-center gap-1">
+        <button
+          onClick={handleWhatsApp}
+          className="inline-flex items-center px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium transition-colors"
+          title="Send WhatsApp"
+        >
+          <IoLogoWhatsapp className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={handleEmail}
+          className="inline-flex items-center px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-medium transition-colors"
+          title="Send Email"
+        >
+          <MdEmail className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditingLead(row);
+            setShowLeadForm(true);
+          }}
+          className="inline-flex items-center px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-xs font-medium transition-colors"
+          title="Edit Lead"
+        >
+          <MdEdit className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete(row.id);
+          }}
+          className="inline-flex items-center px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-medium transition-colors"
+          title="Delete"
+        >
+          <MdDelete className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={() => {
+            setLeadDetailsId(row.id);
+            setShowLeadDetails(true);
+          }}
+          className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-medium transition-colors"
+          title="View Details"
+        >
+          <MdRemoveRedEye className="w-3.5 h-3.5" />
+          <span>View</span>
+        </button>
+      </div>
+    );
+  }, []);
 
   return (
     <Base
-      title="Enquiries"
+      title="Leads"
       filtersConfig={leadFilters}
       initialFilterValues={initialFilters}
       onFiltersChange={handleFilterChange}
@@ -453,7 +518,7 @@ export default function Lead() {
       <div className="space-y-6 ">
         <div className="bg-white p-4 rounded-md shadow flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Enquiry Management</h2>
+            <h2 className="text-lg font-semibold">Lead Management</h2>
             <div className="text-sm text-slate-600">
               {loading ? "Loading…" : `${totalCount} total • ${rows.length} shown`}
             </div>
@@ -462,9 +527,10 @@ export default function Lead() {
 
             <button
               onClick={() => { setEditingLead(null); setShowLeadForm(true); }}
-              className="px-4 py-2 rounded-md bg-sky-600 text-white"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm"
             >
-              + Add
+              <MdAdd className="w-5 h-5" />
+              Add Lead
             </button>
           </div>
         </div>
@@ -498,7 +564,7 @@ export default function Lead() {
         }}
       />
 
-      <AddLeadFollowUpForm
+      <AddLeadFollowUpFormNew
         open={showLeadFollowUp}
         onClose={() => setShowLeadFollowUp(false)}
         baseApi={BASE_API}
