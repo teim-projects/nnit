@@ -2,389 +2,614 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    <meta charset="utf-8" />
+    <style>
+        /* ============================================================
+               GLOBAL PRINT SETTINGS (@page margins prevent content overlap)
+            ============================================================ */
+        @page {
+            size: A4 portrait;
+            margin-top: 52mm;
+            margin-bottom: 20mm;
+            margin-left: 15mm;
+            margin-right: 15mm;
+        }
 
-    body {
-      font-family: Arial, sans-serif;
-      font-size: 10px;
-      color: #000;
-      background: #fff;
-    }
+        * {
+            box-sizing: border-box;
+        }
 
-    .page {
-      width: 100%;
-      padding: 10mm 10mm;
-    }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Calibri', 'Arial', sans-serif;
+            font-size: 17px;
+            color: #000;
+            background: #fff;
+            line-height: 1.5;
+        }
 
-    /* ── HEADER ── */
-    .header {
-      display: flex;
-      align-items: flex-start;
-      border-bottom: 3px solid #c8600a;
-      padding-bottom: 8px;
-      margin-bottom: 12px;
-    }
+        .page {
+            position: relative;
+            width: 100%;
+        }
 
-    .logo-box {
-      width: 72px;
-      min-width: 72px;
-      height: 68px;
-      border: 2px solid #c8600a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      margin-right: 12px;
-      padding: 4px;
-    }
+        /* ============================================================
+               FIXED HEADER – REPEATS ON EVERY PAGE IN TOP MARGIN
+            ============================================================ */
+        .fixed-header {
+            position: fixed;
+            top: -52mm;
+            left: -15mm;
+            right: -15mm;
+            width: 210mm;
+            background: #fff;
+            z-index: 1000;
+        }
 
-    .logo-top {
-      font-size: 20px;
-      font-weight: 900;
-      color: #c8600a;
-      letter-spacing: 1px;
-      line-height: 1;
-    }
+        .header-image {
+            width: 100%;
+            padding: 0;
+            margin: 0;
+            background: #fff;
+        }
 
-    .logo-sub {
-      font-size: 5.5px;
-      font-weight: bold;
-      color: #c8600a;
-      text-align: center;
-      line-height: 1.3;
-      margin-top: 3px;
-      text-transform: uppercase;
-    }
+        .header-image img {
+            width: 100%;
+            height: auto;
+            display: block;
+            margin: 0;
+            padding: 0;
+        }
 
-    .header-info { flex: 1; }
+        .header-image .fallback {
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(to bottom, #fff 0%, #f5f5f5 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            color: #d97706;
+        }
 
-    .company-name {
-      font-size: 17px;
-      font-weight: 900;
-      color: #c8600a;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      line-height: 1.2;
-    }
+        /* ============================================================
+               FOOTER STRIPS – REPEATS ON EVERY PAGE IN BOTTOM MARGIN
+            ============================================================ */
+        .footer-strips {
+            position: fixed;
+            bottom: -20mm;
+            left: -15mm;
+            right: -15mm;
+            width: 210mm;
+            height: 11mm;
+            z-index: 1000;
+        }
 
-    .company-subtitle {
-      font-size: 9px;
-      font-weight: bold;
-      color: #333;
-      margin: 2px 0 3px;
-    }
+        .footer-orange {
+            width: 100%;
+            height: 8px;
+            background: #d97706;
+            margin: 0;
+        }
 
-    .company-address {
-      font-size: 8.5px;
-      color: #555;
-      line-height: 1.5;
-    }
+        .footer-blue {
+            width: 100%;
+            height: 3px;
+            background: #123b73;
+            margin: 0;
+        }
 
-    .header-contact {
-      font-size: 8.5px;
-      color: #333;
-      margin-top: 4px;
-    }
+        /* ============================================================
+               WATERMARK BACKGROUND FOR ANNEXURE I
+            ============================================================ */
+        .watermark-container {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 480px;
+            opacity: 0.10;
+            z-index: 1;
+            pointer-events: none;
+            text-align: center;
+        }
 
-    /* ── TITLE ── */
-    .annexure-title {
-      text-align: center;
-      font-size: 13px;
-      font-weight: bold;
-      text-decoration: underline;
-      margin: 10px 0 8px;
-    }
+        .watermark-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
 
-    /* ── PROJECT BOX ── */
-    .project-box {
-      border: 1px solid #000;
-      padding: 5px 8px;
-      margin-bottom: 10px;
-      font-size: 10px;
-      line-height: 1.8;
-    }
+        /* ============================================================
+               CONTENT AREA
+            ============================================================ */
+        .content {
+            padding: 0;
+            margin: 0;
+            position: relative;
+            z-index: 5;
+        }
 
-    /* ── MAIN TABLE ── */
-    .main-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 9.5px;
-      table-layout: fixed;
-    }
+        /* ============================================================
+               TITLE (31px as requested)
+            ============================================================ */
+        .doc-title {
+            text-align: center;
+            font-size: 31px;
+            font-weight: bold;
+            margin: 0 0 20px 0;
+            padding: 0;
+            text-transform: uppercase;
+            color: #000;
+            letter-spacing: 2px;
+        }
 
-    .main-table th {
-      border: 1px solid #000;
-      background: #ececec;
-      padding: 5px 4px;
-      text-align: center;
-      font-weight: bold;
-      vertical-align: middle;
-      word-wrap: break-word;
-    }
+        /* ============================================================
+               PROJECT BOX
+            ============================================================ */
+        .project-box {
+            border: 2px solid #000;
+            padding: 12px 16px;
+            margin-bottom: 18px;
+            font-size: 17px;
+            line-height: 1.6;
+            background: rgba(255, 255, 255, 0.95);
+        }
 
-    .main-table td {
-      border: 1px solid #000;
-      padding: 5px 4px;
-      vertical-align: top;
-      word-wrap: break-word;
-    }
+        .project-box strong {
+            font-weight: bold;
+            color: #000;
+        }
 
-    .main-table td.center { text-align: center; vertical-align: middle; }
-    .main-table td.right  { text-align: right;  vertical-align: middle; }
-    .main-table td.mid    { vertical-align: middle; }
+        /* ============================================================
+               MAIN TABLE (17px as requested)
+            ============================================================ */
+        .main-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 17px;
+            table-layout: fixed;
+            background: rgba(255, 255, 255, 0.95);
+        }
 
-    /* column widths — must total 100% */
-    .col-solution    { width: 28%; }
-    .col-units       { width: 9%; }
-    .col-rate        { width: 17%; }
-    .col-install     { width: 17%; }
-    .col-cars        { width: 9%; }
-    .col-total       { width: 20%; }
+        .main-table th {
+            border: 2px solid #000;
+            background: #fff;
+            padding: 10px 6px;
+            text-align: center;
+            font-weight: bold;
+            vertical-align: middle;
+            word-wrap: break-word;
+            font-size: 17px;
+        }
 
-    /* ── TOTALS TABLE ── */
-    .totals-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 9.5px;
-      table-layout: fixed;
-    }
+        .main-table td {
+            border: 2px solid #000;
+            padding: 10px 8px;
+            vertical-align: middle;
+            word-wrap: break-word;
+            font-size: 17px;
+        }
 
-    .totals-table td {
-      border: 1px solid #000;
-      padding: 4px 6px;
-      word-wrap: break-word;
-    }
+        .main-table td.center {
+            text-align: center;
+        }
+        .main-table td.right {
+            text-align: right;
+        }
+        .main-table td.mid {
+            vertical-align: middle;
+        }
 
-    .totals-table td.right { text-align: right; font-weight: bold; }
-    .totals-table td.center { text-align: center; }
+        .col-solution {
+            width: 23%;
+        }
+        .col-units {
+            width: 10%;
+        }
+        .col-rate {
+            width: 18%;
+        }
+        .col-install {
+            width: 18%;
+        }
+        .col-cars {
+            width: 10%;
+        }
+        .col-total {
+            width: 21%;
+        }
 
-    .row-basic   { background: #f0f0f0; }
-    .row-grand   { background: #fff9e6; font-weight: bold; font-size: 10px; }
+        /* ============================================================
+               TOTALS TABLE (17px as requested)
+            ============================================================ */
+        .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 17px;
+            table-layout: fixed;
+            background: rgba(255, 255, 255, 0.95);
+        }
 
-    /* ── WORDS ROW ── */
-    .amount-words {
-      border: 1px solid #000;
-      border-top: 0;
-      padding: 5px 8px;
-      font-size: 9.5px;
-    }
+        .totals-table td {
+            border: 2px solid #000;
+            padding: 10px 10px;
+            word-wrap: break-word;
+            font-size: 17px;
+        }
 
-    /* ── FOOTER ── */
-    .footer {
-      margin-top: 24px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 9.5px;
-    }
+        .totals-table td.right {
+            text-align: right;
+            font-weight: bold;
+        }
+        .totals-table td.center {
+            text-align: center;
+            font-weight: bold;
+        }
 
-    .sig-line {
-      margin-top: 32px;
-      border-top: 1px solid #000;
-      padding-top: 3px;
-      font-size: 8.5px;
-      min-width: 130px;
-    }
+        .row-basic {
+            background: #fff;
+        }
+        .row-grand {
+            background: #fff;
+            font-weight: bold;
+            font-size: 17px;
+        }
 
-    @page {
-      size: A4 portrait;
-      margin: 10mm;
-    }
-  </style>
+        /* ============================================================
+               AMOUNT IN WORDS (17px as requested)
+            ============================================================ */
+        .amount-words {
+            border: 2px solid #000;
+            border-top: 0;
+            padding: 12px 16px;
+            font-size: 17px;
+            background: rgba(255, 255, 255, 0.95);
+            font-weight: 500;
+            line-height: 1.5;
+        }
+
+        .amount-words strong {
+            color: #000;
+        }
+
+        /* ============================================================
+               FOOTER SIGNATURE
+            ============================================================ */
+        .footer {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 15px;
+            padding: 0 10px;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        .sig-line {
+            margin-top: 45px;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            font-size: 14px;
+            min-width: 200px;
+            text-align: center;
+        }
+
+        /* ============================================================
+               OFFER HEADER BOX AT TOP OF PAGE 1
+            ============================================================ */
+        .offer-header-box {
+            margin-bottom: 25px;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        .offer-header-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 17px;
+            line-height: 1.6;
+        }
+
+        .offer-header-table td.lbl {
+            font-weight: bold;
+            width: 30%;
+            padding: 3px 0;
+            color: #000;
+            vertical-align: top;
+        }
+
+        .offer-header-table td.val {
+            width: 70%;
+            padding: 3px 0;
+            color: #000;
+            vertical-align: top;
+        }
+
+        /* ============================================================
+               TERMS & CONDITIONS — NO PARAGRAPH SPLITTING
+               Term text: 17px, Term titles: 20px (bold)
+            ============================================================ */
+        .terms-section {
+            font-size: 17px;
+            line-height: 1.5;
+            color: #000;
+        }
+
+        .term-item {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            break-inside: avoid-page !important;
+            display: block !important;
+            margin-bottom: 20px !important;
+            width: 100% !important;
+        }
+
+        .term-title {
+            font-weight: bold;
+            font-size: 20px;
+            margin-bottom: 6px;
+            color: #000;
+            line-height: 1.4;
+            display: block;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+        }
+
+        .term-content {
+            color: #000;
+            text-align: justify;
+            line-height: 1.5;
+            font-size: 17px;
+            display: block;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        .terms-section p,
+        .terms-section div,
+        .terms-section li,
+        .terms-section ol,
+        .terms-section ul {
+            margin: 0 0 8px 0;
+            padding: 0;
+            text-align: justify;
+            line-height: 1.5;
+            font-size: 17px;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        .terms-section ol,
+        .terms-section ul {
+            margin-left: 15px;
+        }
+
+        .terms-section li {
+            margin-bottom: 4px;
+        }
+    </style>
 </head>
 <body>
-<div class="page">
 
-  <!-- HEADER -->
-  <div class="header">
-    <div class="logo-box">
-      <div class="logo-top">NNIT</div>
-      <div class="logo-sub">CAR PARKING<br>SYSTEMS<br>PVT. LTD.<br><span style="font-size:4.5px;">CARS. CARE. CONVENIENCE.</span></div>
+    <!-- FIXED HEADER – REPEATS ON EVERY PAGE -->
+    <div class="fixed-header">
+        <div class="header-image">
+            {% if base64_logo %}
+            <img src="data:image/jpeg;base64,{{ base64_logo }}" alt="NNIT Header">
+            {% else %}
+            <div class="fallback">NNIT CAR PARKING SYSTEMS PVT. LTD.</div>
+            {% endif %}
+        </div>
     </div>
-    <div class="header-info">
-      <div class="company-name">NNIT Car Parking Systems Pvt. Ltd.</div>
-      <div class="company-subtitle">(NILESH NIRMAN INNOVATIVE TECHNOLOGIES)</div>
-      <div class="company-address">
-        Office: Survey No 37, Ground Floor, Flat No 1, Ruturaj Society,<br>
-        Nr. Vitthal Mandir, Karve Nagar, Pune - 52.
-      </div>
-      <div class="header-contact">
-        &#9742; +91 9518377159 &nbsp;&nbsp;
-        &#127760; www.nnitcarparking.in &nbsp;&nbsp;
-        &#9993; info@nnitcarparking.in
-      </div>
+
+    <!-- FOOTER STRIPS – REPEATS ON EVERY PAGE -->
+    <div class="footer-strips">
+        <div class="footer-orange"></div>
+        <div class="footer-blue"></div>
     </div>
-  </div>
 
-  <!-- TITLE -->
-  <div class="annexure-title">Annexure I</div>
+    <!-- ============================================================
+    TERMS & CONDITIONS SECTION WITH OFFER HEADER
+    ============================================================ -->
+    {% if terms %}
+    <div class="page">
+        <div class="content">
 
-  <!-- PROJECT BOX -->
-  <div class="project-box">
-    <strong>Project Name:</strong> {{ project_name }}<br>
-    <strong>Product Name:</strong> {{ product_name }}
-  </div>
+            <!-- OFFER HEADER INFORMATION BLOCK -->
+            <div class="offer-header-box">
+                <table class="offer-header-table">
+                    <tr>
+                        <td class="lbl">Offer No:</td>
+                        <td class="val">{{ quotation.quotation_no }}</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Company Name:</td>
+                        <td class="val">M/s {{ quotation.customer.name|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Kind Attn:</td>
+                        <td class="val">Mr. {{ quotation.customer.poc_name|default:quotation.customer.name|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Contact no:</td>
+                        <td class="val">{{ quotation.customer.contact_number|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Parking Systems:</td>
+                        <td class="val">{{ parking_systems_display|default:product_name }}</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Supplier:</td>
+                        <td class="val">NNIT Car Parking Systems Pvt Ltd</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Contact Person:</td>
+                        <td class="val">Nilesh Sali</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Contact No.:</td>
+                        <td class="val">9518377159</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Date:</td>
+                        <td class="val">{{ version.created_at|date:"d/m/Y" }}</td>
+                    </tr>
+                </table>
+            </div>
 
-  <!-- MAIN TABLE -->
-  <table class="main-table">
-    <colgroup>
-      <col class="col-solution">
-      <col class="col-units">
-      <col class="col-rate">
-      <col class="col-install">
-      <col class="col-cars">
-      <col class="col-total">
-    </colgroup>
-    <thead>
-      <tr>
-        <th>Parking Solution</th>
-        <th>No. of Units</th>
-        <th>Rate per Units (Rs.)</th>
-        <th>Installation Per system (Rs.)</th>
-        <th>No. Of Cars</th>
-        <th>Total Value (Rs.)</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in line_items %}
-      <tr>
-        <td class="mid">{{ item.description }}</td>
-        <td class="center">{{ item.quantity }}</td>
-        <td class="right">{{ item.unit_price_fmt }}</td>
-        <td class="right">{{ item.installation_fmt }}</td>
-        <td class="center">{{ item.cars }}</td>
-        <td class="right">{{ item.total_fmt }}</td>
-      </tr>
-      {% endfor %}
-      {% for i in filler_rows %}
-      <tr>
-        <td style="height:20px">&nbsp;</td>
-        <td></td><td></td><td></td><td></td><td></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+            <div class="doc-title" style="text-align: left; font-size: 22px; font-weight: bold; margin-top: 25px; margin-bottom: 15px; text-transform: none;">Terms &amp; Conditions:</div>
 
-  <!-- TOTALS -->
-  <table class="totals-table">
-    <colgroup>
-      <col style="width:28%">
-      <col style="width:9%">
-      <col style="width:17%">
-      <col style="width:17%">
-      <col style="width:9%">
-      <col style="width:20%">
-    </colgroup>
-    <tr class="row-basic">
-      <td colspan="5" style="text-align:right; font-weight:bold; padding-right:8px;">Basic Total Value</td>
-      <td class="right">{{ basic_total_fmt }}</td>
-    </tr>
-    {% if gst_type == "CGST_SGST" %}
-    <tr>
-      <td colspan="2"></td>
-      <td colspan="2" style="font-weight:bold;">Add: SGST</td>
-      <td class="center">@ {{ sgst_pct }}%</td>
-      <td class="right">{{ sgst_fmt }}</td>
-    </tr>
-    <tr>
-      <td colspan="2"></td>
-      <td colspan="2" style="font-weight:bold;">Add: CGST</td>
-      <td class="center">@ {{ cgst_pct }}%</td>
-      <td class="right">{{ cgst_fmt }}</td>
-    </tr>
-    {% else %}
-    <tr>
-      <td colspan="2"></td>
-      <td colspan="2" style="font-weight:bold;">Add: IGST</td>
-      <td class="center">@ {{ igst_pct }}%</td>
-      <td class="right">{{ igst_fmt }}</td>
-    </tr>
+            <div class="terms-section">
+                {% for term in terms %}
+                <div class="term-item">
+                    <div class="term-title">
+                        {{ term.sequence }}. {{ term.title }}:
+                        {% if term.is_customized %}
+                        <span style="font-size:10px; background:#e0d4ff; padding:1px 4px; border-radius:2px; color:#6b21a8; font-weight:normal; margin-left:3px;">[CUSTOMIZED]</span>
+                        {% endif %}
+                    </div>
+                    <div class="term-content">
+                        {% autoescape off %}
+                        {{ term.content|safe }}
+                        {% endautoescape %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+        </div><!-- /content -->
+    </div><!-- /page -->
     {% endif %}
-    <tr class="row-grand">
-      <td colspan="5" style="text-align:right; font-weight:bold; padding-right:8px;">Grand Total Value</td>
-      <td class="right">{{ grand_total_fmt }}</td>
-    </tr>
-  </table>
 
-  <!-- AMOUNT IN WORDS -->
-  <div class="amount-words">
-    <strong>Total Contract Value in words:</strong> Rs. {{ amount_in_words }}
-  </div>
+    <!-- ============================================================
+    ANNEXURE I – QUOTATION TABLE SECTION
+    ============================================================ -->
+    <div class="page" {% if terms %}style="page-break-before: always;"{% endif %}>
 
-  <!-- FOOTER -->
-  <div class="footer">
-    <div>
-      <div class="sig-line">Customer's Seal &amp; Signature</div>
-    </div>
-    <div style="text-align:right;">
-      <strong>For NNIT Car Parking Systems Pvt. Ltd.</strong>
-      <div class="sig-line" style="text-align:center;">Authorized Signatory</div>
-    </div>
-  </div>
+        <!-- WATERMARK BACKGROUND -->
+        <div class="watermark-container">
+            {% if base64_logo %}
+            <img src="data:image/jpeg;base64,{{ base64_logo }}" alt="NNIT Watermark">
+            {% endif %}
+        </div>
 
-</div>
+        <div class="content">
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- TERMS & CONDITIONS PAGE (New Page)                                   -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-{% if terms %}
-<div class="page" style="page-break-before: always;">
+            <div class="doc-title">Annexure I</div>
 
-  <!-- HEADER (Same as first page) -->
-  <div class="header">
-    <div class="logo-box">
-      <div class="logo-top">NNIT</div>
-      <div class="logo-sub">CAR PARKING<br>SYSTEMS<br>PVT. LTD.<br><span style="font-size:4.5px;">CARS. CARE. CONVENIENCE.</span></div>
-    </div>
-    <div class="header-info">
-      <div class="company-name">NNIT Car Parking Systems Pvt. Ltd.</div>
-      <div class="company-subtitle">(NILESH NIRMAN INNOVATIVE TECHNOLOGIES)</div>
-      <div class="company-address">
-        Office: Survey No 37, Ground Floor, Flat No 1, Ruturaj Society,<br>
-        Nr. Vitthal Mandir, Karve Nagar, Pune - 52.
-      </div>
-      <div class="header-contact">
-        &#9742; +91 9518377159 &nbsp;&nbsp;
-        &#127760; www.nnitcarparking.in &nbsp;&nbsp;
-        &#9993; info@nnitcarparking.in
-      </div>
-    </div>
-  </div>
+            <!-- PROJECT BOX -->
+            <div class="project-box">
+                <strong>Project Name:</strong> {{ project_name }}<br>
+                <strong>Product Name:</strong> {{ product_name }}
+            </div>
 
-  <!-- TERMS TITLE -->
-  <div class="annexure-title">Terms & Conditions</div>
+            <!-- MAIN TABLE -->
+            <table class="main-table">
+                <colgroup>
+                    <col class="col-solution">
+                    <col class="col-units">
+                    <col class="col-rate">
+                    <col class="col-install">
+                    <col class="col-cars">
+                    <col class="col-total">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Parking Solution</th>
+                        <th>No. of Units</th>
+                        <th>Rate per Units (Rs.)</th>
+                        <th>Installation Per system (Rs.)</th>
+                        <th>No. Of Cars</th>
+                        <th>Total Value (Rs.)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in line_items %}
+                    <tr>
+                        <td class="mid">{{ item.description }}</td>
+                        <td class="center">{{ item.quantity }}</td>
+                        <td class="right">{{ item.unit_price_fmt }}</td>
+                        <td class="right">{{ item.installation_fmt }}</td>
+                        <td class="center">{{ item.cars }}</td>
+                        <td class="right">{{ item.total_fmt }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% for i in filler_rows %}
+                    <tr>
+                        <td style="height:25px">&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
 
-  <!-- TERMS CONTENT -->
-  <div style="font-size: 9.5px; line-height: 1.8; padding: 0 8px;">
-    {% for term in terms %}
-    <div style="margin-bottom: 14px; page-break-inside: avoid;">
-      <div style="font-weight: bold; font-size: 10px; margin-bottom: 4px; color: #c8600a;">
-        {{ term.sequence }}. {{ term.title }}
-        {% if term.is_customized %}
-        <span style="font-size: 7px; background: #e0d4ff; padding: 1px 4px; border-radius: 3px; color: #6b21a8; font-weight: normal;">[CUSTOMIZED]</span>
-        {% endif %}
-      </div>
-      <div style="text-align: justify; padding-left: 12px; color: #333;">
-        {{ term.content|linebreaksbr }}
-      </div>
-    </div>
-    {% endfor %}
-  </div>
+            <!-- TOTALS -->
+            <table class="totals-table">
+                <colgroup>
+                    <col style="width:23%">
+                    <col style="width:10%">
+                    <col style="width:18%">
+                    <col style="width:18%">
+                    <col style="width:10%">
+                    <col style="width:21%">
+                </colgroup>
+                <tr class="row-basic">
+                    <td colspan="5" style="text-align:right; font-weight:bold; padding-right:12px;">Basic Total Value</td>
+                    <td class="right">{{ basic_total_fmt }}</td>
+                </tr>
+                {% if gst_type == "CGST_SGST" %}
+                <tr>
+                    <td colspan="2"></td>
+                    <td colspan="2" style="font-weight:bold; text-align:left; padding-left:12px;">Add: SGST</td>
+                    <td class="center">@ {{ sgst_pct }}%</td>
+                    <td class="right">{{ sgst_fmt }}</td>
+                </tr>
+                <tr>
+                    <td colspan="2"></td>
+                    <td colspan="2" style="font-weight:bold; text-align:left; padding-left:12px;">Add: CGST</td>
+                    <td class="center">@ {{ cgst_pct }}%</td>
+                    <td class="right">{{ cgst_fmt }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="2"></td>
+                    <td colspan="2" style="font-weight:bold; text-align:left; padding-left:12px;">Add: IGST</td>
+                    <td class="center">@ {{ igst_pct }}%</td>
+                    <td class="right">{{ igst_fmt }}</td>
+                </tr>
+                {% endif %}
+                <tr class="row-grand">
+                    <td colspan="5" style="text-align:right; font-weight:bold; padding-right:12px;">Grand Total Value</td>
+                    <td class="right" style="font-size:17px; font-weight:bold;">{{ grand_total_fmt }}</td>
+                </tr>
+            </table>
 
-  <!-- FOOTER FOR TERMS PAGE -->
-  <div class="footer">
-    <div>
-      <div class="sig-line">Customer's Seal &amp; Signature</div>
-    </div>
-    <div style="text-align:right;">
-      <strong>For NNIT Car Parking Systems Pvt. Ltd.</strong>
-      <div class="sig-line" style="text-align:center;">Authorized Signatory</div>
-    </div>
-  </div>
+            <!-- AMOUNT IN WORDS -->
+            <div class="amount-words">
+                <strong>Total Contract Value in words:</strong> Rs. {{ amount_in_words }}
+            </div>
 
-</div>
-{% endif %}
+            <!-- FOOTER SIGNATURES -->
+            <div class="footer">
+                <div>
+                    <div style="font-weight:bold;">Customer's Seal & Signature</div>
+                    <div class="sig-line">&nbsp;</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-weight:bold;">For NNIT Car Parking Systems Pvt. Ltd.</div>
+                    <div class="sig-line">Authorized Signatory</div>
+                </div>
+            </div>
+
+        </div><!-- /content -->
+    </div><!-- /page -->
 
 </body>
 </html>
+
+
+
+

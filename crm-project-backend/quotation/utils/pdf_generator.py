@@ -3,6 +3,8 @@ from django.template.loader import render_to_string
 from decimal import Decimal
 from django.conf import settings
 import logging
+import base64
+import os
 
 try:
     from weasyprint import HTML
@@ -10,6 +12,31 @@ except Exception:  # pragma: no cover - depends on OS native libs
     HTML = None
 
 logger = logging.getLogger(__name__)
+
+# Cache the base64 logo to avoid re-encoding on every PDF generation
+_BASE64_LOGO_CACHE = None
+
+def _get_base64_logo():
+    """Get cached base64 encoded logo or load and cache it."""
+    global _BASE64_LOGO_CACHE
+    
+    if _BASE64_LOGO_CACHE is not None:
+        return _BASE64_LOGO_CACHE
+    
+    try:
+        logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'heder.jpg')
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                _BASE64_LOGO_CACHE = base64.b64encode(f.read()).decode('utf-8')
+                logger.info("Logo cached successfully")
+        else:
+            logger.warning(f"Logo file not found: {logo_path}")
+            _BASE64_LOGO_CACHE = ''
+    except Exception as e:
+        logger.warning(f"Could not load header image: {str(e)}")
+        _BASE64_LOGO_CACHE = ''
+    
+    return _BASE64_LOGO_CACHE
 
 
 def _item_line_amount(item):
@@ -80,12 +107,17 @@ def _build_simple_quotation_context(quotation, version):
     high_items = list(version.high_side_items.all())
     line_items = []
 
+    running_basic_total = Decimal('0')
+    running_gst_total = Decimal('0')
+
     for item in high_items:
         qty = int(item.quantity or 0)
         unit_price = Decimal(str(item.unit_price or 0))
-        base = qty * unit_price
-        gst_amt = Decimal(str(item.gst_amount or 0))
-        total = base + gst_amt
+        base_amt = Decimal(str(getattr(item, 'base_amount', None) or (qty * unit_price)))
+        gst_amt = Decimal(str(getattr(item, 'gst_amount', None) or 0))
+
+        # Line item basic total (before GST)
+        line_total_basic = base_amt if base_amt > 0 else (qty * unit_price)
 
         car_capacity = item.product_data.get('car_capacity', 0) if item.product_data else 0
         total_cars = int(car_capacity) * qty if car_capacity else "—"
@@ -101,40 +133,144 @@ def _build_simple_quotation_context(quotation, version):
             'installation': Decimal('0'),
             'installation_fmt': '—',
             'cars': total_cars,
-            'total': total,
-            'total_fmt': _fmt_inr(total),
+            'total': line_total_basic,
+            'total_fmt': _fmt_inr(line_total_basic),
         })
 
-    basic_total = sum((i['total'] for i in line_items), Decimal('0'))
-    cgst = Decimal(str(version.cgst_amount or 0))
-    sgst = Decimal(str(version.sgst_amount or 0))
-    igst = Decimal(str(version.igst_amount or 0))
+        running_basic_total += line_total_basic
+        running_gst_total += gst_amt
+
+    # Use version subtotal (basic value before GST)
+    basic_total = Decimal(str(version.subtotal or 0))
+    if basic_total <= 0:
+        basic_total = running_basic_total
+
     grand_total = Decimal(str(version.grand_total or 0))
+    if grand_total <= 0:
+        grand_total = Decimal(str(version.total_amount or 0))
+    if grand_total <= 0:
+        grand_total = basic_total + running_gst_total
 
     gst_type = version.gst_type or "CGST_SGST"
-    half_pct = "9.00" if gst_type == "CGST_SGST" else "0.00"
-    total_gst_pct = float(version.gst_amount or 0) / float(basic_total) * 100 if basic_total else 18
+    
+    # Calculate exact GST components
+    total_gst_amount = Decimal(str(version.gst_amount or 0))
+    if total_gst_amount <= 0:
+        total_gst_amount = grand_total - basic_total
+
+    if gst_type == "CGST_SGST":
+        cgst = Decimal(str(version.cgst_amount or 0))
+        sgst = Decimal(str(version.sgst_amount or 0))
+        if cgst <= 0 and total_gst_amount > 0:
+            cgst = (total_gst_amount / Decimal('2')).quantize(Decimal('0.01'))
+            sgst = total_gst_amount - cgst
+        igst = Decimal('0')
+        half_pct = "9.00"
+    else:
+        igst = Decimal(str(version.igst_amount or 0))
+        if igst <= 0 and total_gst_amount > 0:
+            igst = total_gst_amount
+        cgst = Decimal('0')
+        sgst = Decimal('0')
+        half_pct = "0.00"
+
+    total_gst_pct = float((total_gst_amount / basic_total) * 100) if basic_total > 0 else 18.00
 
     # Filler rows to give table some visual height (min 3 rows)
     filler_count = max(0, 3 - len(line_items))
 
-    # Product name for project box
+    # Dynamic Product & Category details
     first_item = high_items[0] if high_items else None
-    product_name = (first_item.product_data.get('name', '') if first_item and first_item.product_data else '') or quotation.subject or "Parking System"
+    product_name = ""
+    category_name = ""
+    operation_type = "Hydraulic"
 
-    project_name = quotation.site_name or (quotation.site.site_name if quotation.site else None) or quotation.subject or "—"
+    if first_item and first_item.product_data:
+        p_data = first_item.product_data
+        product_name = p_data.get('name', '') or p_data.get('product_name', '')
+        category_name = p_data.get('category', '') or p_data.get('category_name', '')
 
-    # Get Terms & Conditions for this quotation
+        # Check if master product lookup gives additional category details
+        p_id = p_data.get('id')
+        if p_id:
+            try:
+                from parking_products.models import ParkingProduct
+                p_obj = ParkingProduct.objects.filter(id=p_id).first()
+                if not p_obj:
+                    p_obj = ParkingProduct.objects.filter(product_name__iexact=product_name).first()
+                if p_obj:
+                    if p_obj.category:
+                        category_name = p_obj.category.display_name
+                    if p_obj.operation_type:
+                        operation_type = p_obj.operation_type.title()
+            except Exception:
+                pass
+
+    if not category_name:
+        category_name = "Car Parking Systems"
+    if not product_name:
+        product_name = quotation.subject or "Parking System"
+
+    # Format full system name: Category + Product Name/Model (e.g. "Hydraulic Stack Car Parking Systems (2DP 101)")
+    if category_name.lower() in product_name.lower():
+        system_full_name = f"{operation_type} {product_name}"
+    elif "parking" in category_name.lower():
+        system_full_name = f"{operation_type} {category_name} ({product_name})"
+    else:
+        system_full_name = f"{operation_type} {category_name} Parking Systems ({product_name})"
+
+    # Display string for Offer Header table (shows Category + Product Name)
+    parking_systems_display = f"{category_name} - {product_name}" if category_name != product_name else product_name
+
+    # Project and Location details
+    project_name = quotation.site_name or (quotation.site.name if quotation.site else None) or quotation.subject or "—"
+    site_city = (quotation.site.city if quotation.site and quotation.site.city else None) or (quotation.customer.city if quotation.customer else None) or ""
+    site_location_str = f" at {site_city}" if site_city else ""
+    grand_total_words = _amount_in_words(grand_total)
+    grand_total_fmt = _fmt_inr(grand_total)
+
+    # Get Terms & Conditions for this quotation with dynamic content injection
     from quotation.terms_models import QuotationTerms
-    quotation_terms = QuotationTerms.objects.filter(
+    raw_terms = QuotationTerms.objects.filter(
         quotation=quotation
     ).order_by('sequence')
+
+    processed_terms = []
+    for t in raw_terms:
+        content = t.content or ""
+        seq = t.sequence
+        title_lower = (t.title or "").lower()
+
+        # Dynamic injection for Term 1 (Scope of Work)
+        if seq == 1 or "scope" in title_lower:
+            content = f"<p>The work to be executed under this contract is the complete design, fabrication, assembly/ erection, installation, testing & commissioning <strong>NNIT's {system_full_name}</strong> as per the technical specifications attached.</p>"
+
+        # Dynamic injection for Term 2 (Price & Terms of Payment)
+        elif seq == 2 or "price" in title_lower or "payment" in title_lower:
+            payment_schedule = """<p>1) 50% of order value including GST @ 18% as advance along with your order.</p>
+<p>2) 40% of order value including GST @ 18% after readiness of material against Proforma invoice.</p>
+<p>3) 10% of order value including GST @ 18% after successful trial, installation & handover of the System.</p>
+<p>Any delay in payments as per the above schedule shall carry interest @ 24% p.a. Our Rates are based on current prices of steel. If rates of steel escalate more than 2% of current prices of steel at the time of execution of the works contract, then our quoted prices will escalate proportionately.</p>"""
+            content = f"<p>The total consideration for execution of the above works contract <strong>for \"{project_name}\"{site_location_str}</strong>, shall be inclusive GST <strong>Rs. {grand_total_fmt} ({grand_total_words})</strong> which shall be due and payable as under —</p>{payment_schedule}"
+
+        processed_terms.append({
+            'sequence': t.sequence,
+            'title': t.title,
+            'content': content,
+            'is_customized': t.is_customized
+        })
+
+    # Get cached base64 logo (fast!)
+    base64_logo = _get_base64_logo()
 
     return {
         'quotation': quotation,
         'version': version,
         'project_name': project_name,
         'product_name': product_name,
+        'category_name': category_name,
+        'system_full_name': system_full_name,
+        'parking_systems_display': parking_systems_display,
         'line_items': line_items,
         'filler_rows': range(filler_count),
         'basic_total_fmt': _fmt_inr(basic_total),
@@ -145,9 +281,10 @@ def _build_simple_quotation_context(quotation, version):
         'sgst_fmt': _fmt_inr(sgst),
         'cgst_fmt': _fmt_inr(cgst),
         'igst_fmt': _fmt_inr(igst),
-        'grand_total_fmt': _fmt_inr(grand_total),
-        'amount_in_words': _amount_in_words(grand_total),
-        'terms': quotation_terms,  # Add terms to context
+        'grand_total_fmt': grand_total_fmt,
+        'amount_in_words': grand_total_words,
+        'terms': processed_terms,
+        'base64_logo': base64_logo,  # Cached base64 logo
     }
 
 
@@ -161,6 +298,12 @@ def generate_quotation_pdf(quotation, version, base_url=None):
                 "PDF generation is unavailable. Install WeasyPrint system libraries first."
             )
         context = _build_simple_quotation_context(quotation, version)
+        
+        # Force template reload by clearing Django template cache
+        from django.template import engines
+        from django.template.loader import get_template
+        engines.all()  # This triggers cache refresh
+        
         html_string = render_to_string('pdf/quotation.html', context)
         pdf = HTML(
             string=html_string,
@@ -181,6 +324,12 @@ def generate_quotation_print_pdf(quotation, version, base_url=None):
         raise RuntimeError(
             "PDF generation is unavailable on this machine. Install WeasyPrint system libraries first."
         )
+    
+    # Force template reload by clearing Django template cache
+    from django.template import engines
+    from django.template.loader import get_template
+    engines.all()  # This triggers cache refresh
+    
     dummy_rows = [
         {
             'sr': 1,
@@ -222,6 +371,9 @@ def generate_quotation_print_pdf(quotation, version, base_url=None):
         quotation=quotation
     ).order_by('sequence')
 
+    # Get cached base64 logo (fast!)
+    base64_logo = _get_base64_logo()
+
     context = {
         'quotation': quotation,
         'version': version,
@@ -230,7 +382,8 @@ def generate_quotation_print_pdf(quotation, version, base_url=None):
         'gst_amount': gst_amount,
         'grand_total': grand_total,
         'gst_percentage': gst_pct,
-        'terms': quotation_terms,  # Add terms to context
+        'terms': quotation_terms,
+        'base64_logo': base64_logo,  # Cached base64 logo
     }
 
     html_string = render_to_string('pdf/quotation_print.html', context)

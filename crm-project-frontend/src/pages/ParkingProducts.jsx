@@ -198,11 +198,11 @@ export default function ParkingProducts() {
                       <div className="flex items-start gap-4">
                         {/* Enlarged Image / Thumbnail Placeholder */}
                         <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200 shadow-inner">
-                          {product.image ? (
+                          {product.display_image || product.image || product.image_url ? (
                             <img
-                              src={product.image}
+                              src={product.display_image || product.image || product.image_url}
                               alt={product.product_name}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                             />
                           ) : (
                             <span className="text-3xl">🚗</span>
@@ -210,11 +210,11 @@ export default function ParkingProducts() {
                         </div>
 
                         {/* Title & Code */}
-                        <div className="space-y-1">
-                          <h4 className="font-black text-gray-900 text-lg leading-snug">
+                        <div className="space-y-0.5">
+                          <h4 className="font-bold text-gray-900 text-base leading-snug">
                             {product.product_name}
                           </h4>
-                          <p className="text-xs font-extrabold text-blue-600 uppercase tracking-wide">
+                          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
                             CODE: {product.product_code || 'N/A'}
                           </p>
                         </div>
@@ -222,43 +222,43 @@ export default function ParkingProducts() {
 
                       {/* Status & Category Badges */}
                       <div className="flex items-center gap-2 flex-wrap justify-end">
-                        <span className="px-3 py-1 text-[11px] font-black tracking-wider text-emerald-700 bg-emerald-100/80 rounded-full uppercase">
+                        <span className="px-2.5 py-0.5 text-xs font-semibold tracking-wide text-emerald-700 bg-emerald-100/80 rounded-full uppercase">
                           ACTIVE
                         </span>
                         {product.category_name && (
-                          <span className="px-3 py-1 text-[11px] font-black tracking-wider text-blue-700 bg-blue-100/80 rounded-full">
+                          <span className="px-2.5 py-0.5 text-xs font-semibold tracking-wide text-blue-700 bg-blue-100/80 rounded-full">
                             {product.category_name}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Bold & Detailed Specification Text */}
+                    {/* Specification Text */}
                     <div className="mt-4 pt-3 border-t border-slate-100">
                       {product.description ? (
-                        <p className="text-sm font-semibold text-gray-700 leading-relaxed line-clamp-3">
+                        <p className="text-sm font-normal text-gray-600 leading-relaxed line-clamp-3">
                           {product.description}
                         </p>
                       ) : (
-                        <p className="text-sm font-semibold text-gray-700 leading-relaxed">
-                          <span className="font-bold text-gray-900">Capacity:</span> <strong className="text-blue-700">{product.car_capacity} cars</strong> | 
-                          <span className="font-bold text-gray-900"> Levels:</span> <strong className="text-gray-900">{product.levels}</strong> | 
-                          <span className="font-bold text-gray-900"> Operation:</span> <strong className="text-gray-900">{product.operation_type}</strong> | 
-                          <span className="font-bold text-gray-900"> Pit Required:</span> <strong className="text-gray-900">{product.pit_required ? 'Yes' : 'No'}</strong>
+                        <p className="text-sm font-normal text-gray-600 leading-relaxed">
+                          <span className="font-medium text-gray-900">Capacity:</span> <strong className="font-semibold text-blue-700">{product.car_capacity} cars</strong> | 
+                          <span className="font-medium text-gray-900"> Levels:</span> <strong className="font-semibold text-gray-800">{product.levels}</strong> | 
+                          <span className="font-medium text-gray-900"> Operation:</span> <strong className="font-semibold text-gray-800">{product.operation_type}</strong> | 
+                          <span className="font-medium text-gray-900"> Pit:</span> <strong className="font-semibold text-gray-800">{product.pit_required ? 'Yes' : 'No'}</strong>
                         </p>
                       )}
                     </div>
                   </div>
 
                   {/* Bottom Stats & Action Bar */}
-                  <div className="py-4 px-6 border-t border-gray-100 bg-slate-50/80 flex items-center justify-between">
+                  <div className="py-3.5 px-6 border-t border-gray-100 bg-slate-50/80 flex items-center justify-between">
                     <div className="flex items-center gap-6">
                       {/* Base Price */}
                       <div>
-                        <span className="block text-[10px] font-black tracking-widest text-gray-400 uppercase">
+                        <span className="block text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
                           PRICE
                         </span>
-                        <span className="text-base font-black text-gray-900">
+                        <span className="text-sm font-bold text-gray-900">
                           {product.base_price
                             ? `₹${parseFloat(product.base_price).toFixed(2)}L`
                             : '—'}

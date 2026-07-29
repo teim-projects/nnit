@@ -1,19 +1,19 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Base from "../components/Base";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, RadialBarChart, RadialBar,
-  Legend, LineChart, Line,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from "recharts";
 import {
   FiUsers, FiCheckCircle, FiClock, FiAlertCircle, FiPackage,
   FiFileText, FiArrowUp, FiArrowDown, FiPhone, FiTrendingUp,
-  FiActivity, FiAward, FiTarget, FiZap, FiCalendar,
+  FiActivity, FiAward, FiTarget, FiZap, FiCalendar, FiPieChart, FiBarChart2
 } from "react-icons/fi";
+import { motion, AnimatePresence } from "framer-motion";
 
 /* ── palette ── */
-const C = { indigo:"#818cf8", emerald:"#34d399", orange:"#fb923c", violet:"#a78bfa", sky:"#38bdf8", pink:"#f472b6" };
-const PIE_COLORS = Object.values(C);
+const C = { indigo:"#6366f1", emerald:"#10b981", orange:"#f97316", violet:"#8b5cf6", sky:"#0ea5e9", pink:"#ec4899", rose:"#f43f5e", amber:"#f59e0b" };
+const PIE_COLORS = [C.indigo, C.emerald, C.orange, C.violet, C.sky, C.pink, C.rose, C.amber];
 
 const KPI_DEFS = [
   { key:"totalLeads",      label:"Total Leads",         icon:FiUsers,       from:"#818cf8",to:"#a5b4fc", trend:12,  up:true  },
@@ -24,17 +24,17 @@ const KPI_DEFS = [
 ];
 const MINI_DEFS = [
   { key:"openLeads",       label:"Open Leads",        icon:FiPhone,       color:C.indigo  },
-  { key:"todayFollowups",  label:"Today Follow-ups",  icon:FiClock,       color:C.emerald },
-  { key:"overdueFollowups",label:"Overdue",           icon:FiAlertCircle, color:"#f87171" },
+  { key:"todayFollowups",  label:"Today Follow-ups",  icon:FiCalendar,    color:C.emerald },
+  { key:"overdueFollowups",label:"Overdue",           icon:FiAlertCircle, color:C.rose },
   { key:"inProcessLeads",  label:"In Process",        icon:FiActivity,    color:C.orange  },
 ];
 
 /* ── hooks ── */
-function useCountUp(target, active, duration = 1100) {
+function useCountUp(target, duration = 1200) {
   const [v, setV] = useState(0);
   const raf = useRef();
   useEffect(() => {
-    if (!active || !target) { setV(0); return; }
+    if (!target) { setV(0); return; }
     let t0 = null;
     const ease = p => p < .5 ? 2*p*p : -1+(4-2*p)*p;
     const tick = ts => {
@@ -46,115 +46,90 @@ function useCountUp(target, active, duration = 1100) {
     };
     raf.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf.current);
-  }, [target, active, duration]);
+  }, [target, duration]);
   return v;
 }
 
-function useInView(ref, threshold=0.15) {
-  const [seen, setSeen] = useState(false);
-  useEffect(() => {
-    const io = new IntersectionObserver(([e])=>{ if(e.isIntersecting){setSeen(true);io.disconnect();} },{threshold});
-    if(ref.current) io.observe(ref.current);
-    return ()=>io.disconnect();
-  },[ref,threshold]);
-  return seen;
-}
+/* ── components ── */
+const Sk = ({className=""}) => <div className={`animate-pulse bg-slate-200/70 rounded-2xl ${className}`}/>;
 
-/* ── skeleton ── */
-const Sk = ({className=""}) => <div className={`animate-pulse bg-slate-200/70 rounded-xl ${className}`}/>;
-
-/* ── tooltip ── */
 function CT({active,payload,label}) {
   if(!active||!payload?.length) return null;
   return (
-    <div className="bg-white/95 backdrop-blur border border-slate-100 rounded-xl shadow-xl p-3 text-xs">
-      <p className="font-bold text-slate-600 mb-1.5">{label}</p>
+    <motion.div initial={{opacity:0,scale:0.95,y:5}} animate={{opacity:1,scale:1,y:0}} className="bg-white/95 backdrop-blur-md border border-slate-100 rounded-xl shadow-xl p-3 text-xs z-50">
+      <p className="font-semibold text-slate-700 mb-2 border-b border-slate-100 pb-1.5">{label}</p>
       {payload.map(p=>(
-        <p key={p.dataKey} className="flex items-center gap-1.5 font-semibold" style={{color:p.color}}>
-          <span className="w-2 h-2 rounded-full" style={{background:p.color}}/>
-          {p.name}: <span className="font-bold ml-0.5">{p.value}</span>
+        <p key={p.dataKey||p.name} className="flex items-center justify-between gap-5 font-medium mb-1" style={{color:p.color||p.fill}}>
+          <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{background:p.color||p.fill}}/>{p.name}</span>
+          <span className="font-bold text-slate-800 ml-2">{p.value}</span>
         </p>
       ))}
-    </div>
+    </motion.div>
   );
 }
 
-/* ── animated card wrapper ── */
-function FadeCard({children, className="", delay=0}) {
-  const ref = useRef(); const seen = useInView(ref);
-  return (
-    <div ref={ref} className={`bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg transition-all duration-500 ${className}`}
-      style={{opacity:seen?1:0,transform:seen?"translateY(0)":"translateY(22px)",transition:`opacity .55s ease ${delay}ms,transform .55s cubic-bezier(.22,1,.36,1) ${delay}ms`}}>
-      {children}
-    </div>
-  );
-}
+const itemVariant = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } }
+};
 
-/* ── KPI card ── */
-function KpiCard({icon:Icon,label,value,from,to,trend,up,delay=0}) {
-  const ref=useRef(); const seen=useInView(ref); const animated=useCountUp(value,seen);
+function KpiCard({icon:Icon,label,value,from,to,trend,up}) {
+  const animated=useCountUp(value);
   return (
-    <div ref={ref} className="relative overflow-hidden rounded-2xl p-5 cursor-default group"
-      style={{background:`linear-gradient(135deg,${from},${to})`,boxShadow:`0 6px 24px ${from}44`,
-        opacity:seen?1:0,transform:seen?"translateY(0) scale(1)":"translateY(24px) scale(.97)",
-        transition:`opacity .5s ease ${delay}ms,transform .5s cubic-bezier(.22,1,.36,1) ${delay}ms`}}>
-      <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/15 group-hover:scale-125 transition-transform duration-700"/>
-      <div className="absolute right-4 -bottom-10 w-20 h-20 rounded-full bg-white/10"/>
+    <motion.div variants={itemVariant} whileHover={{y:-4,boxShadow:`0 15px 25px -5px ${from}55`}} className="relative overflow-hidden rounded-2xl p-5 cursor-default group transition-all"
+      style={{background:`linear-gradient(135deg,${from},${to})`,boxShadow:`0 8px 20px -5px ${from}33`}}>
+      <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/20 group-hover:scale-125 transition-transform duration-700 ease-out"/>
+      <div className="absolute right-4 -bottom-10 w-20 h-20 rounded-full bg-white/10 group-hover:-translate-y-4 transition-transform duration-700 ease-out"/>
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-4">
-          <div className="p-2.5 bg-white/25 backdrop-blur-sm rounded-xl"><Icon className="w-5 h-5 text-white"/></div>
-          {trend!=null&&<span className="flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-white/25 text-white">
-            {up?<FiArrowUp className="w-2.5 h-2.5"/>:<FiArrowDown className="w-2.5 h-2.5"/>}{trend}%
+          <div className="p-2.5 bg-white/25 backdrop-blur-md rounded-xl"><Icon className="w-5 h-5 text-white"/></div>
+          {trend!=null&&<span className="flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg bg-white/25 text-white backdrop-blur-md shadow-sm">
+            {up?<FiArrowUp className="w-3 h-3"/>:<FiArrowDown className="w-3 h-3"/>}{trend}%
           </span>}
         </div>
-        <div className="text-3xl font-extrabold text-white">{animated.toLocaleString()}</div>
-        <div className="text-xs font-semibold text-white/80 mt-1">{label}</div>
+        <div className="text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">{animated.toLocaleString()}</div>
+        <div className="text-xs font-medium text-white/90 mt-1">{label}</div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-/* ── mini card ── */
 function MiniCard({icon:Icon,label,value,color}) {
-  const ref=useRef(); const seen=useInView(ref); const animated=useCountUp(value,seen);
+  const animated=useCountUp(value);
   return (
-    <div ref={ref} className="bg-white rounded-xl p-4 border border-slate-100 flex items-center gap-3 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5"
-      style={{opacity:seen?1:0,transform:seen?"translateY(0)":"translateY(16px)",transition:"opacity .45s ease,transform .45s ease"}}>
-      <div className="p-2.5 rounded-xl shrink-0" style={{background:color+"18"}}><Icon className="w-5 h-5" style={{color}}/></div>
-      <div><div className="text-2xl font-bold text-slate-800">{animated}</div><div className="text-xs text-slate-400 font-medium">{label}</div></div>
-    </div>
+    <motion.div variants={itemVariant} whileHover={{y:-3,boxShadow:"0 10px 15px -3px rgba(0,0,0,0.05)"}} className="bg-white rounded-xl p-4 border border-slate-100 flex items-center gap-4 transition-all shadow-sm">
+      <div className="p-3 rounded-xl shrink-0" style={{background:color+"18",color:color}}><Icon className="w-5 h-5"/></div>
+      <div><div className="text-xl font-bold text-slate-800">{animated}</div><div className="text-[11px] text-slate-500 font-semibold uppercase tracking-wide mt-0.5">{label}</div></div>
+    </motion.div>
   );
 }
 
-/* ── animated funnel bar ── */
 function FunnelBar({label,value,max,color,pct}) {
-  const ref=useRef(); const seen=useInView(ref);
   const w = max>0?Math.round((value/max)*100):0;
   return (
-    <div ref={ref} className="space-y-1.5">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-slate-700">{label}</span>
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-slate-800">{value.toLocaleString()}</span>
-          {pct!=null&&<span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full" style={{background:color+"20",color}}>{pct}%</span>}
+          {pct!=null&&<span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{background:color+"20",color}}>{pct}%</span>}
         </div>
       </div>
-      <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-        <div className="h-full rounded-full" style={{width:seen?`${w}%`:"0%",background:`linear-gradient(90deg,${color},${color}99)`,transition:"width 1.1s cubic-bezier(.22,1,.36,1)"}}/>
+      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+        <motion.div initial={{width:0}} animate={{width:`${w}%`}} transition={{duration:1.4,ease:[0.22, 1, 0.36, 1],delay:0.2}} className="h-full rounded-full" style={{background:`linear-gradient(90deg,${color},${color}dd)`}}/>
       </div>
     </div>
   );
 }
 
-/* ═══════════════ MAIN ═══════════════ */
 export default function Dashboard() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
   const token = localStorage.getItem("access")||"";
-  const [stats,setStats] = useState({totalLeads:0,totalCustomers:0,totalQuotations:0,totalProducts:0,openLeads:0,closedLeads:0,inProcessLeads:0,overdueFollowups:0,todayFollowups:0,avgResponseDays:0});
-  const [loading,setLoading] = useState(true);
+  const [stats,setStats] = useState(null);
   const [monthly,setMonthly] = useState([]);
   const [statusData,setStatusData] = useState([]);
   const [srcData,setSrcData] = useState([]);
+  const [portfolioData,setPortfolioData] = useState([]); 
   const [recent,setRecent] = useState([]);
   const [greeting,setGreeting] = useState("Good morning");
 
@@ -162,7 +137,6 @@ export default function Dashboard() {
 
   useEffect(()=>{
     const go=async()=>{
-      setLoading(true);
       const hdr=token?{Authorization:`Bearer ${token}`}:{};
       const safe=async(u)=>{try{const r=await fetch(u,{headers:hdr});return r.ok?r.json():null;}catch{return null;}};
       const [ld,cu,qu,pr]=await Promise.all([safe(`${BASE_API}/lead/lead/?page_size=1000`),safe(`${BASE_API}/lead/customer/?page_size=1000`),safe(`${BASE_API}/api/quotation/quotation/?page_size=1000`),safe(`${BASE_API}/parking/products/?page_size=100`)]);
@@ -172,25 +146,36 @@ export default function Dashboard() {
       const open=L.filter(l=>l.status==="open").length,closed=L.filter(l=>l.status==="closed").length,inp=L.filter(l=>l.status==="in_process").length;
       const tFU=L.filter(l=>{if(!l.followup_date)return false;const d=new Date(l.followup_date);d.setHours(0,0,0,0);return d.getTime()===today.getTime();}).length;
       const ov=L.filter(l=>{if(!l.followup_date)return false;const d=new Date(l.followup_date);d.setHours(0,0,0,0);return d<today;}).length;
+      
       const mon={};const last6=[];
       for(let i=5;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;last6.push(k);mon[k]={month:d.toLocaleDateString("en-IN",{month:"short"}),leads:0,customers:0,quotations:0};}
       L.forEach(x=>{const d=new Date(x.created_at||x.date);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;if(mon[k])mon[k].leads++;});
       Cu.forEach(x=>{const d=new Date(x.created_at);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;if(mon[k])mon[k].customers++;});
       Q.forEach(x=>{const d=new Date(x.created_at);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;if(mon[k])mon[k].quotations++;});
+      
       const sc={};L.forEach(l=>{const s=l.lead_source||"Unknown";sc[s]=(sc[s]||0)+1;});
       const rt=L.filter(l=>l.followup_date&&(l.created_at||l.date)).map(l=>Math.max(0,Math.round((new Date(l.followup_date)-new Date(l.created_at||l.date))/864e5)));
       const avg=rt.length?Math.round(rt.reduce((a,b)=>a+b,0)/rt.length):0;
+      
       setStats({totalLeads:L.length,totalCustomers:Cu.length,totalQuotations:Q.length,totalProducts:P.length,openLeads:open,closedLeads:closed,inProcessLeads:inp,overdueFollowups:ov,todayFollowups:tFU,avgResponseDays:avg});
       setMonthly(last6.map(k=>mon[k]));
       setStatusData([{name:"Open",value:open,fill:C.indigo},{name:"In Process",value:inp,fill:C.orange},{name:"Closed",value:closed,fill:C.emerald}]);
       setSrcData(Object.entries(sc).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value).slice(0,6));
-      setRecent(L.sort((a,b)=>new Date(b.created_at||b.date)-new Date(a.created_at||a.date)).slice(0,7).map(l=>({id:l.id,name:l.customer_name,date:l.date||l.created_at,status:l.status,src:l.lead_source})));
-      setLoading(false);
+      
+      // CRM Portfolio Distribution Pie Data
+      setPortfolioData([
+        { name:"Leads", value:L.length, fill:C.indigo },
+        { name:"Customers", value:Cu.length, fill:C.emerald },
+        { name:"Quotations", value:Q.length, fill:C.orange },
+        { name:"Products", value:P.length, fill:C.violet }
+      ].filter(d=>d.value>0));
+      
+      setRecent(L.sort((a,b)=>new Date(b.created_at||b.date)-new Date(a.created_at||a.date)).slice(0,6).map(l=>({id:l.id,name:l.customer_name,date:l.date||l.created_at,status:l.status,src:l.lead_source})));
     };
     go();
   },[BASE_API,token]);
 
-  if(loading) return (<Base title="Dashboard"><div className="space-y-4 p-2"><Sk className="h-32"/><div className="grid grid-cols-2 lg:grid-cols-5 gap-3">{[...Array(5)].map((_,i)=><Sk key={i} className="h-28"/>)}</div><div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[...Array(4)].map((_,i)=><Sk key={i} className="h-20"/>)}</div><div className="grid grid-cols-1 lg:grid-cols-3 gap-4">{[...Array(3)].map((_,i)=><Sk key={i} className="h-64"/>)}</div></div></Base>);
+  if(!stats) return (<Base title="Dashboard"><div className="space-y-4 p-4"><Sk className="h-40"/><div className="grid grid-cols-2 lg:grid-cols-5 gap-4">{[...Array(5)].map((_,i)=><Sk key={i} className="h-32"/>)}</div><div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(4)].map((_,i)=><Sk key={i} className="h-24"/>)}</div><div className="grid grid-cols-1 lg:grid-cols-3 gap-5">{[...Array(3)].map((_,i)=><Sk key={i} className="h-72"/>)}</div></div></Base>);
 
   const cRate=stats.totalLeads>0?Math.round((stats.totalCustomers/stats.totalLeads)*100):0;
   const qRate=stats.totalLeads>0?Math.round((stats.totalQuotations/stats.totalLeads)*100):0;
@@ -199,158 +184,213 @@ export default function Dashboard() {
   const sCol=s=>s==="open"?C.indigo:s==="closed"?C.emerald:C.orange;
   const funnelData=[{name:"Leads",val:stats.totalLeads,pct:null},{name:"Quotations",val:stats.totalQuotations,pct:qRate},{name:"Customers",val:stats.totalCustomers,pct:cRate},{name:"Closed",val:stats.closedLeads,pct:clRate}];
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+
   return (
     <Base title="Dashboard">
-      <div className="space-y-5 pb-8">
+      <motion.div initial="hidden" animate="visible" variants={containerVariants} className="space-y-5 pb-10">
 
         {/* ── HERO ── */}
-        <div className="relative overflow-hidden rounded-2xl p-6 sm:p-8" style={{background:"linear-gradient(135deg,#eef2ff 0%,#ede9fe 60%,#fce7f3 100%)"}}>
-          <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/30 blur-3xl animate-pulse"/>
-          <div className="absolute bottom-0 left-1/3 w-40 h-40 rounded-full bg-violet-200/30 blur-2xl"/>
-          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+        <motion.div variants={itemVariant} className="relative overflow-hidden rounded-3xl p-6 sm:p-8 border border-white/60 shadow-sm" style={{background:"linear-gradient(135deg, #eef2ff 0%, #ede9fe 50%, #fce7f3 100%)"}}>
+          <div className="absolute -top-16 -right-16 w-72 h-72 rounded-full bg-white/50 blur-3xl animate-pulse"/>
+          <div className="absolute -bottom-8 left-1/4 w-48 h-48 rounded-full bg-violet-300/30 blur-3xl"/>
+          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center"><FiZap className="w-3.5 h-3.5 text-indigo-600"/></span>
-                <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest">CRM Overview</span>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center"><FiZap className="w-4 h-4 text-indigo-600"/></span>
+                <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wide bg-white/60 px-3 py-1.5 rounded-lg shadow-sm backdrop-blur-sm">CRM Overview</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800">{greeting}! 👋</h1>
-              <p className="text-sm text-slate-500 mt-1">Here's your business snapshot for today.</p>
-              <div className="flex flex-wrap gap-3 mt-4">
-                {[{l:"Leads",v:stats.totalLeads,c:"text-indigo-600",bg:"bg-indigo-50"},{l:"Customers",v:stats.totalCustomers,c:"text-emerald-600",bg:"bg-emerald-50"},{l:"Quotations",v:stats.totalQuotations,c:"text-orange-600",bg:"bg-orange-50"}].map(s=>(
-                  <div key={s.l} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${s.bg}`}>
-                    <span className={`text-lg font-extrabold ${s.c}`}>{s.v}</span>
-                    <span className="text-xs font-medium text-slate-500">{s.l}</span>
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-800 tracking-tight">{greeting}! 👋</h1>
+              <p className="text-sm font-medium text-slate-600 mt-2">Here's your business snapshot for today.</p>
+              <div className="flex flex-wrap gap-3 mt-6">
+                {[{l:"Leads",v:stats.totalLeads,c:"text-indigo-700",bg:"bg-indigo-100"},{l:"Customers",v:stats.totalCustomers,c:"text-emerald-700",bg:"bg-emerald-100"},{l:"Quotations",v:stats.totalQuotations,c:"text-orange-700",bg:"bg-orange-100"}].map(s=>(
+                  <div key={s.l} className={`flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm ${s.bg}`}>
+                    <span className={`text-lg font-bold ${s.c}`}>{s.v}</span>
+                    <span className={`text-xs font-semibold uppercase tracking-wide ${s.c} opacity-80`}>{s.l}</span>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="shrink-0 bg-white/60 backdrop-blur border border-white/80 rounded-2xl px-6 py-4 text-center shadow-sm">
-              <div className="text-xs text-slate-400 font-semibold uppercase tracking-wide mb-1">{new Date().toLocaleDateString("en-IN",{weekday:"long"})}</div>
-              <div className="text-2xl font-extrabold text-slate-800">{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short"})}</div>
-              <div className="text-sm text-slate-400 mt-0.5">{new Date().getFullYear()}</div>
-              {stats.overdueFollowups>0&&<div className="mt-3 flex items-center gap-1 bg-red-50 text-red-600 text-xs font-bold px-3 py-1.5 rounded-full"><FiAlertCircle className="w-3 h-3"/>{stats.overdueFollowups} overdue</div>}
-              {stats.todayFollowups>0&&<div className="mt-2 flex items-center gap-1 bg-emerald-50 text-emerald-600 text-xs font-bold px-3 py-1.5 rounded-full"><FiCalendar className="w-3 h-3"/>{stats.todayFollowups} today</div>}
+            <div className="shrink-0 bg-white/80 backdrop-blur-md border border-white rounded-2xl p-6 text-center shadow-sm hover:-translate-y-1 transition-transform duration-500">
+              <div className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-1">{new Date().toLocaleDateString("en-IN",{weekday:"long"})}</div>
+              <div className="text-4xl font-extrabold text-slate-800 tracking-tight">{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short"})}</div>
+              <div className="text-xs font-medium text-slate-400 mt-1 uppercase">{new Date().getFullYear()}</div>
+              <div className="mt-4 space-y-1.5">
+                {stats.overdueFollowups>0&&<div className="flex items-center justify-center gap-1.5 bg-rose-50 text-rose-600 text-[11px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wide"><FiAlertCircle className="w-3.5 h-3.5"/>{stats.overdueFollowups} overdue</div>}
+                {stats.todayFollowups>0&&<div className="flex items-center justify-center gap-1.5 bg-emerald-50 text-emerald-600 text-[11px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wide"><FiCalendar className="w-3.5 h-3.5"/>{stats.todayFollowups} today</div>}
+              </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* ── KPI CARDS ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-          {KPI_DEFS.map((d,i)=><KpiCard key={d.key} icon={d.icon} label={d.label} value={stats[d.key]} from={d.from} to={d.to} trend={d.trend} up={d.up} delay={i*80}/>)}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {KPI_DEFS.map(d=><KpiCard key={d.key} icon={d.icon} label={d.label} value={stats[d.key]} from={d.from} to={d.to} trend={d.trend} up={d.up}/>)}
         </div>
 
-        {/* ── MINI ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* ── MINI CARDS ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {MINI_DEFS.map(d=><MiniCard key={d.key} icon={d.icon} label={d.label} value={stats[d.key]} color={d.color}/>)}
         </div>
 
-        {/* ── ROW 1: Area + Donut ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
-          <FadeCard className="lg:col-span-2 p-5 sm:p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div><p className="text-sm font-bold text-slate-700 flex items-center gap-2"><FiTrendingUp className="text-indigo-400"/>Monthly Trends</p><p className="text-xs text-slate-400 mt-0.5">Last 6 months — animated on load</p></div>
-              <div className="hidden sm:flex gap-3 text-xs">{[["Leads",C.indigo],["Customers",C.emerald],["Quotations",C.orange]].map(([l,c])=><span key={l} className="flex items-center gap-1 font-semibold" style={{color:c}}><span className="w-3 h-1.5 rounded-full" style={{background:c}}/>{l}</span>)}</div>
+        {/* ── ROW 1: Area + NEW CRM Portfolio Pie ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <motion.div variants={itemVariant} className="lg:col-span-2 bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-500">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+              <div><p className="text-base font-bold text-slate-800 flex items-center gap-2"><FiTrendingUp className="text-indigo-500"/>Monthly Trends</p><p className="text-[11px] font-medium text-slate-400 mt-1 uppercase tracking-wide">Revenue & Growth metrics</p></div>
+              <div className="flex flex-wrap gap-3 text-xs">{[["Leads",C.indigo],["Customers",C.emerald],["Quotations",C.orange]].map(([l,c])=><span key={l} className="flex items-center gap-1.5 font-semibold text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md"><span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{background:c}}/>{l}</span>)}</div>
             </div>
-            <div className="h-56">
+            <div className="h-64 sm:h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthly} margin={{top:5,right:5,left:-20,bottom:0}}>
-                  <defs>{[["leads",C.indigo],["customers",C.emerald],["quotations",C.orange]].map(([k,c])=><linearGradient key={k} id={`ag-${k}`} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={c} stopOpacity={0.28}/><stop offset="95%" stopColor={c} stopOpacity={0}/></linearGradient>)}</defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-                  <XAxis dataKey="month" stroke="#cbd5e1" tick={{fontSize:11}} tickLine={false} axisLine={false}/>
-                  <YAxis stroke="#cbd5e1" tick={{fontSize:11}} tickLine={false} axisLine={false}/>
+                <AreaChart data={monthly} margin={{top:5,right:5,left:-25,bottom:0}}>
+                  <defs>{[["leads",C.indigo],["customers",C.emerald],["quotations",C.orange]].map(([k,c])=><linearGradient key={k} id={`ag-${k}`} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={c} stopOpacity={0.3}/><stop offset="95%" stopColor={c} stopOpacity={0}/></linearGradient>)}</defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f8fafc" vertical={false}/>
+                  <XAxis dataKey="month" stroke="#94a3b8" tick={{fontSize:11,fontWeight:500}} tickLine={false} axisLine={false} dy={8}/>
+                  <YAxis stroke="#94a3b8" tick={{fontSize:11,fontWeight:500}} tickLine={false} axisLine={false} dx={-8}/>
                   <Tooltip content={<CT/>}/>
-                  {[["leads","Leads",C.indigo],["customers","Customers",C.emerald],["quotations","Quotations",C.orange]].map(([k,n,c])=><Area key={k} type="monotone" dataKey={k} name={n} stroke={c} strokeWidth={2.5} fill={`url(#ag-${k})`} dot={{r:3,fill:c,strokeWidth:0}} activeDot={{r:5}} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out"/>)}
+                  {[["leads","Leads",C.indigo],["customers","Customers",C.emerald],["quotations","Quotations",C.orange]].map(([k,n,c])=><Area key={k} type="monotone" dataKey={k} name={n} stroke={c} strokeWidth={2.5} fill={`url(#ag-${k})`} dot={{r:4,fill:c,strokeWidth:0}} activeDot={{r:6,strokeWidth:2,stroke:"#fff"}} isAnimationActive animationDuration={1800} animationEasing="ease-out"/>)}
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-          </FadeCard>
-          <FadeCard className="p-5 sm:p-6 flex flex-col" delay={100}>
-            <p className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-4"><FiTarget className="text-indigo-400"/>Lead Status</p>
-            <div className="flex-1 min-h-[180px] flex items-center justify-center">
-              {statusData.some(d=>d.value>0)?(
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart><Pie data={statusData} cx="50%" cy="50%" innerRadius={52} outerRadius={80} dataKey="value" paddingAngle={4} strokeWidth={0} isAnimationActive animationBegin={200} animationDuration={1000} animationEasing="ease-out">
-                    {statusData.map((d,i)=><Cell key={i} fill={d.fill}/>)}
-                  </Pie>
-                  <Tooltip contentStyle={{borderRadius:"10px",border:"1px solid #f1f5f9",fontSize:"12px"}}/></PieChart>
-                </ResponsiveContainer>
-              ):<div className="text-slate-300 text-sm">No data</div>}
-            </div>
-            <div className="space-y-2 mt-2">{statusData.map(d=><div key={d.name} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-slate-600 font-medium"><span className="w-2.5 h-2.5 rounded-full" style={{background:d.fill}}/>{d.name}</span><span className="font-bold text-slate-800">{d.value}</span></div>)}</div>
-          </FadeCard>
-        </div>
+          </motion.div>
 
-        {/* ── ROW 2: Funnel + Sources Pie ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-          <FadeCard className="p-5 sm:p-6">
-            <p className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-5"><FiActivity className="text-violet-400"/>Conversion Funnel</p>
-            <div className="space-y-5">{funnelData.map((f,i)=><FunnelBar key={f.name} label={f.name} value={f.val} max={stats.totalLeads} color={PIE_COLORS[i]} pct={f.pct}/>)}</div>
-            <div className="grid grid-cols-3 gap-3 mt-6">{[{l:"Conversion",v:cRate,c:C.indigo},{l:"Quote Rate",v:qRate,c:C.emerald},{l:"Close Rate",v:clRate,c:C.orange}].map(m=><div key={m.l} className="text-center py-3 rounded-xl" style={{background:m.c+"14"}}><div className="text-xl font-extrabold" style={{color:m.c}}>{m.v}%</div><div className="text-[11px] text-slate-400 font-medium mt-0.5">{m.l}</div></div>)}</div>
-          </FadeCard>
-
-          <FadeCard className="p-5 sm:p-6" delay={80}>
-            <p className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-4"><FiAward className="text-emerald-400"/>Lead Sources</p>
-            {srcData.length>0?(
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <div className="w-full sm:w-1/2 h-52">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart><Pie data={srcData} cx="50%" cy="50%" outerRadius={80} innerRadius={30} dataKey="value" paddingAngle={3} strokeWidth={0} isAnimationActive animationBegin={300} animationDuration={1100} animationEasing="ease-out" label={({name,percent})=>percent>0.08?`${(percent*100).toFixed(0)}%`:""} labelLine={false}>
-                      {srcData.map((_,i)=><Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
+          <motion.div variants={itemVariant} className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-500 flex flex-col">
+            <p className="text-base font-bold text-slate-800 flex items-center gap-2 mb-1"><FiPieChart className="text-violet-500"/>CRM Portfolio</p>
+            <p className="text-[11px] font-medium text-slate-400 mb-6 uppercase tracking-wide">Overall entity distribution</p>
+            <div className="flex-1 min-h-[200px] flex items-center justify-center relative">
+              {portfolioData.length>0?(
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={portfolioData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" paddingAngle={3} strokeWidth={0} isAnimationActive animationBegin={300} animationDuration={1500} animationEasing="ease-out">
+                      {portfolioData.map((d,i)=><Cell key={i} fill={d.fill}/>)}
                     </Pie>
-                    <Tooltip contentStyle={{borderRadius:"10px",border:"1px solid #f1f5f9",fontSize:"12px"}}/></PieChart>
-                  </ResponsiveContainer>
+                    <Tooltip content={<CT/>}/>
+                  </PieChart>
+                </ResponsiveContainer>
+              ):<div className="text-slate-300 text-xs font-medium">No data</div>}
+              {portfolioData.length>0 && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="text-center mt-1">
+                    <div className="text-3xl font-extrabold text-slate-800 tracking-tight">{stats.totalLeads+stats.totalCustomers+stats.totalQuotations+stats.totalProducts}</div>
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">Total</div>
+                  </div>
                 </div>
-                <div className="w-full sm:w-1/2 space-y-2">{srcData.map((d,i)=><div key={d.name} className="flex items-center justify-between text-xs"><span className="flex items-center gap-1.5 font-medium text-slate-600 truncate max-w-[110px]"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:PIE_COLORS[i%PIE_COLORS.length]}}/>{d.name}</span><span className="font-bold text-slate-700">{d.value}</span></div>)}</div>
-              </div>
-            ):<div className="h-52 flex items-center justify-center text-slate-300 text-sm">No source data</div>}
-          </FadeCard>
-        </div>
-
-        {/* ── ROW 3: Bar chart + Recent Activity ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-5">
-          <FadeCard className="lg:col-span-2 p-5 sm:p-6">
-            <p className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-1"><FiTrendingUp className="text-indigo-400"/>Performance</p>
-            <p className="text-xs text-slate-400 mb-4">Conversion rates this cycle</p>
-            <div className="flex items-center gap-3 bg-sky-50 rounded-xl px-4 py-3 border border-sky-100 mb-4">
-              <div className="p-2 bg-sky-100 rounded-lg shrink-0"><FiClock className="w-4 h-4 text-sky-500"/></div>
-              <div><div className="text-[11px] text-sky-500 font-bold uppercase tracking-wide">Avg Response</div><div className="text-xl font-extrabold text-sky-700">{stats.avgResponseDays} <span className="text-sm text-sky-400 font-semibold">days</span></div></div>
-              <div className="ml-auto text-[10px] text-sky-300 font-medium">Lead→Follow-up</div>
+              )}
             </div>
-            <div className="h-44">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={[{name:"Leads",value:stats.totalLeads},{name:"Quotes",value:stats.totalQuotations},{name:"Customers",value:stats.totalCustomers}]} margin={{top:0,right:5,left:-20,bottom:0}}>
-                  <defs><linearGradient id="bg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.indigo}/><stop offset="100%" stopColor={C.violet}/></linearGradient></defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-                  <XAxis dataKey="name" stroke="#cbd5e1" tick={{fontSize:11}} tickLine={false} axisLine={false}/>
-                  <YAxis stroke="#cbd5e1" tick={{fontSize:11}} tickLine={false} axisLine={false}/>
-                  <Tooltip content={<CT/>}/>
-                  <Bar dataKey="value" name="Count" fill="url(#bg1)" radius={[8,8,0,0]} maxBarSize={50} isAnimationActive animationBegin={200} animationDuration={1000} animationEasing="ease-out"/>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </FadeCard>
-
-          <FadeCard className="lg:col-span-3 p-5 sm:p-6" delay={60}>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-bold text-slate-700 flex items-center gap-2"><FiClock className="text-indigo-400"/>Recent Leads</p>
-              <span className="text-[11px] bg-indigo-50 text-indigo-500 font-bold px-2.5 py-1 rounded-full">{recent.length} entries</span>
-            </div>
-            <div className="space-y-2">
-              {recent.length===0?(<div className="flex flex-col items-center py-8 text-slate-300"><FiUsers className="w-10 h-10 mb-2 opacity-30"/><p className="text-sm">No activity</p></div>):
-              recent.map((a,i)=>(
-                <div key={a.id||i} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors"
-                  style={{opacity:0,animation:`fadeSlide .4s ease forwards`,animationDelay:`${i*60}ms`}}>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:sCol(a.status)}}>{(a.name||"?").charAt(0).toUpperCase()}</div>
-                  <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-slate-800 truncate">{a.name||"—"}</p><p className="text-xs text-slate-400">{a.src||"Lead"} · {a.date?new Date(a.date).toLocaleDateString("en-IN",{day:"2-digit",month:"short"}):"—"}</p></div>
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${sBg(a.status)}`}>{a.status}</span>
+            <div className="grid grid-cols-2 gap-2 mt-5">
+              {portfolioData.map(d=>(
+                <div key={d.name} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 hover:bg-slate-100 transition-colors">
+                  <div className="flex items-center gap-1.5 mb-1"><span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{background:d.fill}}/><span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{d.name}</span></div>
+                  <div className="text-lg font-bold text-slate-800 pl-4">{d.value}</div>
                 </div>
               ))}
             </div>
-          </FadeCard>
+          </motion.div>
         </div>
 
-      </div>
-      <style>{`@keyframes fadeSlide{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
+        {/* ── ROW 2: Lead Status + Lead Sources + Funnel ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <motion.div variants={itemVariant} className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-500 flex flex-col">
+            <p className="text-base font-bold text-slate-800 flex items-center gap-2 mb-1"><FiTarget className="text-rose-500"/>Lead Status</p>
+            <p className="text-[11px] font-medium text-slate-400 mb-6 uppercase tracking-wide">Current Pipeline</p>
+            <div className="flex-1 min-h-[200px] flex items-center justify-center">
+              {statusData.some(d=>d.value>0)?(
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={statusData} cx="50%" cy="50%" outerRadius={90} dataKey="value" paddingAngle={2} strokeWidth={2} stroke="#fff" isAnimationActive animationBegin={500} animationDuration={1500} animationEasing="ease-out" label={({name,percent})=>percent>0.05?`${(percent*100).toFixed(0)}%`:""} labelLine={false}>
+                      {statusData.map((d,i)=><Cell key={i} fill={d.fill}/>)}
+                    </Pie>
+                    <Tooltip content={<CT/>}/>
+                  </PieChart>
+                </ResponsiveContainer>
+              ):<div className="text-slate-300 text-xs font-medium">No data</div>}
+            </div>
+            <div className="space-y-2 mt-5">{statusData.map(d=><div key={d.name} className="flex items-center justify-between text-xs px-3 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors rounded-lg border border-slate-100"><span className="flex items-center gap-2 text-slate-700 font-medium"><span className="w-3 h-3 rounded-full shadow-sm" style={{background:d.fill}}/>{d.name}</span><span className="font-bold text-slate-800">{d.value}</span></div>)}</div>
+          </motion.div>
+
+          <motion.div variants={itemVariant} className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-500 flex flex-col">
+            <p className="text-base font-bold text-slate-800 flex items-center gap-2 mb-1"><FiAward className="text-amber-500"/>Lead Sources</p>
+            <p className="text-[11px] font-medium text-slate-400 mb-6 uppercase tracking-wide">Top origin channels</p>
+            <div className="flex-1 min-h-[200px] flex items-center justify-center">
+              {srcData.length>0?(
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={srcData} cx="50%" cy="50%" outerRadius={90} innerRadius={45} dataKey="value" paddingAngle={3} strokeWidth={0} isAnimationActive animationBegin={700} animationDuration={1500} animationEasing="ease-out">
+                      {srcData.map((_,i)=><Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
+                    </Pie>
+                    <Tooltip content={<CT/>}/>
+                  </PieChart>
+                </ResponsiveContainer>
+              ):<div className="text-slate-300 text-xs font-medium">No source data</div>}
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-5">{srcData.slice(0,4).map((d,i)=><div key={d.name} className="flex flex-col bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors"><span className="flex items-center gap-1.5 font-medium text-slate-600 truncate text-[11px] uppercase tracking-wide"><span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{background:PIE_COLORS[i%PIE_COLORS.length]}}/>{d.name}</span><span className="font-bold text-base text-slate-800 pl-4 mt-1">{d.value}</span></div>)}</div>
+          </motion.div>
+
+          <motion.div variants={itemVariant} className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-500">
+            <p className="text-base font-bold text-slate-800 flex items-center gap-2 mb-1"><FiActivity className="text-sky-500"/>Conversion Funnel</p>
+            <p className="text-[11px] font-medium text-slate-400 mb-8 uppercase tracking-wide">Pipeline velocity</p>
+            <div className="space-y-6">{funnelData.map((f,i)=><FunnelBar key={f.name} label={f.name} value={f.val} max={stats.totalLeads} color={PIE_COLORS[i]} pct={f.pct}/>)}</div>
+            <div className="grid grid-cols-3 gap-2 mt-8">
+              {[{l:"Conv. Rate",v:cRate,c:C.indigo},{l:"Quote Rate",v:qRate,c:C.emerald},{l:"Close Rate",v:clRate,c:C.orange}].map(m=>
+                <div key={m.l} className="text-center py-4 rounded-xl border border-slate-100 bg-slate-50 transition-colors hover:bg-slate-100 shadow-sm">
+                  <div className="text-2xl font-bold" style={{color:m.c}}>{m.v}%</div>
+                  <div className="text-[10px] text-slate-500 font-semibold uppercase mt-1 tracking-wide">{m.l}</div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* ── ROW 3: Bar chart + Recent Activity ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          <motion.div variants={itemVariant} className="lg:col-span-2 bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-500">
+            <p className="text-base font-bold text-slate-800 flex items-center gap-2 mb-1"><FiBarChart2 className="text-indigo-500"/>Performance</p>
+            <p className="text-[11px] font-medium text-slate-400 mb-6 uppercase tracking-wide">Volume analysis</p>
+            <div className="flex items-center justify-between bg-sky-50 rounded-xl px-5 py-4 border border-sky-100 mb-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-sky-100 rounded-lg shrink-0"><FiClock className="w-5 h-5 text-sky-600"/></div>
+                <div><div className="text-[10px] text-sky-600 font-bold uppercase tracking-wide">Avg Response Time</div><div className="text-2xl font-extrabold text-sky-800 mt-0.5">{stats.avgResponseDays} <span className="text-sm text-sky-600/70 font-bold">days</span></div></div>
+              </div>
+            </div>
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={[{name:"Leads",value:stats.totalLeads},{name:"Quotes",value:stats.totalQuotations},{name:"Customers",value:stats.totalCustomers}]} margin={{top:5,right:5,left:-25,bottom:0}}>
+                  <defs><linearGradient id="bg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.indigo}/><stop offset="100%" stopColor={C.violet}/></linearGradient></defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f8fafc" vertical={false}/>
+                  <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize:11,fontWeight:500}} tickLine={false} axisLine={false} dy={5}/>
+                  <YAxis stroke="#94a3b8" tick={{fontSize:11,fontWeight:500}} tickLine={false} axisLine={false} dx={-5}/>
+                  <Tooltip content={<CT/>}/>
+                  <Bar dataKey="value" name="Count" fill="url(#bg1)" radius={[10,10,0,0]} maxBarSize={60} isAnimationActive animationBegin={900} animationDuration={1600} animationEasing="ease-out"/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+          <motion.div variants={itemVariant} className="lg:col-span-3 bg-white rounded-2xl p-5 sm:p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-500">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="text-base font-bold text-slate-800 flex items-center gap-2"><FiUsers className="text-indigo-500"/>Recent Activity</p>
+                <p className="text-[11px] font-medium text-slate-400 mt-1 uppercase tracking-wide">Latest leads onboarded</p>
+              </div>
+              <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-3 py-1.5 rounded-full uppercase tracking-wide shadow-sm border border-indigo-100">{recent.length} entries</span>
+            </div>
+            <div className="space-y-3">
+              {recent.length===0?(<div className="flex flex-col items-center justify-center py-12 text-slate-300"><FiUsers className="w-12 h-12 mb-3 opacity-30"/><p className="text-sm font-medium">No activity to show</p></div>):
+              recent.map((a,i)=>(
+                <motion.div initial={{opacity:0,x:-20}} animate={{opacity:1,x:0}} transition={{delay:i*0.1+0.7,duration:0.5,ease:[0.22, 1, 0.36, 1]}} key={a.id||i} className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all cursor-pointer">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm" style={{background:sCol(a.status)}}>{(a.name||"?").charAt(0).toUpperCase()}</div>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-bold text-slate-800 truncate">{a.name||"—"}</p><p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-0.5">{a.src||"Lead"} <span className="mx-1.5 text-slate-300">•</span> {a.date?new Date(a.date).toLocaleDateString("en-IN",{day:"2-digit",month:"short"}):"—"}</p></div>
+                  <span className={`text-[9px] font-bold px-3 py-1.5 rounded-lg shrink-0 uppercase tracking-widest shadow-sm ${sBg(a.status)}`}>{a.status}</span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+
+      </motion.div>
     </Base>
   );
 }

@@ -27,6 +27,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY","unsafe-dev-key")
 # SECRET_KEY = 'django-insecure-enn@a0!v4mho+wm@l@r9=(_^jy(2n+^7#49a4l!2g+%=p+-zv7'
 
+# Allow up to 15MB payload size for product image uploads / Base64 URIs
+DATA_UPLOAD_MAX_MEMORY_SIZE = 15728640
+FILE_UPLOAD_MAX_MEMORY_SIZE = 15728640
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
@@ -175,7 +179,7 @@ AUTHENTICATION_BACKENDS = [
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "k_crm_db",
+        "NAME": "nnit_db",
         "USER": "root",
         "PASSWORD": "",          # XAMPP default password is blank
         "HOST": "localhost",
