@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from rest_framework.permissions import IsAuthenticated
+from api.permissions import HasModulePermission
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.response import Response
 from rest_framework import status, filters
@@ -16,9 +17,10 @@ from django.core.cache import cache
 
 
 class CustomerViewsets(viewsets.ModelViewSet):
+    module_key = 'customers'
     serializer_class = CustomerSerializer
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
         'name', '=email', 'secondary_email', 'contact_number',
@@ -82,9 +84,10 @@ class CustomerViewsets(viewsets.ModelViewSet):
 
 
 class LeadViewSet(viewsets.ModelViewSet):
+    module_key = 'leads'
     serializer_class = LeadSerializer
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, OrderingFilter]
     filterset_class = LeadFilter
 
@@ -164,8 +167,15 @@ class LeadViewSet(viewsets.ModelViewSet):
             )
         )
 
-        if getattr(user, 'role', None) and user.role.name.lower() == "sales":
+        role_name = getattr(getattr(user, 'role', None), 'name', '').lower()
+        if role_name == "sales":
             queryset = queryset.filter(assign_to=user)
+        elif role_name == "designer":
+            queryset = queryset.filter(
+                Q(is_sent=True) |
+                Q(requirements_details__isnull=False) |
+                Q(company_name__isnull=False)
+            )
 
         lead_source = self.request.query_params.get("lead_source")
         if lead_source:
@@ -272,9 +282,10 @@ class LeadFollowUpViewSet(viewsets.ModelViewSet):
     """
     CRUD for follow-ups. Supports filtering by lead: ?lead=<lead_id>
     """
+    module_key = 'followups'
     serializer_class = LeadFollowUpSerializer
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['lead', 'status', 'followup_date', 'created_by']
     search_fields = ['remarks', 'discussion_notes', 'lead__customer__name']

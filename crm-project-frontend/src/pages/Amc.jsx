@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import Base from "../components/Base";
 import AmcList from "../components/amc/AmcList";
 import ServiceManagementList from "../components/amc/ServiceManagementList";
+import { useModulePermissions } from "../hooks/useAuth";
 
 export default function AmcPage() {
   const baseApi = import.meta.env.VITE_BASE_API_URL;
@@ -10,6 +11,8 @@ export default function AmcPage() {
   if (!baseApi) {
     console.error("AmcPage: VITE_BASE_API_URL is not defined!");
   }
+
+  const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("amc");
 
   const [activeTab, setActiveTab] = useState("contracts");
   const [filters, setFilters] = useState({});
@@ -40,6 +43,17 @@ export default function AmcPage() {
     { key: "management", label: "Service Management" },
   ];
 
+  if (!loadingUser && !canView) {
+    return (
+      <Base title="AMC Management">
+        <div className="p-8 text-center text-slate-500 bg-white rounded-xl shadow mt-6">
+          <h3 className="text-xl font-bold text-slate-800 mb-2">Access Denied</h3>
+          <p>You do not have permission to view AMC Management.</p>
+        </div>
+      </Base>
+    );
+  }
+
   return (
     <Base
       title="AMC Management"
@@ -64,8 +78,26 @@ export default function AmcPage() {
           ))}
         </div>
 
-        {activeTab === "contracts" && <AmcList baseApi={baseApi} token={token} filters={filters} />}
-        {activeTab === "management" && <ServiceManagementList baseApi={baseApi} token={token} filters={filters} />}
+        {activeTab === "contracts" && (
+          <AmcList
+            baseApi={baseApi}
+            token={token}
+            filters={filters}
+            canCreate={canCreate}
+            canEdit={canEdit}
+            canDelete={canDelete}
+          />
+        )}
+        {activeTab === "management" && (
+          <ServiceManagementList
+            baseApi={baseApi}
+            token={token}
+            filters={filters}
+            canCreate={canCreate}
+            canEdit={canEdit}
+            canDelete={canDelete}
+          />
+        )}
       </div>
     </Base>
   );

@@ -17,7 +17,7 @@ from rest_framework import filters
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import CustomUser, Role, BranchManagement, SiteManagement
 from .serializers import AddStaffSerializer, RoleSerializer, BranchSerializers, SiteSerializers
-from .permissions import IsAdminOrSubAdmin ,StaffObjectPermission
+from .permissions import IsAdminOrSubAdmin, StaffObjectPermission, HasModulePermission
 from .pagination import StaffPagination
 from rest_framework.decorators import action
 User = get_user_model()
@@ -100,24 +100,59 @@ class PasswordResetConfirmView(APIView):
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
+class AdminResetPasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def post(self, request):
+        email_or_mobile = request.data.get('email_or_mobile') or request.data.get('email')
+        new_password = request.data.get('new_password') or request.data.get('password')
+        staff_id = request.data.get('staff_id') or request.data.get('id')
+
+        if not new_password or len(str(new_password)) < 6:
+            return Response({"error": "New password must be at least 6 characters."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = None
+        if staff_id:
+            user = CustomUser.objects.filter(id=staff_id).first()
+        if not user and email_or_mobile:
+            user = CustomUser.objects.filter(email__iexact=email_or_mobile).first() or CustomUser.objects.filter(mobile_no=email_or_mobile).first()
+
+        if not user:
+            return Response({"error": f"User not found for {email_or_mobile or staff_id}."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Update password in Django MySQL/SQLite database
+        user.set_password(new_password)
+        user.save()
+
+        return Response({
+            "detail": f"Password for {user.email or user.mobile_no} reset successfully in database.",
+            "email": user.email,
+            "mobile_no": user.mobile_no,
+            "id": user.id
+        }, status=status.HTTP_200_OK)
+
+
 # Role section
 class RoleViewSet(viewsets.ModelViewSet):
     """
     CRUD for Role model.
     Only accessible to admin/subadmin or superuser.
     """
+    module_key = 'role_management'
     queryset = Role.objects.all().order_by('id')
     serializer_class = RoleSerializer
     authentication_classes = [JWTAuthentication]   
-    permission_classes = [IsAuthenticated, IsAdminOrSubAdmin]
+    permission_classes = [IsAuthenticated, IsAdminOrSubAdmin, HasModulePermission]
     pagination_class = None
 
 
 # Add Staff section
 
 class StaffViewSet(viewsets.ModelViewSet):
+    module_key = 'accounts'
     serializer_class = AddStaffSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrSubAdmin, StaffObjectPermission]
+    permission_classes = [IsAuthenticated, IsAdminOrSubAdmin, StaffObjectPermission, HasModulePermission]
     authentication_classes = [JWTAuthentication]  
     pagination_class = StaffPagination 
     filter_backends = [DjangoFilterBackend , filters.SearchFilter]

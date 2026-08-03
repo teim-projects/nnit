@@ -19,54 +19,45 @@ export default function Base({
   return (
     <div className="relative h-full flex">
 
-      {/* ── Filter Drawer ── */}
+      {/* ── Filter Form Panel (Right Side Panel) ── */}
       {filtersConfig && filtersOpen && (
-        <>
-          {/* Backdrop — full screen on all sizes */}
-          <button
-            onClick={() => setFiltersOpen(false)}
-            className="fixed inset-0 bg-black/30 z-[1040]"
-            aria-hidden="true"
-          />
-
-          {/* Drawer panel — slides from left, full width on mobile */}
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed top-[62px] left-0 bottom-0 w-full sm:w-80 bg-white shadow-2xl z-[1045] flex flex-col border-r border-slate-100"
-          >
-            {/* Drawer header */}
-            <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100 bg-slate-50 shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-5 bg-indigo-500 rounded-full" />
-                <h3 className="text-sm font-semibold text-slate-700">
-                  {filterTitle || "Filters"}
-                </h3>
-              </div>
-              <button
-                onClick={() => setFiltersOpen(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 text-sm transition"
-              >
-                ✕
-              </button>
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed top-[62px] right-0 bottom-0 w-full sm:w-80 bg-white shadow-xl z-[1030] flex flex-col border-l border-slate-200 transition-all duration-300"
+        >
+          {/* Panel header */}
+          <div className="px-5 py-4 flex items-center justify-between border-b border-slate-200 bg-slate-50 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-5 bg-indigo-600 rounded-full" />
+              <h3 className="text-sm font-bold text-slate-800">
+                {filterTitle || "Filters"}
+              </h3>
             </div>
-
-            {/* Drawer body */}
-            <div className="flex-1 overflow-hidden">
-              <FiltersPanel
-                config={filtersConfig}
-                initialValues={initialFilterValues}
-                onChange={handleFilterChange}
-              />
-            </div>
+            <button
+              onClick={() => setFiltersOpen(false)}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs font-bold transition"
+              title="Close Filters"
+            >
+              ✕
+            </button>
           </div>
-        </>
+
+          {/* Filter form body */}
+          <div className="flex-1 overflow-hidden">
+            <FiltersPanel
+              config={filtersConfig}
+              initialValues={initialFilterValues}
+              onChange={handleFilterChange}
+            />
+          </div>
+        </div>
       )}
 
       {/* ── Main Content ── */}
       <div className={
         "flex-1 flex flex-col transition-all duration-300 overflow-auto " +
-        (filtersOpen ? "sm:ml-80" : "")
+        (filtersOpen ? "sm:mr-80" : "")
       }>
 
         {/* Filter toggle — top right */}
@@ -75,15 +66,16 @@ export default function Base({
             <button
               onClick={() => setFiltersOpen(s => !s)}
               className={
-                "flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all " +
+                "flex items-center gap-2 px-3.5 py-1.5 rounded-lg border text-sm font-bold transition-all shadow-sm " +
                 (filtersOpen
-                  ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
-                  : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600")
+                  ? "bg-indigo-600 border-indigo-600 text-white"
+                  : "bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:text-indigo-600")
               }
               aria-expanded={filtersOpen}
+              title="Toggle Filter Panel (Right Side)"
             >
-              <FaFilter className="w-3 h-3" />
-              <span>Filters</span>
+              <FaFilter className="w-3.5 h-3.5" />
+              <span>{filtersOpen ? "Hide Filters" : "Filters"}</span>
             </button>
           </div>
         )}

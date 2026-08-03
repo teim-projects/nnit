@@ -2,8 +2,10 @@ import { useState, useCallback, useMemo } from "react";
 import Base from "../components/Base";
 import QuotationList from "../components/quotations/QuotationList";
 import AddQuotation from "../components/quotations/AddQuotation";
+import { useModulePermissions } from "../hooks/useAuth";
 
 export default function Quotation() {
+  const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("quotations");
 
   const [mode, setMode] = useState("list");
   const [editId, setEditId] = useState(null);
@@ -18,7 +20,6 @@ export default function Quotation() {
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
 
   // ─── Filter config for FiltersPanel (via Base) ────────────────────────────────
-  // Uses the same config shape as Lead.jsx / Inventory.jsx
   const filtersConfig = useMemo(() => [
     {
       key: "search",
@@ -39,24 +40,36 @@ export default function Quotation() {
 
   // ─── Navigation ───────────────────────────────────────────────────────────────
   const openAdd = () => {
+    if (!canCreate) return;
     setEditId(null);
     setMode("add");
   };
 
   const openEdit = (id) => {
+    if (!canEdit) return;
     setEditId(id);
     setMode("add");
   };
 
   const goBack = () => {
     setMode("list");
-    // force quotation list reload
     setRefreshKey(prev => prev + 1);
   };
 
+  if (!loadingUser && !canView) {
+    return (
+      <Base title="Quotes">
+        <div className="p-8 text-center text-slate-500 bg-white rounded-xl shadow mt-6">
+          <h3 className="text-xl font-bold text-slate-800 mb-2">Access Denied</h3>
+          <p>You do not have permission to view Quotations.</p>
+        </div>
+      </Base>
+    );
+  }
+
   return (
     <Base
-      title="Quotes"
+      title="Quotations"
       filterTitle="Quotation Filters"
       filtersConfig={filtersConfig}
       initialFilterValues={initialFilters}
@@ -65,8 +78,11 @@ export default function Quotation() {
       {/* LIST — always rendered so it's ready in background */}
       <QuotationList
         key={refreshKey}
-        onAdd={openAdd}
-        onEdit={openEdit}
+        onAdd={canCreate ? openAdd : null}
+        onEdit={canEdit ? openEdit : null}
+        canCreate={canCreate}
+        canEdit={canEdit}
+        canDelete={canDelete}
         filters={appliedFilters}
       />
 

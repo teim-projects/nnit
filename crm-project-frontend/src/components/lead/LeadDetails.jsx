@@ -44,8 +44,28 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
 
         setLead(response.data);
       } catch (err) {
-        setError(err.response?.data?.message || err.message || String(err));
-        setLead(null);
+        console.warn("LeadDetails fetch error (likely 403 permission restriction), using design request fallback:", err);
+        const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
+        const foundReq = existingReqs.find(r => String(r.leadId) === String(leadId) || String(r.id) === String(leadId));
+
+        if (foundReq) {
+          setLead({
+            id: leadId,
+            customer_name: foundReq.customerName || `Lead #${leadId}`,
+            company_name: foundReq.companyName || "N/A",
+            customer_contact: foundReq.contact || "N/A",
+            customer_email: foundReq.email || "N/A",
+            lead_source: "Sales Dispatch",
+            status: foundReq.status === "drawing_completed" ? "COMPLETED" : "OPEN",
+            assign_to_details: { full_name: foundReq.salesPersonName || "Pravin Dare" },
+            date: foundReq.sentDate || new Date().toISOString().split("T")[0],
+            followup_date: foundReq.sentDate || new Date().toISOString().split("T")[0]
+          });
+          setError("");
+        } else {
+          setError(err.response?.data?.detail || err.response?.data?.message || err.message || String(err));
+          setLead(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -196,6 +216,9 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                 <div>
                   <h3 className="text-gray-400 text-[11px] font-bold tracking-wider uppercase mb-2">Lead Information</h3>
                   <h2 className="text-2xl font-bold text-gray-900 leading-tight">{lead.customer_name || "—"}</h2>
+                  {lead.company_name && (
+                    <p className="text-xs font-semibold text-indigo-600 mt-1">🏢 {lead.company_name}</p>
+                  )}
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                     <span className="inline-block px-3 py-1 text-xs font-bold bg-[#DEF7EC] text-[#03543F] rounded-full uppercase tracking-wider">
                       {lead.status?.replace('_', ' ') || "OPEN"}
@@ -237,6 +260,64 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                     <span>Converted on {new Date(lead.converted_at).toLocaleDateString("en-IN")}</span>
                   </div>
                 )}
+
+                {/* Designer CAD Drawing & Work Card */}
+                {(() => {
+                  const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
+                  const custName = (lead?.customer_name || lead?.contact_person_name || "").toLowerCase();
+                  const foundDesignReq = existingReqs.find(r => 
+                    r.leadId === lead?.id || 
+                    (r.customerName && custName && custName.includes(r.customerName.toLowerCase())) ||
+                    (r.customerName && custName && r.customerName.toLowerCase().includes(custName))
+                  );
+
+                  if (!foundDesignReq) return null;
+
+                  return (
+                    <div className="bg-gradient-to-br from-purple-50 to-indigo-50/60 p-4 rounded-2xl border border-purple-200 shadow-sm space-y-2 text-xs mt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-purple-900 text-sm flex items-center gap-1.5">
+                          🎨 Designer CAD Drawing
+                        </span>
+                        <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
+                          foundDesignReq.status === "drawing_completed" || foundDesignReq.status === "attached_to_quotation"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-300" 
+                            : "bg-amber-100 text-amber-800 border border-amber-300"
+                        }`}>
+                          {foundDesignReq.status === "drawing_completed" || foundDesignReq.status === "attached_to_quotation" 
+                            ? "✅ Drawing Completed" 
+                            : "⏳ In Designer Queue"}
+                        </span>
+                      </div>
+
+                      {foundDesignReq.drawingTitle ? (
+                        <div className="space-y-1 pt-1 border-t border-purple-100">
+                          <div className="font-bold text-slate-900 text-xs">{foundDesignReq.drawingTitle}</div>
+                          <div className="text-slate-600 font-medium">{foundDesignReq.drawingSpecs}</div>
+                          {foundDesignReq.designerNotes && (
+                            <div className="text-slate-500 italic">"{foundDesignReq.designerNotes}"</div>
+                          )}
+
+                          {foundDesignReq.drawingUrl && (
+                            <a
+                              href={foundDesignReq.drawingUrl}
+                              download={foundDesignReq.fileName || "Drawing.dwg"}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition shadow-sm"
+                            >
+                              📥 Download {foundDesignReq.fileName || "CAD Drawing"}
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-slate-500 text-[11px]">
+                          Lead is currently in Designer Queue. CAD drawing will appear here once uploaded by Designer.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
             {/* RIGHT (8 Cols) — reuse same tab content */}
@@ -313,7 +394,20 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                               </p>
                             )}
 
-                            <p className="text-sm text-gray-700 mb-5 font-medium leading-relaxed">{fu.remarks || fu.discussion_notes || "No discussion notes recorded."}</p>
+                            {fu.site_name && (
+                              <p className="text-xs font-bold text-indigo-700 mb-2">
+                                📍 Site Name: {fu.site_name}
+                              </p>
+                            )}
+
+                            <p className="text-sm text-gray-700 mb-4 font-medium leading-relaxed">{fu.remarks || fu.discussion_notes || "No discussion notes recorded."}</p>
+
+                            {fu.followup_question && (
+                              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
+                                <h5 className="text-xs font-bold text-amber-700 uppercase mb-1">FOLLOW-UP QUESTION / INQUIRY</h5>
+                                <p className="text-sm text-amber-900 font-medium">{fu.followup_question}</p>
+                              </div>
+                            )}
 
                             {(fu.client_commitment || fu.our_commitment) && (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">

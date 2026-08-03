@@ -2,8 +2,10 @@ import { useState, useRef, useCallback, useMemo } from "react";
 import Base from "../components/Base";
 import InvoiceList from "../components/invoice/InvoiceList";
 import AddInvoice from "../components/invoice/AddInvoice";
+import { useModulePermissions } from "../hooks/useAuth";
 
 export default function Invoice() {
+  const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("invoice");
 
   const [mode, setMode] = useState("list");
   const [editId, setEditId] = useState(null);
@@ -19,7 +21,6 @@ export default function Invoice() {
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
 
   // ─── Filter config for FiltersPanel (via Base) ────────────────────────────────
-  // Uses the same config shape as Lead.jsx / Inventory.jsx / Quotation.jsx
   const filtersConfig = useMemo(() => [
     {
       key: "search",
@@ -51,22 +52,34 @@ export default function Invoice() {
 
   // ─── Navigation ───────────────────────────────────────────────────────────────
   const openAdd = () => {
+    if (!canCreate) return;
     setEditId(null);
     setMode("add");
   };
 
   const openEdit = (id) => {
+    if (!canEdit) return;
     setEditId(id);
     setMode("add");
   };
 
   const goBack = () => {
     setMode("list");
-    // Refresh the invoice list after adding/editing
     if (invoiceListRef.current) {
       invoiceListRef.current.refreshList();
     }
   };
+
+  if (!loadingUser && !canView) {
+    return (
+      <Base title="Invoices">
+        <div className="p-8 text-center text-slate-500 bg-white rounded-xl shadow mt-6">
+          <h3 className="text-xl font-bold text-slate-800 mb-2">Access Denied</h3>
+          <p>You do not have permission to view Invoices & Billing.</p>
+        </div>
+      </Base>
+    );
+  }
 
   return (
     <Base
@@ -79,8 +92,11 @@ export default function Invoice() {
       {/* ✅ ALWAYS SHOW LIST IN BACKGROUND */}
       <InvoiceList
         ref={invoiceListRef}
-        onAdd={openAdd}
-        onEdit={openEdit}
+        onAdd={canCreate ? openAdd : null}
+        onEdit={canEdit ? openEdit : null}
+        canCreate={canCreate}
+        canEdit={canEdit}
+        canDelete={canDelete}
         filters={appliedFilters}
       />
 

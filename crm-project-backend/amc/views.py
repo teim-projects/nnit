@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from api.permissions import HasModulePermission
 from django.utils import timezone
 from datetime import timedelta
 from django_filters.rest_framework import DjangoFilterBackend
@@ -40,9 +41,10 @@ class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
+    module_key = 'amc'
     queryset = ServiceManagementRecord.objects.all()
     serializer_class = ServiceManagementRecordSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     pagination_class = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['contract_type', 'customer', 'contract_status']
@@ -94,16 +96,18 @@ class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
 
 
 class ServiceManagementMaterialViewSet(viewsets.ModelViewSet):
+    module_key = 'amc'
     queryset = ServiceManagementMaterial.objects.all()
     serializer_class = ServiceManagementMaterialSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     pagination_class = None
 
 
 class AMCContractViewSet(viewsets.ModelViewSet):
+    module_key = 'amc'
     queryset = AMCContract.objects.all()
     serializer_class = AMCContractSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['customer', 'status', 'amc_included_in_sale']
     search_fields = ['contract_number', 'customer__name', 'amc_type']

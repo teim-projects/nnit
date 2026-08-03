@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from api.permissions import HasModulePermission
 from django.db.models import Q
 from .models import ProductCategory, ParkingProduct, ProductConfiguration
 from .serializers import (
@@ -18,9 +19,10 @@ class ProductCategoryViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Product Categories (Type Master)
     """
+    module_key = 'products'
     queryset = ProductCategory.objects.all()
     serializer_class = ProductCategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -45,8 +47,9 @@ class ParkingProductViewSet(viewsets.ModelViewSet):
     - DELETE /api/parking-products/{id}/ - Delete product
     - POST /api/parking-products/recommend/ - Get product recommendations
     """
+    module_key = 'products'
     queryset = ParkingProduct.objects.select_related('category').prefetch_related('configurations')
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     
     def get_serializer_class(self):
         if self.action == 'list':

@@ -25,6 +25,10 @@ import AmcPage       from "./pages/Amc";
 import ParkingProducts from './pages/ParkingProducts';
 import TermsManagement from './pages/TermsManagement';
 import FollowupManagement from './pages/FollowupManagement';
+import RoleAccessManagement from './pages/RoleAccessManagement';
+import ReportsAnalytics from './pages/ReportsAnalytics';
+import DesignManagement from './pages/DesignManagement';
+import DesignerQueue from './pages/DesignerQueue';
 
 function AppRoutes() {
   const location  = useLocation();
@@ -69,6 +73,8 @@ function AppRoutes() {
               <Route path="/login"    element={isLoggedIn ? <Navigate to="/dashboard" replace /> : <Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/reports"  element={<ReportsAnalytics />} />
+              <Route path="/reports-analytics" element={<ReportsAnalytics />} />
               <Route path="/profile"   element={<ProfileSection />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/password-reset-confirm/:uid/:token" element={<ResetPasswordConfirm />} />
@@ -81,6 +87,9 @@ function AppRoutes() {
               <Route path="/terms-conditions"  element={<TermsManagement />} />
               <Route path="/amc"       element={<AmcPage />} />
               <Route path="/followup-management" element={<FollowupManagement />} />
+              <Route path="/role-access" element={<RoleAccessManagement />} />
+              <Route path="/design-drawings" element={<DesignManagement />} />
+              <Route path="/designer-queue" element={<DesignerQueue />} />
             </Routes>
           </div>
         </main>

@@ -111,16 +111,16 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = PasswordResetTokenGenerator().make_token(user)
 
-        frontend_url = getattr(settings, "FRONTEND_URL", 
-                            #    "http://localhost:5173/password-reset-confirm"
-                            )
-        reset_link = f"{frontend_url}/{uid}/{token}/"
+        frontend_url = str(getattr(settings, "FRONTEND_URL", "http://localhost:5173/password-reset-confirm")).rstrip("/")
+        reset_link = f"{frontend_url}/{uid}/{token}"
 
-        subject = "Password Reset Request"
+        subject = "Password Reset Request - NNIT Parking"
         context = {"user": user, "reset_link": reset_link}
-        body = render_to_string("registration/custom_password_reset_email.html", context)
+        html_body = render_to_string("registration/custom_password_reset_email.html", context)
+        text_body = f"Hi {user.first_name or user.username},\n\nYou requested a password reset for your account. Click the link below to reset your password:\n\n{reset_link}\n\nIf you didn't request this, please ignore this email."
 
-        email = EmailMultiAlternatives(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email])
+        email = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [user.email])
+        email.attach_alternative(html_body, "text/html")
         email.send()
 
         return {"detail": "Password reset email sent successfully."}
@@ -153,10 +153,17 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 # ---RoleSerializer----
 class RoleSerializer(serializers.ModelSerializer):
+    permissions = serializers.JSONField(required=False)
+
     class Meta:
         model = Role
-        fields = ('id', 'name')
+        fields = ('id', 'name', 'permissions')
         read_only_fields = ('id',)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['permissions'] = instance.get_permissions()
+        return ret
 
 # Staff Profile section
 class RoleFlexibleField(serializers.RelatedField):
@@ -165,7 +172,7 @@ class RoleFlexibleField(serializers.RelatedField):
       - integer id (e.g. 3)
       - string id (e.g. "3")
       - role name (e.g. "staff" or "Staff")
-    Represents role in responses as {"id": id, "name": name}
+    Represents role in responses as {"id": id, "name": name, "permissions": perms}
     """
     def to_internal_value(self, data):
         # integer id or numeric string -> pk
@@ -184,7 +191,11 @@ class RoleFlexibleField(serializers.RelatedField):
         raise ValidationError("Invalid role value. Provide a role id or name.")
 
     def to_representation(self, value):
-        return {"id": value.id, "name": value.name}
+        return {
+            "id": value.id,
+            "name": value.name,
+            "permissions": value.get_permissions()
+        }
 
 
 PHONE_10_DIGIT_RE = r'^\d{10}$'
@@ -204,14 +215,18 @@ class AddStaffSerializer(serializers.ModelSerializer):
     )
 
     role = RoleFlexibleField(queryset=Role.objects.all(), required=True)
-    password = serializers.CharField(write_only=True, required=True, min_length=6)
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True, min_length=6)
 
     class Meta:
         model = CustomUser
-        fields = ('id', 'email', 'mobile_no', 'first_name', 'last_name', 'role', 'password')
-        read_only_fields = ('id',)
+        fields = ('id', 'email', 'mobile_no', 'first_name', 'last_name', 'role', 'password', 'is_superuser')
+        read_only_fields = ('id', 'is_superuser')
 
     def validate(self, attrs):
+        # When creating a new user, password is required
+        if self.instance is None and not attrs.get('password'):
+            raise serializers.ValidationError({"password": "Password is required for creating new staff account."})
+
         # strip whitespace from mobile if present
         mobile = attrs.get('mobile_no')
         if mobile is not None:

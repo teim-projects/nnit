@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status, filters
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from api.permissions import HasModulePermission
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
@@ -568,10 +569,11 @@ class TermsMasterViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing master Terms & Conditions templates
     """
+    module_key = 'terms'
     queryset = TermsMaster.objects.all()
     serializer_class = TermsMasterSerializer
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active', 'is_default']
     search_fields = ['title', 'content']
