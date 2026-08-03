@@ -56,21 +56,47 @@ export function useModulePermissions(moduleKey) {
   const { userRole, permissions, isLoading, isSuperUser } = useUserRole(baseApi);
 
   const isSuper = isSuperUser || userRole?.name?.toLowerCase() === 'admin';
-  const modPerms = permissions?.[moduleKey] || {};
+  const modPerms = permissions?.[moduleKey];
 
-  const canView = isSuper || (modPerms.can_view !== false);
-  const canCreate = isSuper || (modPerms.can_create !== false);
-  const canEdit = isSuper || (modPerms.can_edit !== false);
-  const canDelete = isSuper || (modPerms.can_delete !== false);
+  const isTruthy = (val) => val === true || val === 1 || String(val).toLowerCase() === "true";
 
+  // Superuser / Admin gets full unrestricted access across all modules
+  if (isSuper) {
+    return {
+      canView: true,
+      canCreate: true,
+      canEdit: true,
+      canDelete: true,
+      userRole,
+      permissions,
+      isLoading,
+      isSuper: true
+    };
+  }
+
+  // Strictly evaluate configured role permissions for the specific module
+  if (modPerms && typeof modPerms === "object") {
+    return {
+      canView: isTruthy(modPerms.can_view),
+      canCreate: isTruthy(modPerms.can_create),
+      canEdit: isTruthy(modPerms.can_edit),
+      canDelete: isTruthy(modPerms.can_delete),
+      userRole,
+      permissions,
+      isLoading,
+      isSuper: false
+    };
+  }
+
+  // Fallback for roles where permissions dictionary is not yet defined
   return {
-    canView,
-    canCreate,
-    canEdit,
-    canDelete,
+    canView: true,
+    canCreate: true,
+    canEdit: true,
+    canDelete: true,
     userRole,
     permissions,
     isLoading,
-    isSuper
+    isSuper: false
   };
 }
