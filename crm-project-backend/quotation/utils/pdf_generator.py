@@ -291,6 +291,7 @@ def _build_simple_quotation_context(quotation, version):
 def generate_quotation_pdf(quotation, version, base_url=None):
     """
     Generate quotation PDF — Annexure I format matching NNIT style.
+    Version: 2.1 - Updated Terms & Conditions styling
     """
     try:
         if HTML is None:
@@ -303,6 +304,9 @@ def generate_quotation_pdf(quotation, version, base_url=None):
         from django.template import engines
         from django.template.loader import get_template
         engines.all()  # This triggers cache refresh
+        
+        # Add version to context to force reload
+        context['pdf_version'] = '2.1'
         
         html_string = render_to_string('pdf/quotation.html', context)
         pdf = HTML(
@@ -318,7 +322,7 @@ def generate_quotation_pdf(quotation, version, base_url=None):
 def generate_quotation_print_pdf(quotation, version, base_url=None):
     """
     New WeasyPrint quotation PDF (invoice-style layout).
-    Design stage: uses a dummy items table. Existing /pdf/ endpoints unchanged.
+    Version: 2.1 - Updated Terms & Conditions styling
     """
     if HTML is None:
         raise RuntimeError(
