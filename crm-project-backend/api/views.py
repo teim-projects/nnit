@@ -137,14 +137,18 @@ class AdminResetPasswordView(APIView):
 class RoleViewSet(viewsets.ModelViewSet):
     """
     CRUD for Role model.
-    Only accessible to admin/subadmin or superuser.
+    GET allowed for authenticated staff; write operations restricted to admin/subadmin or role_management.
     """
     module_key = 'role_management'
     queryset = Role.objects.all().order_by('id')
     serializer_class = RoleSerializer
     authentication_classes = [JWTAuthentication]   
-    permission_classes = [IsAuthenticated, IsAdminOrSubAdmin, HasModulePermission]
     pagination_class = None
+
+    def get_permissions(self):
+        if self.request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminOrSubAdmin(), HasModulePermission()]
 
 
 # Add Staff section
@@ -152,7 +156,7 @@ class RoleViewSet(viewsets.ModelViewSet):
 class StaffViewSet(viewsets.ModelViewSet):
     module_key = 'accounts'
     serializer_class = AddStaffSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrSubAdmin, StaffObjectPermission, HasModulePermission]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     authentication_classes = [JWTAuthentication]  
     pagination_class = StaffPagination 
     filter_backends = [DjangoFilterBackend , filters.SearchFilter]

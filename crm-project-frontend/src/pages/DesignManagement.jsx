@@ -23,11 +23,14 @@ import {
   FiTrash2
 } from "react-icons/fi";
 import Swal from "sweetalert2";
+import Base from "../components/Base";
+import { useModulePermissions } from "../hooks/useAuth";
 
 // Default Initial State: Empty array until Sales Person sends a lead to Designer
 const DEFAULT_DESIGN_REQUESTS = [];
 
 export default function DesignManagement() {
+  const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("design_drawings");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "sales";

@@ -83,15 +83,20 @@ class HasModulePermission(BasePermission):
         if role_name.lower() == 'designer' and module_key == 'leads' and request.method in ('GET', 'HEAD', 'OPTIONS', 'PATCH'):
             return True
 
-        perms = role.get_permissions().get(module_key, {})
-        
+        perms = role.get_permissions().get(module_key)
+        if perms is None or not isinstance(perms, dict):
+            return True
+
+        def _is_truthy(val):
+            return val is True or val == 1 or str(val).lower() == 'true'
+
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
-            return perms.get('can_view', True)
+            return _is_truthy(perms.get('can_view', False))
         elif request.method == 'POST':
-            return perms.get('can_create', True)
+            return _is_truthy(perms.get('can_create', False))
         elif request.method in ('PUT', 'PATCH'):
-            return perms.get('can_edit', True)
+            return _is_truthy(perms.get('can_edit', False))
         elif request.method == 'DELETE':
-            return perms.get('can_delete', True)
+            return _is_truthy(perms.get('can_delete', False))
         
         return True

@@ -14,8 +14,11 @@ import {
   FiRefreshCw
 } from "react-icons/fi";
 import Swal from "sweetalert2";
+import Base from "../components/Base";
+import { useModulePermissions } from "../hooks/useAuth";
 
 export default function DesignerQueue() {
+  const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("designer_queue");
   const navigate = useNavigate();
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
   const token = localStorage.getItem("access") || "";
