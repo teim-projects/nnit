@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Base from "../components/Base";
 import TableView from "../components/TableView";
 import Swal from "sweetalert2";
+import { useModulePermissions } from "../hooks/useAuth";
 import AddCustomerForm from "../components/customers/AddCustomerForm";
 import CustomerDetails from "../components/customers/CustomerDetails";
 import { IoLogoWhatsapp } from "react-icons/io5";
@@ -17,6 +18,8 @@ export default function Customer() {
   }
   
   const API_URL = `${BASE_API}/lead/customer/`;
+
+  const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("customers");
 
   const initialFilters = useMemo(() => ({ search: "" }), []);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
@@ -188,25 +191,29 @@ export default function Customer() {
           <MdEmail className="w-3.5 h-3.5" />
         </button>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setEditingCustomer(row);
-            setShowCustomerForm(true);
-          }}
-          className="inline-flex items-center px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-xs font-medium transition-colors"
-          title="Edit Customer"
-        >
-          <MdEdit className="w-3.5 h-3.5" />
-        </button>
+        {canEdit && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingCustomer(row);
+              setShowCustomerForm(true);
+            }}
+            className="inline-flex items-center px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-xs font-medium transition-colors"
+            title="Edit Customer"
+          >
+            <MdEdit className="w-3.5 h-3.5" />
+          </button>
+        )}
 
-        <button
-          onClick={handleDeleteClick}
-          className="inline-flex items-center px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-medium transition-colors"
-          title="Delete"
-        >
-          <MdDelete className="w-3.5 h-3.5" />
-        </button>
+        {canDelete && (
+          <button
+            onClick={handleDeleteClick}
+            className="inline-flex items-center px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-medium transition-colors"
+            title="Delete"
+          >
+            <MdDelete className="w-3.5 h-3.5" />
+          </button>
+        )}
 
         <button
           onClick={() => setDetailCustomerId(row.id)}
@@ -218,7 +225,18 @@ export default function Customer() {
         </button>
       </div>
     );
-  }, [currentPage, API_URL, token]);
+  }, [currentPage, API_URL, token, canEdit, canDelete]);
+
+  if (!loadingUser && !canView) {
+    return (
+      <Base title="Customers">
+        <div className="p-8 text-center text-slate-500 bg-white rounded-xl shadow mt-6">
+          <h3 className="text-xl font-bold text-slate-800 mb-2">Access Denied</h3>
+          <p>You do not have permission to view Customer Management.</p>
+        </div>
+      </Base>
+    );
+  }
 
   return (
     <Base
@@ -248,13 +266,15 @@ export default function Customer() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm"
-              >
-                <MdAdd className="w-5 h-5" />
-                Add Customer
-              </button>
+              {canCreate && (
+                <button
+                  onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm"
+                >
+                  <MdAdd className="w-5 h-5" />
+                  Add Customer
+                </button>
+              )}
             </div>
           </div>
 

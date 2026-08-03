@@ -109,11 +109,24 @@ const FollowupHistoryModal = ({ open, onClose, lead }) => {
                         <p className="text-sm text-blue-600 font-semibold mb-3">F001</p>
                       )}
 
-                      {/* Discussion */}
+                      {fu.site_name && (
+                        <p className="text-sm text-indigo-700 font-semibold mb-2">
+                          📍 Site: {fu.site_name}
+                        </p>
+                      )}
+
+                      {/* Discussion & Questions */}
                       {(fu.remarks || fu.discussion_notes || fu.followup_summary) && (
-                        <p className="text-sm text-gray-700 leading-relaxed mb-4">
+                        <p className="text-sm text-gray-700 leading-relaxed mb-3">
                           {fu.remarks || fu.discussion_notes || fu.followup_summary}
                         </p>
+                      )}
+
+                      {fu.followup_question && (
+                        <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 mb-4">
+                          <h5 className="text-xs font-bold text-amber-700 uppercase mb-1">FOLLOW-UP QUESTION / INQUIRY</h5>
+                          <p className="text-sm text-gray-800">{fu.followup_question}</p>
+                        </div>
                       )}
 
                       {/* Commitments */}
@@ -288,7 +301,9 @@ export default function AddLeadFollowUpFormNew({
   const [remarks, setRemarks] = useState("");
   const [discussionNotes, setDiscussionNotes] = useState("");
 
-  // Follow-up mode & conducted by
+  // Follow-up mode & details
+  const [siteName, setSiteName] = useState("");
+  const [followupQuestion, setFollowupQuestion] = useState("");
   const [followupMode, setFollowupMode] = useState("call");
   const [followupStatus, setFollowupStatus] = useState("completed");
   const [conductedBy, setConductedBy] = useState("");
@@ -490,7 +505,9 @@ export default function AddLeadFollowUpFormNew({
       setRemarks(followup.remarks ?? "");
       setDiscussionNotes(followup.discussion_notes ?? "");
 
-      // Followup mode, conducted by, etc.
+      // Followup mode, site, questions, conducted by, etc.
+      setSiteName(followup.site_name ?? "");
+      setFollowupQuestion(followup.followup_question ?? "");
       setFollowupMode(followup.interaction_type ?? "call");  // Changed from followup_mode
       setFollowupStatus(followup.followup_status ?? "completed");  // Added
       setConductedBy(followup.conducted_by ?? "");
@@ -679,6 +696,8 @@ export default function AddLeadFollowUpFormNew({
 
       const payload = {
         lead: leadId,
+        site_name: siteName.trim(),
+        followup_question: followupQuestion.trim(),
         followup_date: followupDate,
         next_followup_date: nextFollowupDate || null,
         status,
@@ -849,22 +868,15 @@ export default function AddLeadFollowUpFormNew({
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Conducted By
+                    Site Name
                   </label>
-                  <select
-                    value={conductedBy}
-                    onChange={(e) => setConductedBy(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                    disabled={usersLoading}
-                  >
-                    <option value="">Select Team Member</option>
-                    {usersList.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name || user.full_name || user.username || user.id}
-                      </option>
-                    ))}
-                  </select>
-                  {usersLoading && <span className="text-xs text-gray-400">Loading users...</span>}
+                  <input
+                    type="text"
+                    placeholder="Enter site name / project location"
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                  />
                 </div>
               </div>
 
@@ -942,6 +954,19 @@ export default function AddLeadFollowUpFormNew({
                   value={discussionNotes}
                   onChange={(e) => setDiscussionNotes(e.target.value)}
                   placeholder="Enter detailed conversation notes..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Follow-up Question / Inquiry
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                  rows={3}
+                  value={followupQuestion}
+                  onChange={(e) => setFollowupQuestion(e.target.value)}
+                  placeholder="Enter questions, requirements, or inquiries raised during follow-up..."
                 />
               </div>
 

@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import Base from '../components/Base';
 import AddCategoryModal from '../components/parking-products/AddCategoryModal';
 import AddProductForm from '../components/parking-products/AddProductForm';
+import { useModulePermissions } from '../hooks/useAuth';
 
 export default function ParkingProducts() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
@@ -13,6 +14,8 @@ export default function ParkingProducts() {
   if (!BASE_API) {
     console.error("ParkingProducts: VITE_BASE_API_URL is not defined!");
   }
+
+  const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("products");
   
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -108,6 +111,17 @@ export default function ParkingProducts() {
     }
   };
 
+  if (!loadingUser && !canView) {
+    return (
+      <Base title="Parking Products">
+        <div className="p-8 text-center text-slate-500 bg-white rounded-xl shadow mt-6">
+          <h3 className="text-xl font-bold text-slate-800 mb-2">Access Denied</h3>
+          <p>You do not have permission to view Parking Product Master.</p>
+        </div>
+      </Base>
+    );
+  }
+
   return (
     <Base title="Parking Products">
       <div className="space-y-6">
@@ -118,25 +132,27 @@ export default function ParkingProducts() {
               <h2 className="text-2xl font-black text-gray-900">Parking Products</h2>
               <p className="text-sm font-semibold text-gray-500 mt-1">Manage parking solution catalog</p>
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowCategoryModal(true)}
-                className="btn-secondary flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-bold text-sm transition"
-              >
-                <MdCategory className="w-5 h-5" />
-                Add Category
-              </button>
-              <button
-                onClick={() => {
-                  setEditingProduct(null);
-                  setShowProductForm(true);
-                }}
-                className="btn-primary flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition shadow-sm"
-              >
-                <MdAdd className="w-5 h-5" />
-                Add Product
-              </button>
-            </div>
+            {canCreate && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowCategoryModal(true)}
+                  className="btn-secondary flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-bold text-sm transition"
+                >
+                  <MdCategory className="w-5 h-5" />
+                  Add Category
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingProduct(null);
+                    setShowProductForm(true);
+                  }}
+                  className="btn-primary flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition shadow-sm"
+                >
+                  <MdAdd className="w-5 h-5" />
+                  Add Product
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -297,20 +313,24 @@ export default function ParkingProducts() {
                       >
                         <MdSearch className="w-5 h-5" />
                       </button>
-                      <button
-                        onClick={() => handleEditProduct(product)}
-                        title="Edit Product"
-                        className="hover:text-slate-900 p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
-                      >
-                        <MdEdit className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteProduct(product.id)}
-                        title="Delete Product"
-                        className="hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <MdDelete className="w-5 h-5" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleEditProduct(product)}
+                          title="Edit Product"
+                          className="hover:text-slate-900 p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
+                        >
+                          <MdEdit className="w-5 h-5" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDeleteProduct(product.id)}
+                          title="Delete Product"
+                          className="hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <MdDelete className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

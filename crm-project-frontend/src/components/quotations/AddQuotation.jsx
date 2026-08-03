@@ -235,6 +235,33 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
               </div>
             </div>
 
+            {/* Attached Design Drawing Preview Box */}
+            {(() => {
+              if (!customerId) return null;
+              const selectedCust = customers.find(c => String(c.id) === String(customerId));
+              const custName = (selectedCust?.name || "").toLowerCase();
+              const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
+              const foundReq = existingReqs.find(r => 
+                custName && (r.customerName?.toLowerCase().includes(custName) || custName.includes(r.customerName?.toLowerCase()))
+              );
+
+              if (foundReq && foundReq.drawingTitle) {
+                return (
+                  <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-xs space-y-1">
+                    <div className="font-bold text-purple-900 flex items-center justify-between">
+                      <span>🎨 Attached CAD/PDF Design Drawing:</span>
+                      <span className="px-2 py-0.5 bg-purple-200 text-purple-900 rounded font-extrabold uppercase text-[10px]">
+                        {foundReq.fileName || "AutoCAD Plan"}
+                      </span>
+                    </div>
+                    <div className="font-bold text-slate-900">{foundReq.drawingTitle}</div>
+                    <div className="text-slate-600">{foundReq.drawingSpecs}</div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* Select Product */}
             <div>
               <label className="block text-sm font-bold text-slate-800 mb-1.5">

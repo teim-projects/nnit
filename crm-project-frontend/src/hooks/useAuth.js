@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 
 export function useUserRole(baseApi) {
   const [userRole, setUserRole] = useState(null);
+  const [isSuperUser, setIsSuperUser] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [trigger, setTrigger] = useState(0);
 
@@ -19,6 +20,7 @@ export function useUserRole(baseApi) {
     const token = localStorage.getItem("access");
     if (!token) {
       setUserRole(null);
+      setIsSuperUser(false);
       setIsLoading(false);
       return;
     }
@@ -33,15 +35,42 @@ export function useUserRole(baseApi) {
       })
       .then(data => {
         setUserRole(data.role);
+        setIsSuperUser(!!data.is_superuser || data.role?.name?.toLowerCase() === 'admin');
       })
       .catch(err => {
         console.error("Failed to fetch user role:", err);
-        setUserRole(null); // Set to null on error
+        setUserRole(null);
+        setIsSuperUser(false);
       })
       .finally(() => {
         setIsLoading(false);
       });
-  }, [baseApi, trigger]); // Re-run if baseApi or trigger changes
+  }, [baseApi, trigger]);
 
-  return { userRole, isLoading };
+  const permissions = userRole?.permissions || {};
+  return { userRole, permissions, isLoading, isSuperUser };
+}
+
+export function useModulePermissions(moduleKey) {
+  const baseApi = import.meta.env.VITE_BASE_API_URL;
+  const { userRole, permissions, isLoading, isSuperUser } = useUserRole(baseApi);
+
+  const isSuper = isSuperUser || userRole?.name?.toLowerCase() === 'admin';
+  const modPerms = permissions?.[moduleKey] || {};
+
+  const canView = isSuper || (modPerms.can_view !== false);
+  const canCreate = isSuper || (modPerms.can_create !== false);
+  const canEdit = isSuper || (modPerms.can_edit !== false);
+  const canDelete = isSuper || (modPerms.can_delete !== false);
+
+  return {
+    canView,
+    canCreate,
+    canEdit,
+    canDelete,
+    userRole,
+    permissions,
+    isLoading,
+    isSuper
+  };
 }

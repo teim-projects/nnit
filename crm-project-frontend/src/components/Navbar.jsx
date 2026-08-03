@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBars, faXmark } from "@fortawesome/free-solid-svg-icons";
-import { FiSearch, FiLogOut, FiUser, FiBell, FiTarget, FiUsers, FiCheck, FiAlertCircle, FiUserCheck } from "react-icons/fi";
+import { FiSearch, FiLogOut, FiUser, FiBell, FiTarget, FiUsers, FiCheck, FiAlertCircle, FiUserCheck, FiKey } from "react-icons/fi";
 import logoNNIT from "../assets/logo-nnit.svg";
 
 const SEARCH_ROUTES = [
@@ -34,11 +34,70 @@ function fmtDate(d) {
 }
 
 /* ─── notification types ──────────────────────────────────── */
-// type: "new_lead" | "converted" | "overdue" | "today_followup"
+// type: "design_sent" | "design_completed" | "new_lead" | "converted" | "overdue" | "today_followup"
 function buildNotifications(leadsArr) {
   const now   = new Date();
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const items = [];
+
+  const currentRole = (localStorage.getItem("user_role") || "").toLowerCase();
+  const isSuper = currentRole === "admin";
+  const isDesigner = currentRole === "designer";
+  const isSales = currentRole === "sales" || (!isSuper && !isDesigner);
+
+  // 0. Forgot Password Reset Requests (For Admin)
+  try {
+    const passwordRequests = JSON.parse(localStorage.getItem("nnit_password_reset_requests") || "[]");
+    passwordRequests.forEach(req => {
+      if (req.status === "pending" && (isSuper || currentRole === "admin")) {
+        items.push({
+          id: `pwd-${req.id}`,
+          type: "password_reset",
+          title: "🔑 Forgot Password Request",
+          body: `Reset requested for ${req.employeeEmail}`,
+          time: req.requestDate || new Date().toISOString(),
+          path: "/accounts",
+          read: false,
+        });
+      }
+    });
+  } catch (e) {
+    console.error("Password reset notification parse error", e);
+  }
+
+  // 1. Design Request & Completion Notifications (Role-Filtered)
+  try {
+    const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
+    existingReqs.forEach(req => {
+      // For Designer (or Admin): Show new design request sent by Sales
+      if ((isDesigner || isSuper) && (req.status === "pending_drawing" || req.status === "drawing_completed")) {
+        items.push({
+          id: `design-sent-${req.id}`,
+          type: "design_sent",
+          title: "🎨 New Design Request Sent",
+          body: `${req.customerName} — Sent by ${req.salesPersonName || "Sales Person"}`,
+          time: req.sentDate || new Date().toISOString(),
+          path: "/designer-leads",
+          read: false,
+        });
+      }
+
+      // For Sales Person (or Admin): Show completed CAD drawing returned by Designer
+      if ((isSales || isSuper) && (req.status === "drawing_completed" || req.status === "attached_to_quotation")) {
+        items.push({
+          id: `design-done-${req.id}`,
+          type: "design_completed",
+          title: "✅ CAD Drawing Completed!",
+          body: `${req.customerName} — ${req.drawingTitle || "AutoCAD Plan Ready"}`,
+          time: req.completedDate || req.sentDate || new Date().toISOString(),
+          path: "/design-drawings",
+          read: false,
+        });
+      }
+    });
+  } catch (e) {
+    console.error("Design notifications parse error", e);
+  }
 
   leadsArr.forEach(lead => {
     const name = lead.customer_name || "Unknown";
@@ -113,6 +172,9 @@ function buildNotifications(leadsArr) {
 /* ─── icon per type ───────────────────────────────────────── */
 function NotifIcon({ type }) {
   const map = {
+    password_reset:{ icon: FiKey,       bg: "bg-amber-100",   text: "text-amber-600" },
+    design_sent:   { icon: FiTarget,    bg: "bg-purple-100",  text: "text-purple-600" },
+    design_completed: { icon: FiUserCheck, bg: "bg-emerald-100", text: "text-emerald-600" },
     new_lead:      { icon: FiTarget,    bg: "bg-indigo-100",  text: "text-indigo-600" },
     converted:     { icon: FiUserCheck, bg: "bg-emerald-100", text: "text-emerald-600" },
     overdue:       { icon: FiAlertCircle, bg: "bg-red-100",   text: "text-red-500" },
@@ -180,23 +242,33 @@ const Navbar = ({ onMenuClick }) => {
     const token = localStorage.getItem("access");
     const BASE_API = import.meta.env.VITE_BASE_API_URL;
     if (!token || !BASE_API) return;
+    let arr = [];
     try {
       const res = await fetch(`${BASE_API}/lead/lead/?page_size=500`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return;
-      const data = await res.json();
-      const arr = Array.isArray(data) ? data : data?.results || [];
-      const built = buildNotifications(arr);
-      setNotifications(built);
+      if (res.ok) {
+        const data = await res.json();
+        arr = Array.isArray(data) ? data : data?.results || [];
+      }
     } catch { /* silent */ }
+
+    // Always build notifications (incorporates role-based design requests)
+    const built = buildNotifications(arr);
+    setNotifications(built);
   }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchNotifications();
-    const id = setInterval(fetchNotifications, 60_000); // refresh every 60s
-    return () => clearInterval(id);
+    window.addEventListener("passwordResetRequested", fetchNotifications);
+    window.addEventListener("storage", fetchNotifications);
+    const id = setInterval(fetchNotifications, 10_000); // refresh every 10s
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("passwordResetRequested", fetchNotifications);
+      window.removeEventListener("storage", fetchNotifications);
+    };
   }, [isAuthenticated, fetchNotifications]);
 
   const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
@@ -240,16 +312,22 @@ const Navbar = ({ onMenuClick }) => {
 
   /* ─── grouping ───────────────────────────────────────── */
   const grouped = {
-    overdue:        notifications.filter(n => n.type === "overdue"),
-    today_followup: notifications.filter(n => n.type === "today_followup"),
-    new_lead:       notifications.filter(n => n.type === "new_lead"),
-    converted:      notifications.filter(n => n.type === "converted"),
+    password_reset:   notifications.filter(n => n.type === "password_reset"),
+    design_sent:      notifications.filter(n => n.type === "design_sent"),
+    design_completed: notifications.filter(n => n.type === "design_completed"),
+    overdue:          notifications.filter(n => n.type === "overdue"),
+    today_followup:   notifications.filter(n => n.type === "today_followup"),
+    new_lead:         notifications.filter(n => n.type === "new_lead"),
+    converted:        notifications.filter(n => n.type === "converted"),
   };
   const groupLabels = {
-    overdue:        "⚠️ Overdue Follow-ups",
-    today_followup: "📅 Today's Follow-ups",
-    new_lead:       "🎯 New Leads Today",
-    converted:      "✅ Converted to Customer",
+    password_reset:   "🔑 Forgot Password Requests",
+    design_sent:      "🎨 New Design Requests",
+    design_completed: "✅ Completed CAD Drawings",
+    overdue:          "⚠️ Overdue Follow-ups",
+    today_followup:   "📅 Today's Follow-ups",
+    new_lead:         "🎯 New Leads Today",
+    converted:        "✅ Converted to Customer",
   };
 
   return (

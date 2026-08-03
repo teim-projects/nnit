@@ -82,6 +82,7 @@ class lead_management(models.Model):
     followup_date = models.DateField(blank=True, null=True)
     last_followup_date = models.DateField(blank=True, null=True)
     remarks = models.TextField(blank=True, null=True)
+    company_name = models.CharField(max_length=255, blank=True, null=True)
     project_name = models.CharField(max_length=100, blank=True, null=True)
     project_adderess = models.CharField(max_length=500, blank=True, null=True)
     creatd_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_created')
@@ -94,6 +95,9 @@ class lead_management(models.Model):
     # Customer conversion tracking
     is_converted = models.BooleanField(default=False)
     converted_at = models.DateTimeField(blank=True, null=True)
+    # Designer & Drawing Workflow Flags (boolean 0/1)
+    is_sent = models.BooleanField(default=False)
+    is_received = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -189,6 +193,10 @@ class LeadFollowUp(models.Model):
         default=FollowUpStatus.COMPLETED
     )
     
+    # Site & Question fields
+    site_name = models.CharField(max_length=255, blank=True, null=True, help_text="Site name or project site location")
+    followup_question = models.TextField(blank=True, null=True, help_text="Follow-up question or inquiry details")
+
     # Conducted by and contacted person
     conducted_by = models.CharField(max_length=200, blank=True, null=True, help_text="Team member who conducted the follow-up")
     contacted_person = models.CharField(max_length=200, blank=True, null=True, help_text="Person contacted during follow-up")

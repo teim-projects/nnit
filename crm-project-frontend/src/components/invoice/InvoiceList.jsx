@@ -30,7 +30,7 @@ api.interceptors.request.use((config) => {
  * Exposed ref methods:
  *   refreshList() – force re-fetch (called from parent after add/edit)
  */
-const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
+const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {}, canCreate = true, canEdit = true, canDelete = true }, ref) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -51,29 +51,34 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
     return params.toString();
   }, []);
 
-  // ─── Fetch invoices whenever filters change ─────────────────────────────────
-  const fetchInvoices = useCallback(() => {
+  // ─── Fetch Invoices ────────────────────────────────────────────────────────
+  const fetchInvoices = useCallback(async () => {
     setLoading(true);
-    const qs = buildParams(filters);
-    api
-      .get(`invoice/invoice/${qs ? `?${qs}` : ""}`)
-      .then((res) => {
-        setData(res.data.results || res.data);
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
+    try {
+      const qs = buildParams(filters);
+      const res = await api.get(`invoice/invoice/${qs ? `?${qs}` : ""}`);
+      const raw = res.data;
+      const list = Array.isArray(raw) ? raw : raw?.results || [];
+      setData(list);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [filters, buildParams]);
 
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
 
-  // Expose refresh method to parent component
+  // Expose refresh method to parent ref
   useImperativeHandle(ref, () => ({
-    refreshList: fetchInvoices
+    refreshList() {
+      fetchInvoices();
+    },
   }));
 
-  /* ================= PDF VIEW ================= */
+  /* ================= VIEW PDF ================= */
 
   const handleViewPDF = async (invoiceId) => {
     try {
@@ -134,6 +139,7 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
   /* ================= DELETE ================= */
 
   const handleDeleteInvoice = async (invoiceId) => {
+    if (!canDelete) return;
     const ok = window.confirm("Delete this invoice?");
     if (!ok) return;
 
@@ -156,14 +162,16 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
             {loading ? "Loading..." : `${data.length} invoice(s) found`}
           </div>
         </div>
-        <div>
-          <button
-            onClick={onAdd}
-            className="px-4 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700"
-          >
-            + Create Invoice
-          </button>
-        </div>
+        {canCreate && onAdd && (
+          <div>
+            <button
+              onClick={onAdd}
+              className="px-4 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700"
+            >
+              + Create Invoice
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table — matches PurchaseOrder.jsx */}
@@ -216,9 +224,11 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
                       <MdRemoveRedEye />
                     </button>
 
-                    <button onClick={() => onEdit(inv.id)} className="px-2 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300" title="Edit">
-                      <MdEdit />
-                    </button>
+                    {canEdit && onEdit && (
+                      <button onClick={() => onEdit(inv.id)} className="px-2 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300" title="Edit">
+                        <MdEdit />
+                      </button>
+                    )}
 
                     <button onClick={() => handleDownloadPDF(inv.id)} className="px-2 py-1 bg-green-200 text-green-800 rounded hover:bg-green-300" title="Download">
                       <MdDownload />
@@ -232,9 +242,11 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
                       <MdEmail />
                     </button>
 
-                    <button onClick={() => handleDeleteInvoice(inv.id)} className="px-2 py-1 bg-red-200 text-red-800 rounded hover:bg-red-300" title="Delete">
-                      <MdDelete />
-                    </button>
+                    {canDelete && (
+                      <button onClick={() => handleDeleteInvoice(inv.id)} className="px-2 py-1 bg-red-200 text-red-800 rounded hover:bg-red-300" title="Delete">
+                        <MdDelete />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

@@ -5,6 +5,8 @@ import { MdAdd, MdRemoveRedEye } from "react-icons/md";
 import { FiAlertCircle, FiClock, FiCheckCircle, FiList, FiFilter } from "react-icons/fi";
 import AddLeadFollowUpFormNew from "../components/lead/AddLeadFollowUpForm";
 
+import { useModulePermissions } from "../hooks/useAuth";
+
 /* ── stat card ── */
 function StatCard({ icon: Icon, label, value, color, sub }) {
   return (
@@ -37,6 +39,7 @@ function StatusBadge({ status }) {
 
 export default function FollowupManagement() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  const { canView, canCreate, isLoading: loadingUser } = useModulePermissions("followups");
   const token = useMemo(() =>
     localStorage.getItem("access") || localStorage.getItem("token") || "", []);
 
@@ -100,6 +103,17 @@ export default function FollowupManagement() {
     { key: "completed", label: "Completed",       icon: FiCheckCircle },
   ];
 
+  if (!loadingUser && !canView) {
+    return (
+      <Base title="Follow-up Management">
+        <div className="p-8 text-center text-slate-500 bg-white rounded-xl shadow mt-6">
+          <h3 className="text-xl font-bold text-slate-800 mb-2">Access Denied</h3>
+          <p>You do not have permission to view Follow-up Management.</p>
+        </div>
+      </Base>
+    );
+  }
+
   return (
     <Base title="Follow-up Management">
       <div className="space-y-5 pb-8">
@@ -110,12 +124,14 @@ export default function FollowupManagement() {
             <h2 className="text-xl font-bold text-slate-800">Follow-up Management</h2>
             <p className="text-sm text-slate-400 mt-0.5">{totalCount} lead{totalCount !== 1 ? "s" : ""} found</p>
           </div>
-          <button
-            onClick={() => { setActiveLead(null); setShowForm(true); }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm transition-colors"
-          >
-            <MdAdd className="w-5 h-5" /> Add Follow-up
-          </button>
+          {canCreate && (
+            <button
+              onClick={() => { setActiveLead(null); setShowForm(true); }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm transition-colors"
+            >
+              <MdAdd className="w-5 h-5" /> Add Follow-up
+            </button>
+          )}
         </div>
 
         {/* ── Stat cards ── */}
@@ -164,7 +180,7 @@ export default function FollowupManagement() {
                 ) : leads.map((lead, idx) => (
                   <tr key={lead.id} className="hover:bg-indigo-50/30 transition-colors">
                     <td className="px-4 py-3 text-center text-slate-600">{(page-1)*PAGE_SIZE + idx + 1}</td>
-                    <td className="px-4 py-3 text-center font-semibold text-slate-800 whitespace-nowrap">{lead.customer_name || "—"}</td>
+                    <td className="px-4 py-3 text-center font-semibold text-slate-800 whitespace-nowrap">{lead.company_name || lead.customer_name || "—"}</td>
                     <td className="px-4 py-3 text-center text-slate-600 whitespace-nowrap">{lead.contact_person_name || lead.customer_name || "—"}</td>
                     <td className="px-4 py-3 text-center text-slate-600 whitespace-nowrap">{lead.customer_contact || "—"}</td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
@@ -181,13 +197,15 @@ export default function FollowupManagement() {
                     </td>
                     <td className="px-4 py-3 text-center"><StatusBadge status={lead.status}/></td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => { setActiveLead(lead.id); setShowForm(true); }}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-100 transition-colors"
-                        title="Add Follow-up"
-                      >
-                        <MdAdd className="w-3.5 h-3.5" /> Follow-up
-                      </button>
+                      {canCreate && (
+                        <button
+                          onClick={() => { setActiveLead(lead.id); setShowForm(true); }}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-100 transition-colors"
+                          title="Add Follow-up"
+                        >
+                          <MdAdd className="w-3.5 h-3.5" /> Follow-up
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

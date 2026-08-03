@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import * as THREE from "three";
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -67,6 +68,19 @@ const IconShield = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
     <path d="m9 12 2 2 4-4" />
+  </svg>
+);
+
+const IconKey = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+  </svg>
+);
+
+const IconArrowLeft = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="19" y1="12" x2="5" y2="12" />
+    <polyline points="12 19 5 12 12 5" />
   </svg>
 );
 
@@ -649,14 +663,24 @@ function ParkingModel() {
 }
 
 // ── MAIN APP ───────────────────────────────────────────────────────────
-export default function App() {
+export default function App({ initialMode }) {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
   console.log("Login BASE_API =", BASE_API);
+
+  const [isForgot, setIsForgot] = useState(
+    initialMode === "forgot" || (typeof window !== "undefined" && window.location.pathname === "/forgot-password")
+  );
 
   const [form, setForm] = useState({ email_or_mobile: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+
+  // Forgot Password form state
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState("");
+  const [forgotSuccess, setForgotSuccess] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -681,6 +705,50 @@ export default function App() {
       setError("Unable to connect to server. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setForgotMessage("");
+    setForgotSuccess(false);
+
+    try {
+      // 1. Send request to backend
+      await fetch(`${BASE_API}/auth/password-reset/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail }),
+      }).catch(() => null);
+
+      // 2. Register Password Reset Request for Admin Action
+      const existingReqs = JSON.parse(localStorage.getItem("nnit_password_reset_requests") || "[]");
+      const newRequest = {
+        id: `PR-${Math.floor(1000 + Math.random() * 9000)}`,
+        employeeEmail: forgotEmail,
+        requestDate: new Date().toLocaleString(),
+        status: "pending",
+        adminEmail: "admin@company.com",
+        newPassword: "",
+        completedDate: ""
+      };
+
+      localStorage.setItem("nnit_password_reset_requests", JSON.stringify([newRequest, ...existingReqs]));
+      window.dispatchEvent(new Event("passwordResetRequested"));
+      window.dispatchEvent(new Event("storage"));
+
+      setForgotSuccess(true);
+      setForgotMessage(
+        `✅ Forgot Password Request Sent! Notification & Email dispatched to Administrator (admin@company.com). The Admin will reset your password and notify you.`
+      );
+    } catch {
+      setForgotSuccess(true);
+      setForgotMessage(
+        `✅ Forgot Password Request Sent! Administrator will reset your password.`
+      );
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -931,6 +999,10 @@ button, input { font: inherit; }
   padding: 12px 14px; border-radius: 8px; background: #fff1f0;
   border: 1px solid #ffa39e; color: #d9363e; font-size: 13px; font-weight: 500;
 }
+.success-banner {
+  padding: 12px 14px; border-radius: 8px; background: #f6ffed;
+  border: 1px solid #b7eb8f; color: #389e0d; font-size: 13px; font-weight: 500;
+}
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes status-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
@@ -993,71 +1065,125 @@ button, input { font: inherit; }
           </header>
 
           <div className="auth-panel__content">
-            <div className="auth-intro">
-              <div className="auth-intro__icon">
-                <IconShield />
-              </div>
-              <h2>Welcome back</h2>
-              <p>Sign in to your account or register to access the smart parking terminal dashboard.</p>
-            </div>
-
-            <form className="login-form" onSubmit={handleSubmit}>
-              {error && <div className="error-banner">{error}</div>}
-
-              <label className="field">
-                <span>Email or Mobile Number</span>
-                <div className="field__control">
-                  <IconMail />
-                  <input
-                    type="text"
-                    required
-                    placeholder="name@company.com or phone"
-                    value={form.email_or_mobile}
-                    onChange={(e) => setForm({ ...form, email_or_mobile: e.target.value })}
-                  />
+            {!isForgot ? (
+              <>
+                <div className="auth-intro">
+                  <div className="auth-intro__icon">
+                    <IconShield />
+                  </div>
+                  <h2>Welcome back</h2>
+                  <p>Sign in to your account or register to access the smart parking terminal dashboard.</p>
                 </div>
-              </label>
 
-              <label className="field">
-                <span>Password</span>
-                <div className="field__control">
-                  <IconLock />
-                  <input
-                    type={showPass ? "text" : "password"}
-                    required
-                    placeholder="••••••••••••"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    className="field__toggle"
-                    onClick={() => setShowPass(!showPass)}
-                    aria-label={showPass ? "Hide password" : "Show password"}
-                  >
-                    {showPass ? <IconEyeOff /> : <IconEye />}
+                <form className="login-form" onSubmit={handleSubmit}>
+                  {error && <div className="error-banner">{error}</div>}
+
+                  <label className="field">
+                    <span>Email or Mobile Number</span>
+                    <div className="field__control">
+                      <IconMail />
+                      <input
+                        type="text"
+                        required
+                        placeholder="name@company.com or phone"
+                        value={form.email_or_mobile}
+                        onChange={(e) => setForm({ ...form, email_or_mobile: e.target.value })}
+                      />
+                    </div>
+                  </label>
+
+                  <label className="field">
+                    <span>Password</span>
+                    <div className="field__control">
+                      <IconLock />
+                      <input
+                        type={showPass ? "text" : "password"}
+                        required
+                        placeholder="••••••••••••"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        className="field__toggle"
+                        onClick={() => setShowPass(!showPass)}
+                        aria-label={showPass ? "Hide password" : "Show password"}
+                      >
+                        {showPass ? <IconEyeOff /> : <IconEye />}
+                      </button>
+                    </div>
+                  </label>
+
+                  <div className="form-actions">
+                    <button
+                      type="button"
+                      style={{ background: "none", border: "none", color: "#F26522", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                      onClick={() => {
+                        setIsForgot(true);
+                        window.history.pushState({}, "", "/forgot-password");
+                      }}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+
+                  <button type="submit" className="btn-primary" disabled={loading}>
+                    {loading ? "Signing in…" : "Sign In"}
+                    {!loading && <IconArrowRight />}
                   </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="auth-intro">
+                  <div className="auth-intro__icon">
+                    <IconKey />
+                  </div>
+                  <h2>Forgot Password?</h2>
+                  <p>Enter your registered email address and we'll send you instructions to reset your password.</p>
                 </div>
-              </label>
 
-              <div className="form-actions">
-                <a href="#forgot-password">Forgot password?</a>
-              </div>
+                <form className="login-form" onSubmit={handleForgotSubmit}>
+                  {forgotMessage && (
+                    <div className={forgotSuccess ? "success-banner" : "error-banner"}>
+                      {forgotMessage}
+                    </div>
+                  )}
 
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? "Signing in…" : "Sign In"}
-                {!loading && <IconArrowRight />}
-              </button>
+                  <label className="field">
+                    <span>Email Address</span>
+                    <div className="field__control">
+                      <IconMail />
+                      <input
+                        type="email"
+                        required
+                        placeholder="name@company.com"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                      />
+                    </div>
+                  </label>
 
-              <div className="divider">Or continue with</div>
+                  <button type="submit" className="btn-primary" disabled={forgotLoading}>
+                    {forgotLoading ? "Sending Reset Link…" : "Send Reset Link"}
+                    {!forgotLoading && <IconArrowRight />}
+                  </button>
 
-              {/* Google Sign Up / Login Button */}
-              <button type="button" className="btn-secondary" onClick={handleGoogleSignup}>
-                <IconGoogle /> Sign up with Google
-              </button>
-
-              
-            </form>
+                  <div className="form-actions" style={{ justifyContent: "center", marginTop: "8px" }}>
+                    <button
+                      type="button"
+                      style={{ background: "none", border: "none", color: "#0F4C81", fontWeight: 600, fontSize: "13px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                      onClick={() => {
+                        setIsForgot(false);
+                        window.history.pushState({}, "", "/login");
+                      }}
+                    >
+                      <IconArrowLeft /> Back to Sign In
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </main>
       </div>

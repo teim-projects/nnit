@@ -28,6 +28,7 @@ export default function AddLeadForm({
   const [formData, setFormData] = useState({
     enquiry_date: "",
     clientName: "",
+    companyName: "",
     contactNumber: "",
     secondaryContactNumber: "",
     email: "",
@@ -246,6 +247,7 @@ export default function AddLeadForm({
         city: lead.customer_city || "",
         state: lead.customer_state || "",
         pincode: lead.customer_pincode || "",
+        companyName: lead.company_name || "",
         projectName: lead.project_name || "",
         projectAddress: lead.project_adderess || "",
         requirementDetails: lead.requirements_details || "",
@@ -655,6 +657,7 @@ export default function AddLeadForm({
       }
 
       const payload = {
+        company_name: formData.companyName || "",
         project_name: formData.projectName || "",
         project_adderess: formData.projectAddress || "",
         requirements_details: formData.requirementDetails || "",
@@ -1221,6 +1224,22 @@ export default function AddLeadForm({
                     />
                   </div>
                 )}
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Company Name
+                  </label>
+                  <input
+                    name="companyName"
+                    placeholder="Company Name"
+                    value={formData.companyName || ""}
+                    onChange={(e) => {
+                      clearError(e);
+                      handleChange(e);
+                    }}
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
+                  />
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">

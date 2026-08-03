@@ -6,7 +6,7 @@ import Swal from "sweetalert2";
 import {
   MdRemoveRedEye, MdDownload, MdEdit, MdDelete,
   MdEmail, MdExpandMore, MdExpandLess, MdPrint,
-  MdSend, MdClose, MdHistory,
+  MdSend, MdClose, MdHistory, MdOutlineNavigateBefore, MdOutlineNavigateNext
 } from "react-icons/md";
 import { FaWhatsapp } from "react-icons/fa";
 
@@ -119,7 +119,7 @@ function SendModal({ quotation, version, onClose }) {
 }
 
 // ── Main QuotationList ────────────────────────────────────────────────────────
-export default function QuotationList({ onAdd, onEdit, filters = {} }) {
+export default function QuotationList({ onAdd, onEdit, filters = {}, canCreate = true, canEdit = true, canDelete = true }) {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expandedRows, setExpandedRows] = useState({});   // { [quotation.id]: bool }
@@ -135,6 +135,7 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
     if (f.date?.from) params.set("date_from", f.date.from);
     if (f.date?.to) params.set("date_to", f.date.to);
     params.set("page", String(pg));
+    params.set("page_size", String(PAGE_SIZE));
     return params.toString();
   }, []);
 
@@ -201,6 +202,7 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
 
   // ── Delete version ──────────────────────────────────────────────────────────
   const deleteVersion = async (quotationId, versionId) => {
+    if (!canDelete) return;
     const res = await Swal.fire({
       title: "Delete this version?",
       text: "This action cannot be undone.",
@@ -219,10 +221,66 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
     }
   };
 
+  const handleViewQuotationDrawing = (q) => {
+    const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
+    const custName = (q.customer_name || q.customer || "").trim().toLowerCase();
+    
+    // Flexible matching by customer name
+    const foundReq = existingReqs.find(r => {
+      const rName = (r.customerName || "").trim().toLowerCase();
+      if (!rName) return false;
+      return rName === custName || rName.includes(custName) || custName.includes(rName);
+    });
+
+    const drawingTitle = foundReq?.drawingTitle || `${q.customer_name || "Customer"} Gate & Parking Layout Plan`;
+    const fileName = foundReq?.fileName || `${q.quotation_no ? q.quotation_no.replace(/\//g, "_") : "Quotation"}_CAD_Drawing.dwg`;
+    const drawingSpecs = foundReq?.drawingSpecs || "AutoCAD CAD Drawing & General Arrangement Site Layout";
+    const designerNotes = foundReq?.designerNotes || "AutoCAD site entrance and pit parking design layout completed.";
+    const drawingUrl = foundReq?.drawingUrl || "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=60";
+    const fileType = foundReq?.fileType || "autocad";
+
+    Swal.fire({
+      title: `🎨 Attached Design Drawing`,
+      html: `
+        <div style="text-align: left; font-size: 13px; line-height: 1.6;">
+          <p><strong>Quotation No:</strong> ${q.quotation_no || "N/A"}</p>
+          <p><strong>Customer:</strong> ${q.customer_name || "N/A"}</p>
+          <p><strong>Drawing Title:</strong> ${drawingTitle}</p>
+          <p><strong>File Name:</strong> ${fileName}</p>
+          <p><strong>Format:</strong> ${fileType.toUpperCase()}</p>
+          <p><strong>Technical Specs:</strong> ${drawingSpecs}</p>
+          <p><strong>Designer Remarks:</strong> ${designerNotes}</p>
+        </div>
+      `,
+      icon: "info",
+      showCancelButton: true,
+      confirmButtonText: "📥 Download CAD/PDF Drawing",
+      cancelButtonText: "Close",
+      confirmButtonColor: "#10b981"
+    }).then((res) => {
+      if (res.isConfirmed) {
+        const a = document.createElement("a");
+        a.href = drawingUrl;
+        a.download = fileName;
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    });
+  };
+
   // ── Action buttons (reused for main row and version rows) ──────────────────
   function ActionButtons({ q, v, isLatest = false }) {
     return (
       <div className="flex items-center justify-center gap-1.5 flex-wrap">
+        {/* View CAD / PDF Drawing */}
+        <button onClick={() => handleViewQuotationDrawing(q)}
+          title="View Attached Design Drawing"
+          className="p-1.5 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 flex items-center gap-1 font-bold text-xs">
+          <span>🎨 Drawing</span>
+        </button>
+
         {/* View PDF */}
         <button onClick={() => openPDF(q.id, v?.id)}
           title="View PDF"
@@ -252,7 +310,7 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
         </button>
 
         {/* Edit — only on latest version */}
-        {isLatest && (
+        {isLatest && canEdit && (
           <button onClick={() => onEdit(q.id)}
             title="Edit / New Version"
             className="p-1.5 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200">
@@ -261,11 +319,13 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
         )}
 
         {/* Delete */}
-        <button onClick={() => deleteVersion(q.id, v?.id)}
-          title="Delete version"
-          className="p-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200">
-          <MdDelete size={16} />
-        </button>
+        {canDelete && (
+          <button onClick={() => deleteVersion(q.id, v?.id)}
+            title="Delete version"
+            className="p-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200">
+            <MdDelete size={16} />
+          </button>
+        )}
       </div>
     );
   }
@@ -275,35 +335,40 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
   return (
     <div className="space-y-4">
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="bg-white p-4 rounded-md shadow flex items-center justify-between">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Quotation Management</h2>
-          <p className="text-sm text-slate-500">
-            {loading ? "Loading…" : `${totalCount} quotation(s) found`}
-          </p>
+          <h2 className="text-lg font-semibold">Quotations</h2>
+          <div className="text-xs text-slate-500 font-medium">
+            {loading ? "Loading…" : `${totalCount} total • ${list.length} shown`}
+          </div>
         </div>
-        <button onClick={onAdd}
-          className="px-4 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700 text-sm font-medium">
-          + Add Quotation
-        </button>
+        {canCreate && (
+          <button
+            onClick={onAdd}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm transition flex items-center gap-1.5"
+          >
+            + Add Quotation
+          </button>
+        )}
       </div>
 
       {/* ── Table ────────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-md shadow overflow-x-auto">
-        <table className="w-full text-sm min-w-[900px]">
-          <thead className="bg-slate-50 border-b">
-            <tr>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 w-10">#</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Quotation No</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Customer</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Site</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Latest Version</th>
-              <th className="px-4 py-3 text-right font-semibold text-slate-700">Total (₹)</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Date</th>
-              <th className="px-4 py-3 text-center font-semibold text-slate-700">Versions</th>
-              <th className="px-4 py-3 text-center font-semibold text-slate-700">Actions</th>
-            </tr>
-          </thead>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap w-10">SR.NO</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">QUOTATION NO</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">CUSTOMER</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">SITE</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">LATEST VERSION</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">TOTAL (₹)</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">DATE</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">VERSIONS</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">ACTIONS</th>
+              </tr>
+            </thead>
 
           <tbody>
             {loading && (
@@ -429,25 +494,33 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
             })}
           </tbody>
         </table>
+      </div>
 
-        {/* ── Pagination ───────────────────────────────────────────────────── */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t bg-slate-50">
-            <span className="text-sm text-slate-500">
-              Page {page} of {totalPages} · {totalCount} total
-            </span>
-            <div className="flex gap-2">
+        {/* ── Pagination ── */}
+        {!loading && list.length > 0 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+            <p className="text-xs text-slate-500 font-medium">
+              Page <span className="font-bold text-slate-700">{page}</span> of{" "}
+              <span className="font-bold text-slate-700">{totalPages}</span>
+            </p>
+
+            <div className="flex items-center gap-1.5">
               <button
+                onClick={() => fetchQuotations(Math.max(1, page - 1))}
                 disabled={page === 1}
-                onClick={() => fetchQuotations(page - 1)}
-                className="px-3 py-1 rounded border bg-white text-sm disabled:opacity-40 hover:bg-slate-100">
-                ← Prev
+                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                aria-label="Previous page"
+              >
+                <MdOutlineNavigateBefore className="w-4 h-4" />
               </button>
+
               <button
+                onClick={() => fetchQuotations(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
-                onClick={() => fetchQuotations(page + 1)}
-                className="px-3 py-1 rounded border bg-white text-sm disabled:opacity-40 hover:bg-slate-100">
-                Next →
+                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                aria-label="Next page"
+              >
+                <MdOutlineNavigateNext className="w-4 h-4" />
               </button>
             </div>
           </div>

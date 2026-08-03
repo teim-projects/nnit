@@ -33,6 +33,7 @@ import {
   Close as CloseIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
+import { useModulePermissions } from '../hooks/useAuth';
 
 const API_BASE_URL = import.meta.env.VITE_BASE_API_URL 
   ? `${import.meta.env.VITE_BASE_API_URL}/api/quotation`
@@ -45,6 +46,7 @@ if (!import.meta.env.VITE_BASE_API_URL) {
 }
 
 const TermsConditions = () => {
+  const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("terms");
   const [terms, setTerms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
@@ -201,6 +203,19 @@ const TermsConditions = () => {
     );
   }
 
+  if (!loadingUser && !canView) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography variant="h5" color="text.secondary" gutterBottom>
+          Access Denied
+        </Typography>
+        <Typography color="text.secondary">
+          You do not have permission to view Terms & Conditions.
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -208,13 +223,15 @@ const TermsConditions = () => {
         <Typography variant="h4" component="h1">
           Terms & Conditions Master
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add New Term
-        </Button>
+        {canCreate && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+          >
+            Add New Term
+          </Button>
+        )}
       </Box>
 
       {/* Summary Cards */}
@@ -278,7 +295,8 @@ const TermsConditions = () => {
                     control={
                       <Switch
                         checked={term.is_active}
-                        onChange={() => handleToggleActive(term)}
+                        onChange={() => canEdit && handleToggleActive(term)}
+                        disabled={!canEdit}
                         size="small"
                       />
                     }
@@ -290,7 +308,8 @@ const TermsConditions = () => {
                     control={
                       <Switch
                         checked={term.is_default}
-                        onChange={() => handleToggleDefault(term)}
+                        onChange={() => canEdit && handleToggleDefault(term)}
+                        disabled={!canEdit}
                         size="small"
                         color="secondary"
                       />
@@ -299,24 +318,28 @@ const TermsConditions = () => {
                   />
                 </TableCell>
                 <TableCell>
-                  <Tooltip title="Edit">
-                    <IconButton
-                      size="small"
-                      color="primary"
-                      onClick={() => handleOpenDialog(term)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete">
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDelete(term.id)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Tooltip>
+                  {canEdit && (
+                    <Tooltip title="Edit">
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => handleOpenDialog(term)}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {canDelete && (
+                    <Tooltip title="Delete">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleDelete(term.id)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
