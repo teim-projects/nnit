@@ -329,66 +329,53 @@
         }
 
         /* ============================================================
-               TERMS & CONDITIONS — NO PARAGRAPH SPLITTING
-               Term text: 17px, Term titles: 20px (bold)
+               TERMS & CONDITIONS — INLINE STYLING APPROACH
+               Minimal CSS, relying on inline styles for page-break control
             ============================================================ */
         .terms-section {
-            font-size: 17px;
-            line-height: 1.5;
+            font-size: 15px;
+            line-height: 1.7;
             color: #000;
         }
 
-        .term-item {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            break-inside: avoid-page !important;
-            display: block !important;
-            margin-bottom: 20px !important;
-            width: 100% !important;
+        /* Print-specific overrides */
+        @media print {
+            .terms-section > div {
+                page-break-inside: avoid !important;
+            }
         }
 
-        .term-title {
-            font-weight: bold;
-            font-size: 20px;
-            margin-bottom: 6px;
-            color: #000;
-            line-height: 1.4;
-            display: block;
-            page-break-after: avoid !important;
-            break-after: avoid !important;
-        }
-
-        .term-content {
-            color: #000;
-            text-align: justify;
-            line-height: 1.5;
-            font-size: 17px;
-            display: block;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-        }
-
-        .terms-section p,
-        .terms-section div,
-        .terms-section li,
+        /* -------- lists inside terms -------- */
         .terms-section ol,
         .terms-section ul {
-            margin: 0 0 8px 0;
+            list-style-position: inside;
+            margin: 10px 0 10px 15px;
             padding: 0;
-            text-align: justify;
-            line-height: 1.5;
-            font-size: 17px;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-        }
-
-        .terms-section ol,
-        .terms-section ul {
-            margin-left: 15px;
         }
 
         .terms-section li {
-            margin-bottom: 4px;
+            margin: 6px 0;
+            padding: 0 0 0 5px;
+            list-style-position: inside;
+            text-align: justify;
+        }
+
+        .terms-section p {
+            margin: 0 0 10px 0 !important;
+            padding: 0 !important;
+            text-align: justify !important;
+            line-height: 1.7 !important;
+            display: block !important;
+            font-size: 15px !important;
+        }
+
+        .terms-section p:before {
+            content: none !important;
+            display: none !important;
+        }
+
+        .terms-section div {
+            list-style: none !important;
         }
     </style>
 </head>
@@ -460,18 +447,22 @@
                 </table>
             </div>
 
-            <div class="doc-title" style="text-align: left; font-size: 22px; font-weight: bold; margin-top: 25px; margin-bottom: 15px; text-transform: none;">Terms &amp; Conditions:</div>
+            <div class="doc-title" style="text-align: left; font-size: 22px; font-weight: bold; margin-top: 20px; margin-bottom: 12px; text-transform: none;">Terms &amp; Conditions:</div>
 
             <div class="terms-section">
                 {% for term in terms %}
-                <div class="term-item">
-                    <div class="term-title">
+                <!--
+                Using inline styles with WeasyPrint-specific page-break properties
+                Each term is a single block that should not be split across pages
+                -->
+                <div style="page-break-inside: avoid; -webkit-column-break-inside: avoid; display: block; margin-bottom: 15px; width: 100%;">
+                    <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px; color: #000; line-height: 1.5; display: inline;">
                         {{ term.sequence }}. {{ term.title }}:
                         {% if term.is_customized %}
                         <span style="font-size:10px; background:#e0d4ff; padding:1px 4px; border-radius:2px; color:#6b21a8; font-weight:normal; margin-left:3px;">[CUSTOMIZED]</span>
                         {% endif %}
                     </div>
-                    <div class="term-content">
+                    <div style="color: #000; text-align: justify; line-height: 1.7; font-size: 15px; display: inline;">
                         {% autoescape off %}
                         {{ term.content|safe }}
                         {% endautoescape %}
@@ -612,4 +603,4 @@
 
 
 
-
+
