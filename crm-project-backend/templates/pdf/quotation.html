@@ -22,7 +22,7 @@
         body {
             margin: 0;
             padding: 0;
-            font-family: 'Calibri', 'Arial', sans-serif;
+            font-family: DejaVu Sans, sans-serif;
             font-size: 17px;
             color: #000;
             background: #fff;
@@ -164,13 +164,13 @@
         }
 
         /* ============================================================
-               MAIN TABLE (17px as requested)
+               MAIN TABLE - WeasyPrint 60.1 Compatible
             ============================================================ */
         .main-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 17px;
-            table-layout: fixed;
+            table-layout: auto;
             background: rgba(255, 255, 255, 0.95);
         }
 
@@ -203,33 +203,14 @@
             vertical-align: middle;
         }
 
-        .col-solution {
-            width: 23%;
-        }
-        .col-units {
-            width: 10%;
-        }
-        .col-rate {
-            width: 18%;
-        }
-        .col-install {
-            width: 18%;
-        }
-        .col-cars {
-            width: 10%;
-        }
-        .col-total {
-            width: 21%;
-        }
-
         /* ============================================================
-               TOTALS TABLE (17px as requested)
+               TOTALS TABLE - WeasyPrint 60.1 Compatible
             ============================================================ */
         .totals-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 17px;
-            table-layout: fixed;
+            table-layout: auto;
             background: rgba(255, 255, 255, 0.95);
         }
 
@@ -276,16 +257,35 @@
         }
 
         /* ============================================================
-               FOOTER SIGNATURE
+               FOOTER SIGNATURE - Table-based for WeasyPrint 60.1
             ============================================================ */
         .footer {
             margin-top: 40px;
-            display: flex;
-            justify-content: space-between;
+            width: 100%;
             font-size: 15px;
-            padding: 0 10px;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+        }
+
+        .footer-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .footer-table td {
+            border: none;
+            padding: 0 10px;
+            vertical-align: top;
+        }
+
+        .footer-table td:first-child {
+            width: 50%;
+            text-align: left;
+        }
+
+        .footer-table td:last-child {
+            width: 50%;
+            text-align: right;
         }
 
         .sig-line {
@@ -295,6 +295,7 @@
             font-size: 14px;
             min-width: 200px;
             text-align: center;
+            display: inline-block;
         }
 
         /* ============================================================
@@ -330,12 +331,13 @@
 
         /* ============================================================
                TERMS & CONDITIONS — INLINE STYLING APPROACH
-               Minimal CSS, relying on inline styles for page-break control
+               Keep Calibri font for Terms & Conditions
             ============================================================ */
         .terms-section {
-            font-size: 15px;
+            font-size: 16px;
             line-height: 1.7;
             color: #000;
+            font-family: 'Calibri', 'Arial', sans-serif;
         }
 
         /* Print-specific overrides */
@@ -349,24 +351,27 @@
         .terms-section ol,
         .terms-section ul {
             list-style-position: inside;
-            margin: 10px 0 10px 15px;
+            margin: 12px 0 12px 18px;
             padding: 0;
+            font-family: 'Calibri', 'Arial', sans-serif;
         }
 
         .terms-section li {
-            margin: 6px 0;
+            margin: 8px 0;
             padding: 0 0 0 5px;
             list-style-position: inside;
             text-align: justify;
+            font-family: 'Calibri', 'Arial', sans-serif;
         }
 
         .terms-section p {
-            margin: 0 0 10px 0 !important;
+            margin: 0 0 12px 0 !important;
             padding: 0 !important;
             text-align: justify !important;
             line-height: 1.7 !important;
             display: block !important;
-            font-size: 15px !important;
+            font-size: 16px !important;
+            font-family: 'Calibri', 'Arial', sans-serif !important;
         }
 
         .terms-section p:before {
@@ -447,7 +452,7 @@
                 </table>
             </div>
 
-            <div class="doc-title" style="text-align: left; font-size: 22px; font-weight: bold; margin-top: 20px; margin-bottom: 12px; text-transform: none;">Terms &amp; Conditions:</div>
+            <div class="doc-title" style="text-align: left; font-size: 24px; font-weight: bold; margin-top: 20px; margin-bottom: 15px; text-transform: none; font-family: 'Calibri', 'Arial', sans-serif;">Terms &amp; Conditions:</div>
 
             <div class="terms-section">
                 {% for term in terms %}
@@ -455,14 +460,14 @@
                 Using inline styles with WeasyPrint-specific page-break properties
                 Each term is a single block that should not be split across pages
                 -->
-                <div style="page-break-inside: avoid; -webkit-column-break-inside: avoid; display: block; margin-bottom: 15px; width: 100%;">
-                    <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px; color: #000; line-height: 1.5; display: inline;">
+                <div style="page-break-inside: avoid; -webkit-column-break-inside: avoid; display: block; margin-bottom: 18px; width: 100%;">
+                    <div style="font-weight: bold; font-size: 18px; margin-bottom: 6px; color: #000; line-height: 1.5; display: inline; font-family: 'Calibri', 'Arial', sans-serif;">
                         {{ term.sequence }}. {{ term.title }}:
                         {% if term.is_customized %}
                         <span style="font-size:10px; background:#e0d4ff; padding:1px 4px; border-radius:2px; color:#6b21a8; font-weight:normal; margin-left:3px;">[CUSTOMIZED]</span>
                         {% endif %}
                     </div>
-                    <div style="color: #000; text-align: justify; line-height: 1.7; font-size: 15px; display: inline;">
+                    <div style="color: #000; text-align: justify; line-height: 1.7; font-size: 16px; display: inline; font-family: 'Calibri', 'Arial', sans-serif;">
                         {% autoescape off %}
                         {{ term.content|safe }}
                         {% endautoescape %}
@@ -497,16 +502,8 @@
                 <strong>Product Name:</strong> {{ product_name }}
             </div>
 
-            <!-- MAIN TABLE -->
+            <!-- MAIN TABLE - Auto layout for WeasyPrint 60.1 -->
             <table class="main-table">
-                <colgroup>
-                    <col class="col-solution">
-                    <col class="col-units">
-                    <col class="col-rate">
-                    <col class="col-install">
-                    <col class="col-cars">
-                    <col class="col-total">
-                </colgroup>
                 <thead>
                     <tr>
                         <th>Parking Solution</th>
@@ -537,16 +534,8 @@
                 </tbody>
             </table>
 
-            <!-- TOTALS -->
+            <!-- TOTALS - Auto layout for WeasyPrint 60.1 -->
             <table class="totals-table">
-                <colgroup>
-                    <col style="width:23%">
-                    <col style="width:10%">
-                    <col style="width:18%">
-                    <col style="width:18%">
-                    <col style="width:10%">
-                    <col style="width:21%">
-                </colgroup>
                 <tr class="row-basic">
                     <td colspan="5" style="text-align:right; font-weight:bold; padding-right:12px;">Basic Total Value</td>
                     <td class="right">{{ basic_total_fmt }}</td>
@@ -583,16 +572,20 @@
                 <strong>Total Contract Value in words:</strong> Rs. {{ amount_in_words }}
             </div>
 
-            <!-- FOOTER SIGNATURES -->
+            <!-- FOOTER SIGNATURES - Table-based for WeasyPrint 60.1 -->
             <div class="footer">
-                <div>
-                    <div style="font-weight:bold;">Customer's Seal & Signature</div>
-                    <div class="sig-line">&nbsp;</div>
-                </div>
-                <div style="text-align:right;">
-                    <div style="font-weight:bold;">For NNIT Car Parking Systems Pvt. Ltd.</div>
-                    <div class="sig-line">Authorized Signatory</div>
-                </div>
+                <table class="footer-table">
+                    <tr>
+                        <td>
+                            <div style="font-weight:bold;">Customer's Seal & Signature</div>
+                            <div class="sig-line">&nbsp;</div>
+                        </td>
+                        <td>
+                            <div style="font-weight:bold;">For NNIT Car Parking Systems Pvt. Ltd.</div>
+                            <div class="sig-line">Authorized Signatory</div>
+                        </td>
+                    </tr>
+                </table>
             </div>
 
         </div><!-- /content -->
