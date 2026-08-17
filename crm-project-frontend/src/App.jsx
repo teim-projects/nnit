@@ -29,6 +29,8 @@ import RoleAccessManagement from './pages/RoleAccessManagement';
 import ReportsAnalytics from './pages/ReportsAnalytics';
 import DesignManagement from './pages/DesignManagement';
 import DesignerQueue from './pages/DesignerQueue';
+import ProductRequirementsList from './components/product-requirements/ProductRequirementsList';
+import ProductRequirementForm from './components/product-requirements/ProductRequirementForm';
 
 function AppRoutes() {
   const location  = useLocation();
@@ -90,6 +92,9 @@ function AppRoutes() {
               <Route path="/role-access" element={<RoleAccessManagement />} />
               <Route path="/design-drawings" element={<DesignManagement />} />
               <Route path="/designer-queue" element={<DesignerQueue />} />
+              <Route path="/product-requirements" element={<ProductRequirementsList />} />
+              <Route path="/product-requirements/add" element={<ProductRequirementForm />} />
+              <Route path="/product-requirements/edit/:id" element={<ProductRequirementForm />} />
             </Routes>
           </div>
         </main>

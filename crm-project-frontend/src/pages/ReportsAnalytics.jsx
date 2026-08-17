@@ -184,11 +184,11 @@ export default function ReportsAnalytics() {
       color: CHART_COLORS[i % CHART_COLORS.length]
     }));
 
-    const statusMap = { open: 0, closed: 0, in_process: 0 };
+    const statusMap = { open: 0, closed: 0, close_win: 0, close_loss: 0 };
     leads.forEach(l => {
       const st = (l.status || "open").toLowerCase();
-      if (st.includes("closed") || st.includes("won")) statusMap.closed++;
-      else if (st.includes("process")) statusMap.in_process++;
+      if (st.includes("win") || st === "closed") statusMap.close_win++;
+      else if (st.includes("loss")) statusMap.close_loss++;
       else statusMap.open++;
     });
 

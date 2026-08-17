@@ -98,8 +98,8 @@ export default function Lead() {
 
   const status_choice = useMemo(() => [
     { value: "open", label: "Open" },
-    { value: "in_process", label: "In Process" },
-    { value: "closed", label: "Closed" },
+    { value: "close_win", label: "Close Win" },
+    { value: "close_loss", label: "Close Loss" },
   ], []);
 
   const leadSourceOptions = useMemo(() => [
@@ -436,7 +436,15 @@ export default function Lead() {
     // { key: "email", label: "Email", render: (r) => r.customer_email },
     // { key: "hvac_application", label: "HVAC Application", render: (r) => r.hvac_application },
     { key: "lead_source", label: "Source", render: (r) => r.lead_source },
-    { key: "status", label: "Status", render: (r) => r.status },
+    { key: "status", label: "Status", render: (r) => {
+        const s = (r.status || "open").toLowerCase();
+        if (s === "close_win" || s === "closed_win") return <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-xs">Close Win</span>;
+        if (s === "close_loss" || s === "closed_loss") return <span className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-full font-bold text-xs">Close Loss</span>;
+        if (s === "closed") return <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-full font-bold text-xs">Closed</span>;
+        if (s === "in_process") return <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-bold text-xs">In Process</span>;
+        return <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full font-bold text-xs">Open</span>;
+      }
+    },
     // ✅ SHOW ONLY IF USER IS NOT SALES
     ...(userRole?.name !== "sales"
       ? [{

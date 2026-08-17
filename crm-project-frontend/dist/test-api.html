@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test - Product Requirements</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            background: #4F46E5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #4338CA;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #4F46E5;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            border-left-color: #EF4444;
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+        .success {
+            border-left-color: #10B981;
+            background: #D1FAE5;
+            color: #065F46;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .info {
+            background: #DBEAFE;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Product Requirements API Test</h1>
+        
+        <div class="info">
+            <strong>Instructions:</strong><br>
+            1. First login to the app<br>
+            2. Then come back to this page<br>
+            3. Click buttons below to test APIs
+        </div>
+
+        <div>
+            <button onclick="testToken()">1. Test Token</button>
+            <button onclick="testCategories()">2. Test Categories API</button>
+            <button onclick="testProducts()">3. Test Products API</button>
+            <button onclick="testAll()">4. Test All</button>
+        </div>
+
+        <div id="result" class="result" style="display:none;">
+            <h3>Result:</h3>
+            <pre id="output"></pre>
+        </div>
+    </div>
+
+    <script>
+        const baseApi = 'http://localhost:8000';
+        
+        function showResult(message, isError = false, isSuccess = false) {
+            const resultDiv = document.getElementById('result');
+            const output = document.getElementById('output');
+            
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            
+            if (isError) resultDiv.classList.add('error');
+            if (isSuccess) resultDiv.classList.add('success');
+            
+            output.textContent = message;
+        }
+
+        function testToken() {
+            const token = localStorage.getItem('access_token');
+            
+            if (!token) {
+                showResult('❌ Token NOT found!\n\nPlease login first to the main app.', true);
+                return;
+            }
+            
+            showResult(`✅ Token Found!\n\nToken: ${token.substring(0, 50)}...\n\nToken looks valid. You can proceed with API tests.`, false, true);
+        }
+
+        async function testCategories() {
+            const token = localStorage.getItem('access_token');
+            
+            if (!token) {
+                showResult('❌ No token! Login first.', true);
+                return;
+            }
+
+            try {
+                showResult('⏳ Fetching categories...');
+                
+                const response = await fetch(`${baseApi}/parking/categories/?is_active=true`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    showResult(`❌ API Error (${response.status}):\n\n${JSON.stringify(errorData, null, 2)}`, true);
+                    return;
+                }
+
+                const data = await response.json();
+                const categories = data.results || data;
+                
+                if (categories.length === 0) {
+                    showResult('⚠️ Categories API works but NO categories found!\n\nPlease add categories in Parking Products module.', true);
+                    return;
+                }
+
+                showResult(`✅ Categories Found: ${categories.length}\n\n${JSON.stringify(categories, null, 2)}`, false, true);
+            } catch (error) {
+                showResult(`❌ Network Error:\n\n${error.message}\n\nMake sure backend is running on ${baseApi}`, true);
+            }
+        }
+
+        async function testProducts() {
+            const token = localStorage.getItem('access_token');
+            
+            if (!token) {
+                showResult('❌ No token! Login first.', true);
+                return;
+            }
+
+            try {
+                showResult('⏳ Fetching products...');
+                
+                const response = await fetch(`${baseApi}/parking/products/?is_active=true`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    showResult(`❌ API Error (${response.status}):\n\n${JSON.stringify(errorData, null, 2)}`, true);
+                    return;
+                }
+
+                const data = await response.json();
+                const products = data.results || data;
+                
+                if (products.length === 0) {
+                    showResult('⚠️ Products API works but NO products found!\n\nPlease add products in Parking Products module.', true);
+                    return;
+                }
+
+                showResult(`✅ Products Found: ${products.length}\n\n${JSON.stringify(products, null, 2)}`, false, true);
+            } catch (error) {
+                showResult(`❌ Network Error:\n\n${error.message}\n\nMake sure backend is running on ${baseApi}`, true);
+            }
+        }
+
+        async function testAll() {
+            const token = localStorage.getItem('access_token');
+            
+            if (!token) {
+                showResult('❌ No token! Login first.', true);
+                return;
+            }
+
+            let results = '=== COMPREHENSIVE API TEST ===\n\n';
+
+            // Test 1: Token
+            results += '1. TOKEN CHECK:\n';
+            results += `   ✅ Token exists (${token.substring(0, 30)}...)\n\n`;
+
+            // Test 2: Categories
+            results += '2. CATEGORIES API:\n';
+            try {
+                const catResponse = await fetch(`${baseApi}/parking/categories/?is_active=true`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (catResponse.ok) {
+                    const catData = await catResponse.json();
+                    const cats = catData.results || catData;
+                    results += `   ✅ Success! Found ${cats.length} categories\n`;
+                    cats.forEach(c => {
+                        results += `      - ${c.display_name}\n`;
+                    });
+                } else {
+                    results += `   ❌ Failed (${catResponse.status})\n`;
+                }
+            } catch (e) {
+                results += `   ❌ Error: ${e.message}\n`;
+            }
+            results += '\n';
+
+            // Test 3: Products
+            results += '3. PRODUCTS API:\n';
+            try {
+                const prodResponse = await fetch(`${baseApi}/parking/products/?is_active=true`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (prodResponse.ok) {
+                    const prodData = await prodResponse.json();
+                    const prods = prodData.results || prodData;
+                    results += `   ✅ Success! Found ${prods.length} products\n`;
+                    prods.forEach(p => {
+                        results += `      - ${p.product_name} (${p.category.display_name})\n`;
+                    });
+                } else {
+                    results += `   ❌ Failed (${prodResponse.status})\n`;
+                }
+            } catch (e) {
+                results += `   ❌ Error: ${e.message}\n`;
+            }
+
+            showResult(results, false, true);
+        }
+
+        // Auto-test on page load
+        window.onload = function() {
+            console.log('🔍 API Test Page Loaded');
+            console.log('Base API:', baseApi);
+            console.log('Token:', localStorage.getItem('access_token') ? 'Found' : 'Not Found');
+        };
+    </script>
+</body>
+</html>

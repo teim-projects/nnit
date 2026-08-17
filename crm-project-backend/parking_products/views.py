@@ -1,55 +1,41 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from api.permissions import HasModulePermission
 from django.db.models import Q
-from .models import ProductCategory, ParkingProduct, ProductConfiguration
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import ProductCategory, ParkingProduct, ProductConfiguration, ProductRequirement
 from .serializers import (
     ProductCategorySerializer,
     ParkingProductSerializer,
     ParkingProductListSerializer,
     ProductConfigurationSerializer,
     ProductRecommendationSerializer,
-    RecommendedProductSerializer
+    RecommendedProductSerializer,
+    ProductRequirementSerializer
 )
 
 
 class ProductCategoryViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for Product Categories (Type Master)
-    """
-    module_key = 'products'
     queryset = ProductCategory.objects.all()
     serializer_class = ProductCategorySerializer
-    permission_classes = [IsAuthenticated, HasModulePermission]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        
-        # Filter by active status
         is_active = self.request.query_params.get('is_active')
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
-        
         return queryset
 
 
 class ParkingProductViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for Parking Products
-    
-    Endpoints:
-    - GET /api/parking-products/ - List all products
-    - POST /api/parking-products/ - Create new product
-    - GET /api/parking-products/{id}/ - Get product details
-    - PUT/PATCH /api/parking-products/{id}/ - Update product
-    - DELETE /api/parking-products/{id}/ - Delete product
-    - POST /api/parking-products/recommend/ - Get product recommendations
-    """
-    module_key = 'products'
     queryset = ParkingProduct.objects.select_related('category').prefetch_related('configurations')
-    permission_classes = [IsAuthenticated, HasModulePermission]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -59,7 +45,6 @@ class ParkingProductViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         
-        # Search by product name
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(
@@ -68,45 +53,36 @@ class ParkingProductViewSet(viewsets.ModelViewSet):
                 Q(description__icontains=search)
             )
         
-        # Filter by category
         category = self.request.query_params.get('category')
         if category:
             queryset = queryset.filter(category__name=category)
         
-        # Filter by operation type
         operation_type = self.request.query_params.get('operation_type')
         if operation_type:
             queryset = queryset.filter(operation_type=operation_type)
         
-        # Filter by automation type
         automation_type = self.request.query_params.get('automation_type')
         if automation_type:
             queryset = queryset.filter(automation_type=automation_type)
         
-        # Filter by pit required
         pit_required = self.request.query_params.get('pit_required')
         if pit_required is not None:
             queryset = queryset.filter(pit_required=pit_required.lower() == 'true')
         
-        # Filter by active status
         is_active = self.request.query_params.get('is_active')
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
         else:
-            # By default, show only active products
             queryset = queryset.filter(is_active=True)
         
-        # Filter by featured
         is_featured = self.request.query_params.get('is_featured')
         if is_featured is not None:
             queryset = queryset.filter(is_featured=is_featured.lower() == 'true')
         
-        # Filter by minimum capacity
         min_capacity = self.request.query_params.get('min_capacity')
         if min_capacity:
             queryset = queryset.filter(car_capacity__gte=int(min_capacity))
         
-        # Filter by maximum capacity
         max_capacity = self.request.query_params.get('max_capacity')
         if max_capacity:
             queryset = queryset.filter(car_capacity__lte=int(max_capacity))
@@ -118,22 +94,6 @@ class ParkingProductViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'], url_path='recommend')
     def recommend_products(self, request):
-        """
-        Recommend parking products based on requirements
-        
-        POST /api/parking-products/recommend/
-        Body:
-        {
-            "cars_required": 20,
-            "car_type": "mixed",
-            "basement_available": true,
-            "pit_possible": true,
-            "available_height": 12.5,
-            "available_width": 40,
-            "available_length": 30,
-            "budget_range": "30-40 Lakhs"
-        }
-        """
         serializer = ProductRecommendationSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -147,20 +107,17 @@ class ParkingProductViewSet(viewsets.ModelViewSet):
             match_score = 0
             match_reasons = []
             
-            # Check capacity match
             if product.car_capacity >= requirements.get('cars_required', 0):
                 match_score += 30
                 match_reasons.append(f"Can accommodate {product.car_capacity} cars")
             
-            # Check pit requirement
             pit_possible = requirements.get('pit_possible', False)
             if product.pit_required and not pit_possible:
-                continue  # Skip if pit required but not possible
+                continue
             elif not product.pit_required and not pit_possible:
                 match_score += 20
                 match_reasons.append("No pit required")
             
-            # Check space availability
             available_height = requirements.get('available_height')
             available_width = requirements.get('available_width')
             available_length = requirements.get('available_length')
@@ -174,33 +131,27 @@ class ParkingProductViewSet(viewsets.ModelViewSet):
                 space_fits = False
             
             if not space_fits:
-                continue  # Skip if doesn't fit
+                continue
             elif all([available_height, available_width, available_length]):
                 match_score += 25
                 match_reasons.append("Fits within available space")
             
-            # Basement availability bonus
             basement_available = requirements.get('basement_available', False)
             if basement_available and product.category.name in ['pit_parking', 'stack_parking']:
                 match_score += 15
                 match_reasons.append("Ideal for basement installation")
             
-            # Operation type preference
             if product.operation_type == 'hydraulic':
                 match_score += 10
                 match_reasons.append("Hydraulic operation for smooth performance")
             
-            # Add match data to product
             product.match_score = match_score
             product.match_reasons = match_reasons
             
             if match_score > 0:
                 recommended.append(product)
         
-        # Sort by match score (highest first)
         recommended.sort(key=lambda x: x.match_score, reverse=True)
-        
-        # Return top 10 recommendations
         recommended = recommended[:10]
         
         serializer = RecommendedProductSerializer(recommended, many=True)
@@ -212,7 +163,6 @@ class ParkingProductViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def configurations(self, request, pk=None):
-        """Get all configurations for a product"""
         product = self.get_object()
         configurations = product.configurations.filter(is_active=True)
         serializer = ProductConfigurationSerializer(configurations, many=True)
@@ -220,24 +170,35 @@ class ParkingProductViewSet(viewsets.ModelViewSet):
 
 
 class ProductConfigurationViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for Product Configurations
-    """
     queryset = ProductConfiguration.objects.select_related('product')
     serializer_class = ProductConfigurationSerializer
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        
-        # Filter by product
         product_id = self.request.query_params.get('product')
         if product_id:
             queryset = queryset.filter(product_id=product_id)
-        
-        # Filter by active status
         is_active = self.request.query_params.get('is_active')
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
-        
         return queryset
+
+
+class ProductRequirementViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Product Requirements.
+    Filtering by category is done via django-filter using the category ID.
+    """
+    queryset = ProductRequirement.objects.select_related('category', 'product').all()
+    serializer_class = ProductRequirementSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['category']          # filters by category ID (foreign key)
+    search_fields = ['product__product_name', 'category__display_name']
+    ordering_fields = ['created_at', 'price']
+    ordering = ['-created_at']
+    
+    # The custom get_queryset override has been removed to avoid conflict with the filter backend.

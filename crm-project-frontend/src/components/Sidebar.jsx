@@ -121,6 +121,7 @@ export default function Sidebar({ onNavigate }) {
           { key: "followups", label: "Follow-up Management", icon: FollowupIcon, path: "/followup-management" },
           { key: "quotations", label: "Quotations", icon: QuoteIcon, path: "/quotation" },
           { key: "products", label: "Product Master", icon: ParkingIcon, path: "/parking-products" },
+          { key: "product_requirements", label: "Product Requirements", icon: DocumentIcon, path: "/product-requirements" },
           { key: "customers", label: "Customers", icon: UserIcon, path: "/customer" },
         ],
       },

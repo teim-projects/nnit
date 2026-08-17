@@ -397,6 +397,29 @@
         </div>
         {% endif %}
 
+        <!-- CLOSING SIGNATURE SECTION AFTER TERMS & CONDITIONS -->
+        <div style="margin-top: 25px; page-break-inside: avoid; break-inside: avoid; font-size: 17px; line-height: 1.5; color: #000;">
+          <p style="font-size: 18px; margin: 0 0 10px 0;">Thanking You</p>
+          <p style="font-size: 19px; font-weight: bold; margin: 0 0 10px 0;">For, NNIT Car Parking Systems Pvt Ltd</p>
+          
+          <div style="margin: 10px 0; min-height: 45px;">
+            {% if base64_signature %}
+            <img src="data:image/png;base64,{{ base64_signature }}" alt="Signature" style="height: 50px; width: auto; display: block;" />
+            {% else %}
+            <div style="margin: 5px 0;">
+              <span style="font-style: italic; font-size: 24px; font-weight: bold; color: #1e3a8a;">Nilesh Sali</span>
+              <div style="border-bottom: 2px solid #1e3a8a; width: 150px; margin-top: 2px;"></div>
+            </div>
+            {% endif %}
+          </div>
+
+          <div>
+            <p style="font-weight: bold; font-size: 18px; margin: 6px 0 0 0;">({{ contact_person_name|default:"Nilesh Sali" }})</p>
+            <p style="font-size: 16px; margin: 1px 0 0 0;">Authorized Signatory</p>
+            <p style="font-size: 16px; margin: 1px 0 0 0;">Date: {{ quotation_date }}</p>
+          </div>
+        </div>
+
       </div>
     </div>
 

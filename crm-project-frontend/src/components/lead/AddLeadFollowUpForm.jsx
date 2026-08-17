@@ -297,7 +297,7 @@ export default function AddLeadFollowUpFormNew({
   // ---------- State (all fields) ----------
   const [followupDate, setFollowupDate] = useState("");
   const [nextFollowupDate, setNextFollowupDate] = useState("");
-  const [status, setStatus] = useState("in_process");
+  const [status, setStatus] = useState("open");
   const [remarks, setRemarks] = useState("");
   const [discussionNotes, setDiscussionNotes] = useState("");
 
@@ -501,7 +501,7 @@ export default function AddLeadFollowUpFormNew({
       // Basic fields
       setFollowupDate(followup.followup_date ?? "");
       setNextFollowupDate(followup.next_followup_date ?? "");
-      setStatus(followup.status ?? "in_process");
+      setStatus(followup.status ?? "open");
       setRemarks(followup.remarks ?? "");
       setDiscussionNotes(followup.discussion_notes ?? "");
 
@@ -565,7 +565,7 @@ export default function AddLeadFollowUpFormNew({
       // But we want to keep default values for mode, status, etc.
       setFollowupDate("");
       setNextFollowupDate("");
-      setStatus("in_process");
+      setStatus("open");
       setRemarks("");
       setDiscussionNotes("");
       setFollowupMode("call");
@@ -923,8 +923,8 @@ export default function AddLeadFollowUpFormNew({
                   onChange={(e) => setStatus(e.target.value)}
                 >
                   <option value="open">Open</option>
-                  <option value="in_process">In Process</option>
-                  <option value="closed">Closed</option>
+                  <option value="close_win">Close Win</option>
+                  <option value="close_loss">Close Loss</option>
                 </select>
                 {validationErrors.status && (
                   <p className="text-red-500 text-xs mt-1">{validationErrors.status}</p>

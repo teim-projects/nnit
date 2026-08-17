@@ -143,7 +143,9 @@ export default function Dashboard() {
       const arr=d=>d?(Array.isArray(d)?d:d?.results||[]):[];
       const L=arr(ld),Cu=arr(cu),Q=arr(qu),P=arr(pr);
       const today=new Date();today.setHours(0,0,0,0);
-      const open=L.filter(l=>l.status==="open").length,closed=L.filter(l=>l.status==="closed").length,inp=L.filter(l=>l.status==="in_process").length;
+      const open=L.filter(l=>l.status==="open").length;
+      const win=L.filter(l=>l.status==="close_win"||l.status==="closed_win"||l.status==="closed").length;
+      const loss=L.filter(l=>l.status==="close_loss"||l.status==="closed_loss").length;
       const tFU=L.filter(l=>{if(!l.followup_date)return false;const d=new Date(l.followup_date);d.setHours(0,0,0,0);return d.getTime()===today.getTime();}).length;
       const ov=L.filter(l=>{if(!l.followup_date)return false;const d=new Date(l.followup_date);d.setHours(0,0,0,0);return d<today;}).length;
       
@@ -157,9 +159,9 @@ export default function Dashboard() {
       const rt=L.filter(l=>l.followup_date&&(l.created_at||l.date)).map(l=>Math.max(0,Math.round((new Date(l.followup_date)-new Date(l.created_at||l.date))/864e5)));
       const avg=rt.length?Math.round(rt.reduce((a,b)=>a+b,0)/rt.length):0;
       
-      setStats({totalLeads:L.length,totalCustomers:Cu.length,totalQuotations:Q.length,totalProducts:P.length,openLeads:open,closedLeads:closed,inProcessLeads:inp,overdueFollowups:ov,todayFollowups:tFU,avgResponseDays:avg});
+      setStats({totalLeads:L.length,totalCustomers:Cu.length,totalQuotations:Q.length,totalProducts:P.length,openLeads:open,closedLeads:win,inProcessLeads:loss,overdueFollowups:ov,todayFollowups:tFU,avgResponseDays:avg});
       setMonthly(last6.map(k=>mon[k]));
-      setStatusData([{name:"Open",value:open,fill:C.indigo},{name:"In Process",value:inp,fill:C.orange},{name:"Closed",value:closed,fill:C.emerald}]);
+      setStatusData([{name:"Open",value:open,fill:C.indigo},{name:"Close Win",value:win,fill:C.emerald},{name:"Close Loss",value:loss,fill:"#EF4444"}]);
       setSrcData(Object.entries(sc).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value).slice(0,6));
       
       // CRM Portfolio Distribution Pie Data

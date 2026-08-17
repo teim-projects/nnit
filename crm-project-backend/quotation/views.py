@@ -440,27 +440,47 @@ def simple_quotation_create(request):
 def simple_quotation_detail(request, pk):
     """
     GET /quotation/simple-quotation/<pk>/
-    Returns simple-form-friendly data for editing.
+    Returns simple-form-friendly data for editing (including multiple items).
     """
-    from lead_management.serializers import CustomerSerializer
     quotation = get_object_or_404(Quotation, pk=pk)
     version = quotation.versions.filter(is_active=True).first()
-    item = version.high_side_items.first() if version else None
+    
+    items_list = []
+    first_item = None
+    if version:
+        high_items = list(version.high_side_items.all())
+        first_item = high_items[0] if high_items else None
+        for h_item in high_items:
+            p_id = h_item.product_data.get("id") if h_item.product_data else None
+            p_name = h_item.product_data.get("name") if h_item.product_data else ""
+            qty = h_item.quantity or 1
+            inst_rate = (float(h_item.mathadi_charges) / qty) if (h_item.mathadi_charges and qty > 0) else 0.0
+            items_list.append({
+                "id": h_item.id,
+                "parking_product_id": p_id,
+                "parking_product_name": p_name,
+                "quantity": qty,
+                "unit_price": float(h_item.unit_price or 0),
+                "installation_charges": inst_rate,
+                "description": h_item.description or "",
+                "line_total": float(h_item.base_amount or 0)
+            })
 
     data = {
         "id": quotation.id,
         "quotation_no": quotation.quotation_no,
         "customer": quotation.customer_id,
-        "customer_name": quotation.customer.name,
+        "customer_name": quotation.customer.name if quotation.customer else "",
         "subject": quotation.subject,
-        "quantity": item.quantity if item else 1,
-        "unit_price": float(item.unit_price) if item else 0,
-        "gst_percent": float(item.gst_percent) if item else 18,
-        "parking_product_id": item.product_data.get("id") if item else None,
-        "parking_product_name": item.product_data.get("name") if item else "",
+        "quantity": first_item.quantity if first_item else 1,
+        "unit_price": float(first_item.unit_price) if first_item else 0,
+        "gst_percent": float(first_item.gst_percent) if first_item else 18,
+        "parking_product_id": first_item.product_data.get("id") if first_item and first_item.product_data else None,
+        "parking_product_name": first_item.product_data.get("name") if first_item and first_item.product_data else "",
         "subtotal": float(version.subtotal) if version else 0,
         "gst_amount": float(version.gst_amount) if version else 0,
         "grand_total": float(version.grand_total) if version else 0,
+        "items": items_list
     }
     return Response(data)
 
@@ -471,24 +491,35 @@ def simple_quotation_detail(request, pk):
 def simple_quotation_update(request, pk):
     """
     PUT /quotation/simple-quotation/<pk>/
-    Creates a new version with updated product/price.
+    Creates a new version with updated products/prices list.
     """
     from parking_products.models import ParkingProduct
 
     quotation = get_object_or_404(Quotation, pk=pk)
     data = request.data
-
-    quantity = int(data.get("quantity", 1))
-    unit_price = float(data.get("unit_price", 0))
     gst_percent = float(data.get("gst_percent", 18))
-    parking_product_id = data.get("parking_product_id")
 
-    parking_product = get_object_or_404(ParkingProduct, pk=parking_product_id) if parking_product_id else None
+    raw_items = data.get("items")
+    if not raw_items or not isinstance(raw_items, list) or len(raw_items) == 0:
+        p_id = data.get("parking_product_id")
+        if p_id:
+            raw_items = [{
+                "parking_product_id": p_id,
+                "quantity": data.get("quantity", 1),
+                "unit_price": data.get("unit_price", 0),
+                "description": "",
+                "installation_charges": 0
+            }]
+        else:
+            return Response({"detail": "At least one product item is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Update quotation fields
-    if parking_product:
-        quotation.subject = f"{parking_product.product_name} - {parking_product.category.display_name}"
-    quotation.save()
+    # Fetch first product to build subject if needed
+    first_product_id = raw_items[0].get("parking_product_id")
+    first_product = ParkingProduct.objects.filter(pk=first_product_id).first() if first_product_id else None
+
+    if first_product:
+        quotation.subject = f"{first_product.product_name} - {first_product.category.display_name}"
+        quotation.save()
 
     # Deactivate old version
     old_version = quotation.versions.filter(is_active=True).first()
@@ -510,44 +541,58 @@ def simple_quotation_update(request, pk):
         created_by=request.user,
     )
 
-    if parking_product:
-        product_data = {
-            "id": parking_product.id,
-            "name": parking_product.product_name,
-            "sku": parking_product.product_code or parking_product.product_name,
-            "category": parking_product.category.display_name,
-            "car_capacity": parking_product.car_capacity,
+    total_subtotal = 0.0
+    total_gst_amount = 0.0
+
+    for item_data in raw_items:
+        p_id = item_data.get("parking_product_id")
+        product = ParkingProduct.objects.filter(pk=p_id).first() if p_id else None
+        qty = int(item_data.get("quantity", 1))
+        u_price = float(item_data.get("unit_price", 0))
+        inst_charges = float(item_data.get("installation_charges", 0))
+        desc = item_data.get("description") or (f"{product.product_name} ({product.category.display_name})" if product else "Parking System")
+
+        product_data_snapshot = {
+            "id": product.id if product else None,
+            "name": product.product_name if product else "Parking System",
+            "sku": (product.product_code or product.product_name) if product else "PKG",
+            "category": product.category.display_name if (product and product.category) else "",
+            "car_capacity": getattr(product, 'car_capacity', 2) or 2,
+            "load_capacity": float(getattr(product, 'load_capacity', 0) or 0) if product else 0,
         }
-    else:
-        product_data = {}
 
-    base_amount = quantity * unit_price
-    gst_value = (base_amount * gst_percent) / 100
+        base_amount = qty * u_price
+        line_subtotal = base_amount + (qty * inst_charges)
+        gst_value = (line_subtotal * gst_percent) / 100
+        total_with_gst = line_subtotal + gst_value
 
-    QuotationHighSideItem.objects.create(
-        quotation_version=version,
-        product_data=product_data,
-        quantity=quantity,
-        unit_price=unit_price,
-        unit="NOS",
-        gst_percent=gst_percent,
-        mathadi_charges=0,
-        transportation_charges=0,
-        description="",
-        hsn_sac="",
-        base_amount=base_amount,
-        gst_amount=gst_value,
-        total_with_gst=base_amount + gst_value,
-    )
+        QuotationHighSideItem.objects.create(
+            quotation_version=version,
+            product_data=product_data_snapshot,
+            quantity=qty,
+            unit_price=u_price,
+            unit="NOS",
+            gst_percent=gst_percent,
+            mathadi_charges=inst_charges * qty,
+            transportation_charges=0,
+            description=desc,
+            hsn_sac="",
+            base_amount=line_subtotal,
+            gst_amount=gst_value,
+            total_with_gst=total_with_gst,
+        )
 
-    half_gst = gst_value / 2
-    version.subtotal = base_amount
-    version.gst_amount = gst_value
+        total_subtotal += line_subtotal
+        total_gst_amount += gst_value
+
+    half_gst = total_gst_amount / 2.0
+    version.subtotal = total_subtotal
+    version.gst_amount = total_gst_amount
     version.cgst_amount = half_gst
     version.sgst_amount = half_gst
     version.igst_amount = 0
-    version.total_amount = base_amount + gst_value
-    version.grand_total = base_amount + gst_value
+    version.total_amount = total_subtotal + total_gst_amount
+    version.grand_total = total_subtotal + total_gst_amount
     version.save()
 
     return Response({"id": quotation.id, "quotation_no": quotation.quotation_no, "version": new_version_no})

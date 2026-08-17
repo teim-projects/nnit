@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ProductCategory, ParkingProduct, ProductConfiguration
+from .models import ProductCategory, ParkingProduct, ProductConfiguration, ProductRequirement
 
 
 class ProductCategorySerializer(serializers.ModelSerializer):
@@ -85,18 +85,21 @@ class ParkingProductSerializer(serializers.ModelSerializer):
 class ParkingProductListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for list view"""
     category_name = serializers.CharField(source='category.display_name', read_only=True)
+    category_id = serializers.IntegerField(source='category.id', read_only=True)
     space_required = serializers.SerializerMethodField()
     display_image = serializers.ReadOnlyField()
     image_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    configurations = ProductConfigurationSerializer(many=True, read_only=True)
 
     class Meta:
         model = ParkingProduct
         fields = [
             'id', 'product_name', 'product_code',
-            'category_name', 'car_capacity', 'levels',
+            'category', 'category_id', 'category_name', 'car_capacity', 'levels',
             'operation_type', 'automation_type', 'pit_required',
             'min_height', 'min_width', 'min_length',
-            'space_required', 'base_price',
+            'space_required', 'base_price', 'specifications', 'configurations',
             'image', 'image_url', 'display_image',
             'is_active', 'is_featured'
         ]
@@ -158,3 +161,33 @@ class RecommendedProductSerializer(serializers.ModelSerializer):
     
     def get_space_required(self, obj):
         return obj.total_space_required
+
+
+
+class ProductRequirementSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.display_name', read_only=True)
+    product_name = serializers.CharField(source='product.product_name', read_only=True)
+    
+    category_id = serializers.PrimaryKeyRelatedField(
+        source='category',
+        queryset=ProductCategory.objects.all(),
+        write_only=True
+    )
+    product_id = serializers.PrimaryKeyRelatedField(
+        source='product',
+        queryset=ParkingProduct.objects.all(),
+        write_only=True
+    )
+    
+    class Meta:
+        model = ProductRequirement
+        fields = [
+            'id', 'category', 'category_id', 'category_name',
+            'product', 'product_id', 'product_name',
+            'height', 'width', 'length',
+            'height_available', 'upper_car_height', 'ground_car_height', 'pit_depth_available', 'pit_car_height',
+            'platform_width', 'car_width_mirror_open', 'total_width_required', 'platform_width_top', 'platform_width_middle',
+            'total_available_length', 'platform_length', 'car_length',
+            'price', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'category', 'product', 'created_at', 'updated_at']

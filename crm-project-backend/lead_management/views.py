@@ -220,7 +220,7 @@ class LeadViewSet(viewsets.ModelViewSet):
         lead_management.objects.filter(pk=lead.pk).update(
             is_converted=True,
             converted_at=timezone.now(),
-            status='closed',
+            status='close_win',
         )
         lead.refresh_from_db()
 
