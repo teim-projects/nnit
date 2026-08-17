@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
+import { MdAdd, MdDelete, MdClose } from "react-icons/md";
 import QuotationTermsSelector from "../QuotationTermsSelector";
 
 const BASE_API = import.meta.env.VITE_BASE_API_URL;
@@ -17,40 +18,36 @@ api.interceptors.request.use((cfg) => {
   return cfg;
 });
 
-// base_price is stored in Lakhs (e.g. 6.5 = ₹6.5 Lakhs)
-// All price state is kept in Lakhs for display/input
-// Raw rupees = Lakhs × 100000  (used only for backend submission)
-
 const fmtLakhs = (lakhs) => {
   const n = parseFloat(lakhs) || 0;
   return `₹${n.toFixed(2)} Lakhs`;
 };
 
-const fmtL = (val) => {
-  const n = parseFloat(val) || 0;
-  if (n === 0) return "";
-  return `₹${n.toFixed(2)}L`;
-};
-
 export default function AddQuotation({ id = null, onBack, leadData = null }) {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
-  const [termsOptions, setTermsOptions] = useState([]);
   const [refLoading, setRefLoading] = useState(true);
 
   const [customerId, setCustomerId] = useState("");
-  const [productId, setProductId] = useState("");
-  const [quantity, setQuantity] = useState(1);
-  // unitPriceLakhs: value in Lakhs (e.g. 6.5 = ₹6.5L)
-  const [unitPriceLakhs, setUnitPriceLakhs] = useState("");
   const [gstPercent, setGstPercent] = useState(18);
   const [selectedTerms, setSelectedTerms] = useState([]);
 
+  // Multi-product items state (same form layout)
+  const [items, setItems] = useState([
+    {
+      id: 1,
+      parking_product_id: "",
+      description: "",
+      quantity: 1,
+      unitPriceLakhs: "",
+      installationLakhs: "",
+    }
+  ]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isEditLoaded, setIsEditLoaded] = useState(false);
 
-  // ── Load reference data ───────────────────────────────────────────────────
+  // Load reference data
   useEffect(() => {
     const load = async () => {
       setRefLoading(true);
@@ -58,12 +55,9 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
         const [custRes, prodRes] = await Promise.all([
           api.get("lead/customer/?page_size=500&is_lead_only=false"),
           api.get("parking/products/?is_active=true&page_size=500"),
-          // Removed: inventory/terms - module removed from backend
         ]);
         setCustomers(Array.isArray(custRes.data) ? custRes.data : custRes.data?.results || []);
         setProducts(Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.results || []);
-        // setTermsOptions(Array.isArray(termsRes.data) ? termsRes.data : termsRes.data?.results || []);
-        setTermsOptions([]); // Empty - inventory module removed
       } catch (e) {
         console.error("Reference data failed", e);
       } finally {
@@ -85,307 +79,396 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
       .then((res) => {
         const d = res.data;
         setCustomerId(String(d.customer ?? ""));
-        setProductId(String(d.parking_product_id ?? ""));
-        setQuantity(d.quantity ?? 1);
-        // unit_price from backend is in raw rupees → convert to Lakhs
-        const rawPrice = parseFloat(d.unit_price) || 0;
-        setUnitPriceLakhs(rawPrice > 0 ? String(rawPrice / 100000) : "");
         setGstPercent(d.gst_percent ?? 18);
-        setIsEditLoaded(true); // Mark that edit data has been loaded
+
+        if (Array.isArray(d.items) && d.items.length > 0) {
+          setItems(
+            d.items.map((it, idx) => ({
+              id: it.id || idx + 1,
+              parking_product_id: String(it.parking_product_id || ""),
+              description: it.description || "",
+              quantity: it.quantity || 1,
+              unitPriceLakhs: it.unit_price > 0 ? String(it.unit_price / 100000) : "",
+              installationLakhs: it.installation_charges > 0 ? String(it.installation_charges / 100000) : "",
+            }))
+          );
+        } else if (d.parking_product_id) {
+          const rawPrice = parseFloat(d.unit_price) || 0;
+          setItems([
+            {
+              id: 1,
+              parking_product_id: String(d.parking_product_id),
+              description: d.subject || "",
+              quantity: d.quantity || 1,
+              unitPriceLakhs: rawPrice > 0 ? String(rawPrice / 100000) : "",
+              installationLakhs: "",
+            }
+          ]);
+        }
       })
       .catch((e) => console.error("Edit load failed", e));
   }, [id]);
 
-  // Selected product
-  const selectedProduct = useMemo(
-    () => products.find((p) => String(p.id) === String(productId)) || null,
-    [products, productId]
-  );
+  // Item handlers
+  const addItemRow = () => {
+    setItems((prev) => [
+      ...prev,
+      {
+        id: Date.now() + Math.random(),
+        parking_product_id: "",
+        description: "",
+        quantity: 1,
+        unitPriceLakhs: "",
+        installationLakhs: "",
+      }
+    ]);
+  };
 
-  // Auto-fill price (in Lakhs) from product base_price (also stored in Lakhs)
-  // Only auto-fill when creating new quotation, not when editing
-  useEffect(() => {
-    if (id && !isEditLoaded) return; // Wait for edit data to load first
-    if (id && isEditLoaded) return; // Don't auto-fill when editing
-    if (selectedProduct?.base_price != null) {
-      setUnitPriceLakhs(String(parseFloat(selectedProduct.base_price) || ""));
-    }
-  }, [selectedProduct, id, isEditLoaded]);
+  const removeItemRow = (index) => {
+    if (items.length <= 1) return;
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  };
 
-  // ── Derived calculations (all in Lakhs) ──────────────────────────────────
-  const qty = parseInt(quantity) || 0;
-  const priceL = parseFloat(unitPriceLakhs) || 0;   // price in Lakhs
-  const gst = parseFloat(gstPercent) || 0;
+  const handleItemChange = (index, field, value) => {
+    setItems((prev) => {
+      const updated = [...prev];
+      const currentItem = { ...updated[index], [field]: value };
 
-  const subtotalL = qty * priceL;
-  const gstL = (subtotalL * gst) / 100;
-  const totalL = subtotalL + gstL;
+      if (field === "parking_product_id") {
+        const prod = products.find((p) => String(p.id) === String(value));
+        if (prod) {
+          if (prod.base_price != null && (!currentItem.unitPriceLakhs || currentItem.unitPriceLakhs === "0")) {
+            currentItem.unitPriceLakhs = String(parseFloat(prod.base_price) || "");
+          }
+          if (!currentItem.description) {
+            const catName = typeof prod.category === "object" ? prod.category?.display_name : prod.category_name || "";
+            let capStr = "";
+            if (prod.load_capacity) {
+              const val = parseFloat(prod.load_capacity);
+              if (val >= 1000) {
+                const ton = val / 1000;
+                capStr = ` (${Number.isInteger(ton) ? ton : ton.toFixed(1)} Ton Capacity)`;
+              } else if (val > 0) {
+                capStr = ` (${val} Ton Capacity)`;
+              }
+            }
+            currentItem.description = `${prod.product_name}${catName ? ` (${catName})` : ""}${capStr}`;
+          }
+        }
+      }
 
-  const totalCars = selectedProduct ? selectedProduct.car_capacity * qty : 0;
+      updated[index] = currentItem;
+      return updated;
+    });
+  };
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // Calculations
+  const summary = useMemo(() => {
+    let subtotalLakhs = 0;
+    let totalCarsCount = 0;
+
+    const computedItems = items.map((it) => {
+      const q = parseInt(it.quantity) || 0;
+      const rateL = parseFloat(it.unitPriceLakhs) || 0;
+      const instL = parseFloat(it.installationLakhs) || 0;
+      
+      const lineSubtotalL = (q * rateL) + (q * instL);
+      subtotalLakhs += lineSubtotalL;
+
+      const prod = products.find((p) => String(p.id) === String(it.parking_product_id));
+      const cap = prod ? (parseInt(prod.car_capacity) || 1) : 1;
+      totalCarsCount += cap * q;
+
+      return {
+        ...it,
+        lineSubtotalL,
+        cars: cap * q
+      };
+    });
+
+    const gst = parseFloat(gstPercent) || 0;
+    const gstLakhs = (subtotalLakhs * gst) / 100;
+    const grandTotalLakhs = subtotalLakhs + gstLakhs;
+
+    return {
+      computedItems,
+      subtotalLakhs,
+      gstLakhs,
+      grandTotalLakhs,
+      totalCarsCount
+    };
+  }, [items, products, gstPercent]);
+
+  // Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
-    if (!customerId)     { setError("Please select a customer."); return; }
-    if (!productId)      { setError("Please select a product."); return; }
-    if (qty < 1)         { setError("Quantity must be at least 1."); return; }
-    if (priceL <= 0)     { setError("Unit price must be greater than 0."); return; }
+    if (!customerId) {
+      setError("Please select a customer.");
+      return;
+    }
 
-    // Convert Lakhs → raw rupees for backend
-    const unitPriceRaw = priceL * 100000;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (!it.parking_product_id) {
+        setError(`Product #${i + 1}: Please select a parking product.`);
+        return;
+      }
+      if ((parseInt(it.quantity) || 0) < 1) {
+        setError(`Product #${i + 1}: Quantity must be at least 1.`);
+        return;
+      }
+      if ((parseFloat(it.unitPriceLakhs) || 0) <= 0) {
+        setError(`Product #${i + 1}: Unit price must be greater than 0.`);
+        return;
+      }
+    }
+
+    const itemsPayload = items.map((it) => ({
+      parking_product_id: parseInt(it.parking_product_id),
+      quantity: parseInt(it.quantity) || 1,
+      unit_price: (parseFloat(it.unitPriceLakhs) || 0) * 100000,
+      installation_charges: (parseFloat(it.installationLakhs) || 0) * 100000,
+      description: it.description || "",
+    }));
 
     const payload = {
       customer: parseInt(customerId),
-      parking_product_id: parseInt(productId),
-      quantity: qty,
-      unit_price: unitPriceRaw,
-      gst_percent: gst,
-      terms_ids: selectedTerms,  // Add selected terms
-      // terms_conditions: termsOptions.map((t) => t.id), // Inventory module removed
+      items: itemsPayload,
+      gst_percent: parseFloat(gstPercent) || 18,
+      terms_ids: selectedTerms,
     };
 
     setLoading(true);
     try {
       if (id) {
         await api.put(`api/quotation/simple-quotation/${id}/update/`, payload);
+        Swal.fire("Success", "Quotation updated successfully!", "success");
       } else {
         await api.post("api/quotation/simple-quotation/", payload);
+        Swal.fire("Success", "Quotation created successfully!", "success");
       }
-      Swal.fire({
-        icon: "success",
-        title: id ? "Quotation updated!" : "Quotation created!",
-        timer: 1500,
-        showConfirmButton: false,
-      });
-      onBack && onBack();
+      if (onBack) onBack();
     } catch (err) {
-      const data = err.response?.data;
-      const msg =
-        typeof data === "string"
-          ? data
-          : data?.detail ||
-            (Array.isArray(data) ? data[0] : null) ||
-            JSON.stringify(data) ||
-            "Failed to save quotation.";
-      setError(msg);
+      console.error("Save quotation error:", err);
+      const errMsg =
+        err.response?.data?.detail ||
+        JSON.stringify(err.response?.data) ||
+        "Failed to save quotation";
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-[1050] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
-
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-white shrink-0">
+    <div className="fixed inset-0 bg-black/50 flex justify-center items-center p-4 pt-12 z-[1050]">
+      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden font-sans">
+        
+        {/* Modal Header (Exact as screenshot) */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <div>
-            <h2 className="text-xl font-extrabold text-slate-900">
+            <h1 className="text-base font-bold text-slate-800">
               {id ? "Edit Quotation" : "Create New Quotation"}
-            </h2>
-            <p className="text-xs font-semibold text-slate-500 mt-0.5">
+            </h1>
+            <p className="text-xs text-slate-500">
               Fill in customer, product, pricing, and terms details below
             </p>
           </div>
           <button
             type="button"
             onClick={onBack}
-            className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center font-bold text-sm transition"
+            className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
           >
-            ✕
+            <MdClose className="text-xl" />
           </button>
         </div>
 
-        {/* Form Container */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+        {/* Modal Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs">
+              {error}
+            </div>
+          )}
 
-          {/* Inner Scrollable Body */}
-          <div className="p-6 overflow-y-auto flex-1 space-y-5">
-
-            {error && (
-              <div className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                {error}
-              </div>
-            )}
-
-            {/* Select Customer */}
-            <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                Select Customer <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
+          {refLoading ? (
+            <div className="py-12 text-center text-slate-500 text-sm">
+              Loading quotation form...
+            </div>
+          ) : (
+            <form id="quotation-modal-form" onSubmit={handleSubmit} className="space-y-4">
+              
+              {/* Select Customer (Exact as screenshot) */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Select Customer <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={customerId}
                   onChange={(e) => setCustomerId(e.target.value)}
-                  disabled={refLoading}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none pr-10"
+                  className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition bg-white"
                 >
                   <option value="">Choose customer</option>
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}{c.contact_number ? ` — ${c.contact_number}` : ""}
+                      {c.name} {c.company_name ? `(${c.company_name})` : ""}
                     </option>
                   ))}
                 </select>
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-base">▾</span>
               </div>
-            </div>
 
-            {/* Attached Design Drawing Preview Box */}
-            {(() => {
-              if (!customerId) return null;
-              const selectedCust = customers.find(c => String(c.id) === String(customerId));
-              const custName = (selectedCust?.name || "").toLowerCase();
-              const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
-              const foundReq = existingReqs.find(r => 
-                custName && (r.customerName?.toLowerCase().includes(custName) || custName.includes(r.customerName?.toLowerCase()))
-              );
+              {/* Product Details Section (Supports multiple products in exact original layout!) */}
+              <div className="space-y-4">
+                {summary.computedItems.map((item, index) => (
+                  <div key={item.id} className="space-y-4 p-3 rounded-lg border border-slate-100 bg-slate-50/50 relative">
+                    {items.length > 1 && (
+                      <div className="flex justify-between items-center text-xs font-bold text-slate-600">
+                        <span>Product #{index + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeItemRow(index)}
+                          className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-0.5"
+                        >
+                          <MdDelete className="text-sm" /> Remove
+                        </button>
+                      </div>
+                    )}
 
-              if (foundReq && foundReq.drawingTitle) {
-                return (
-                  <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-xs space-y-1">
-                    <div className="font-bold text-purple-900 flex items-center justify-between">
-                      <span>🎨 Attached CAD/PDF Design Drawing:</span>
-                      <span className="px-2 py-0.5 bg-purple-200 text-purple-900 rounded font-extrabold uppercase text-[10px]">
-                        {foundReq.fileName || "AutoCAD Plan"}
-                      </span>
+                    {/* Select Product (Exact as screenshot) */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Select Product {items.length > 1 ? `#${index + 1}` : ""} <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={item.parking_product_id}
+                        onChange={(e) => handleItemChange(index, "parking_product_id", e.target.value)}
+                        className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition bg-white"
+                      >
+                        <option value="">Choose product</option>
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.product_name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <div className="font-bold text-slate-900">{foundReq.drawingTitle}</div>
-                    <div className="text-slate-600">{foundReq.drawingSpecs}</div>
+
+                    {/* Quantity / Units & Total Capacity (Exact as screenshot) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">
+                          Quantity / Units <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                          className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">
+                          Total Capacity
+                        </label>
+                        <div className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 bg-slate-100">
+                          {item.cars} cars
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Unit Price (Lakhs ₹) (Exact as screenshot) */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Unit Price (Lakhs ₹) <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.unitPriceLakhs}
+                          onChange={(e) => handleItemChange(index, "unitPriceLakhs", e.target.value)}
+                          placeholder="e.g. 6.5"
+                          className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition bg-white pr-16"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
+                          Lakhs
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Specification / Description (Optional) */}
+                    <div>
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => handleItemChange(index, "description", e.target.value)}
+                        placeholder="Specification / Annexure line item description (Optional)"
+                        className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                      />
+                    </div>
                   </div>
-                );
-              }
-              return null;
-            })()}
+                ))}
 
-            {/* Select Product */}
-            <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                Select Product <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  value={productId}
-                  onChange={(e) => setProductId(e.target.value)}
-                  disabled={refLoading}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none pr-10"
-                >
-                  <option value="">Choose product</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.product_name} - {p.category_name} ({p.car_capacity} cars)
-                      {p.base_price ? ` - ${fmtL(p.base_price)}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-base">▾</span>
-              </div>
-            </div>
-
-            {/* Quantity + Total Capacity */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                  Quantity / Units <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-800 mb-1.5">Total Capacity</label>
-                <div className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 text-sm font-bold select-none">
-                  {totalCars > 0 ? `${totalCars} cars` : "0 cars"}
+                {/* + Add Another Product Button */}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={addItemRow}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1 border border-indigo-200 px-3 py-1.5 rounded-md bg-indigo-50/50 hover:bg-indigo-50 transition"
+                  >
+                    <MdAdd className="text-sm" /> Add Another Product
+                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* Unit Price in Lakhs */}
-            <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                Unit Price (Lakhs ₹) <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min={0}
-                  step={0.1}
-                  value={unitPriceLakhs}
-                  onChange={(e) => setUnitPriceLakhs(e.target.value)}
-                  placeholder="e.g. 6.5"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 pr-16"
-                />
-                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">
-                  Lakhs
-                </span>
+              {/* Summary Box (Exact as screenshot) */}
+              <div className="p-4 rounded-md border border-slate-200 bg-slate-50 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Basic Subtotal:</span>
+                  <span className="font-semibold text-slate-800">{fmtLakhs(summary.subtotalLakhs)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">GST ({gstPercent}%):</span>
+                  <span className="font-semibold text-slate-800">{fmtLakhs(summary.gstLakhs)}</span>
+                </div>
+                <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                  <span className="text-sm font-bold text-slate-800">Total Amount:</span>
+                  <span className="text-xl font-bold text-blue-600">{fmtLakhs(summary.grandTotalLakhs)}</span>
+                </div>
               </div>
-              {priceL > 0 && (
-                <p className="mt-1.5 text-xs font-semibold text-blue-600">
-                  = ₹{(priceL * 100000).toLocaleString("en-IN")}
-                </p>
-              )}
-            </div>
 
-            <hr className="border-slate-200 my-2" />
-
-            {/* Subtotal / GST Summary Card */}
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-2">
-              <div className="flex justify-between text-sm text-slate-600 font-semibold">
-                <span>Basic Subtotal:</span>
-                <span className="font-bold text-slate-800">{fmtLakhs(subtotalL)}</span>
+              {/* Terms & Conditions (Exact as screenshot) */}
+              <div className="border border-slate-200 rounded-md p-4">
+                <QuotationTermsSelector selectedTerms={selectedTerms} setSelectedTerms={setSelectedTerms} />
               </div>
-              <div className="flex justify-between text-sm text-slate-600 font-semibold">
-                <span>GST ({gst}%):</span>
-                <span className="font-bold text-slate-800">{fmtLakhs(gstL)}</span>
-              </div>
-            </div>
+            </form>
+          )}
+        </div>
 
-            {/* Total Amount Card */}
-            <div className="flex justify-between items-center bg-blue-50 rounded-xl px-5 py-3.5 border border-blue-200">
-              <span className="text-base font-extrabold text-slate-800">Total Amount:</span>
-              <span className="text-2xl font-black text-blue-700">{fmtLakhs(totalL)}</span>
-            </div>
+        {/* Modal Footer (Exact as screenshot) */}
+        <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 shrink-0 bg-slate-50">
+          <button
+            type="button"
+            onClick={onBack}
+            className="px-5 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-100 transition"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="quotation-modal-form"
+            disabled={loading || refLoading}
+            className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition disabled:opacity-50"
+          >
+            {loading ? "Saving..." : id ? "Update Quotation" : "Create Quotation"}
+          </button>
+        </div>
 
-            {/* Terms & Conditions Selector */}
-            <div className="pt-2">
-              <QuotationTermsSelector
-                quotationId={id}
-                onTermsChange={(terms) => setSelectedTerms(terms)}
-              />
-            </div>
-
-          </div>
-
-          {/* Sticky Modal Action Footer */}
-          <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 shrink-0 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onBack}
-              disabled={loading}
-              className="btn-secondary px-6 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 hover:bg-slate-100 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || refLoading}
-              className="btn-primary px-8 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold shadow-sm transition disabled:opacity-50"
-            >
-              {loading
-                ? id ? "Updating…" : "Creating…"
-                : id ? "Update Quotation" : "Create Quotation"}
-            </button>
-          </div>
-
-        </form>
       </div>
     </div>
   );

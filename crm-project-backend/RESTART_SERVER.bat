@@ -1,7 +1,16 @@
 @echo off
-echo Restarting Django Server...
+echo ========================================
+echo  RESTARTING DJANGO SERVER
+echo ========================================
 echo.
-echo Press Ctrl+C to stop current server, then run this script again
+echo Please follow these steps:
 echo.
-cd /d "C:\Users\OWNER\Desktop\nnit\nnit\crm-project-backend"
-env\Scripts\python.exe manage.py runserver
+echo 1. Press Ctrl+C in the terminal running "python manage.py runserver"
+echo 2. Run this command to start the server again:
+echo.
+echo    python manage.py runserver
+echo.
+echo 3. The Product Requirements page should now work!
+echo.
+echo ========================================
+pause

@@ -52,8 +52,11 @@ class LeadSource(models.TextChoices):
 # Lead status
 class LeadStatus(models.TextChoices):
     OPEN = 'open', 'Open'
+    CLOSE_WIN = 'close_win', 'Close Win'
+    CLOSE_LOSS = 'close_loss', 'Close Loss'
     CLOSED = 'closed', 'Closed'
     IN_PROCESS = 'in_process', 'In Process'
+
 
 
 class ServiceType(models.TextChoices):

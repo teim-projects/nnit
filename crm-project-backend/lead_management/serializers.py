@@ -21,7 +21,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         return obj.leads.count()
     
     def get_active_leads(self, obj):
-        return obj.leads.exclude(status='closed').count()
+        return obj.leads.exclude(status__in=['closed', 'close_win', 'close_loss']).count()
 
     def validate_contact_number(self, value):
         value = value.strip()

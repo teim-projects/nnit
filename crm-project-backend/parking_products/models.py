@@ -221,3 +221,81 @@ class ProductConfiguration(models.Model):
     
     def __str__(self):
         return f"{self.product.product_name} - {self.variant_name}"
+
+
+class ProductRequirement(models.Model):
+    """Product Requirements with specifications"""
+    
+    category = models.ForeignKey(
+        ProductCategory,
+        on_delete=models.PROTECT,
+        related_name='requirements'
+    )
+    product = models.ForeignKey(
+        ParkingProduct,
+        on_delete=models.PROTECT,
+        related_name='requirements'
+    )
+    
+    # Legacy / Summary dimension fields
+    height = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        blank=True, 
+        null=True,
+        help_text="Height in feet or mm"
+    )
+    width = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        blank=True, 
+        null=True,
+        help_text="Width in feet or mm"
+    )
+    length = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        blank=True, 
+        null=True,
+        help_text="Length in feet or mm"
+    )
+    
+    # Detailed Height Specification Fields (mm)
+    height_available = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Height Available (H) in mm")
+    upper_car_height = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Upper Car Height (G+1) in mm")
+    ground_car_height = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Ground Car Height in mm")
+    pit_depth_available = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Pit Depth Available (P1) in mm")
+    pit_car_height = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Pit Car Height (P2) in mm")
+
+    # Detailed Width Specification Fields (mm)
+    platform_width = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Platform Width (W) in mm")
+    car_width_mirror_open = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Car Width (Mirror Open) in mm")
+    total_width_required = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Total Width Required in mm")
+    platform_width_top = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Platform Width (TOP P) in mm")
+    platform_width_middle = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Platform Width (MIDDLE P) in mm")
+
+    # Detailed Length Specification Fields (mm)
+    total_available_length = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Total Available Length in mm")
+    platform_length = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Platform Length in mm")
+    car_length = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Car Length in mm")
+
+    price = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        blank=True, 
+        null=True,
+        help_text="Price in INR"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'product_requirements'
+        verbose_name = 'Product Requirement'
+        verbose_name_plural = 'Product Requirements'
+        ordering = ['-created_at']
+        unique_together = ['category', 'product']
+    
+    def __str__(self):
+        return f"{self.product.product_name} - {self.category.display_name}"

@@ -39,6 +39,40 @@ def _get_base64_logo():
     return _BASE64_LOGO_CACHE
 
 
+_BASE64_SIGNATURE_CACHE = None
+
+def _get_base64_signature():
+    """Get cached base64 encoded signature or load and cache it."""
+    global _BASE64_SIGNATURE_CACHE
+    if _BASE64_SIGNATURE_CACHE is not None:
+        return _BASE64_SIGNATURE_CACHE
+
+    try:
+        candidate_paths = [
+            os.path.join(settings.BASE_DIR, 'static', 'images', 'sign.png'),
+            os.path.join(settings.BASE_DIR, 'static', 'images', 'sign.jpg'),
+            os.path.join(settings.BASE_DIR, 'static', 'images', 'signature.png'),
+            os.path.join(settings.BASE_DIR, 'static', 'images', 'signature.jpg'),
+        ]
+
+        found_path = None
+        for p in candidate_paths:
+            if os.path.exists(p):
+                found_path = p
+                break
+
+        if found_path:
+            with open(found_path, 'rb') as f:
+                _BASE64_SIGNATURE_CACHE = base64.b64encode(f.read()).decode('utf-8')
+        else:
+            _BASE64_SIGNATURE_CACHE = ''
+    except Exception as e:
+        logger.warning(f"Could not load signature image: {str(e)}")
+        _BASE64_SIGNATURE_CACHE = ''
+
+    return _BASE64_SIGNATURE_CACHE
+
+
 def _item_line_amount(item):
     """Return line total including GST and extra charges where stored on the model."""
     total = getattr(item, 'total_with_gst', None)
@@ -119,19 +153,77 @@ def _build_simple_quotation_context(quotation, version):
         # Line item basic total (before GST)
         line_total_basic = base_amt if base_amt > 0 else (qty * unit_price)
 
-        car_capacity = item.product_data.get('car_capacity', 0) if item.product_data else 0
-        total_cars = int(car_capacity) * qty if car_capacity else "—"
+        # Car capacity calculation: check snapshot, master product, or default to 2 cars/unit
+        car_capacity = 0
+        if item.product_data:
+            car_capacity = item.product_data.get('car_capacity') or item.product_data.get('capacity') or 0
+
+        if not car_capacity and item.product_data and item.product_data.get('id'):
+            try:
+                from parking_products.models import ParkingProduct
+                p_obj = ParkingProduct.objects.filter(id=item.product_data.get('id')).first()
+                if p_obj and p_obj.car_capacity:
+                    car_capacity = p_obj.car_capacity
+            except Exception:
+                pass
+
+        if not car_capacity:
+            car_capacity = 2
+
+        try:
+            total_cars_num = int(car_capacity) * qty
+            total_cars = f"{total_cars_num} Cars"
+        except Exception:
+            total_cars = f"{qty * 2} Cars"
+
+        # Load capacity lookup and formatting (e.g. 2.5 Ton Capacity / 2 Ton Capacity)
+        load_cap = 0
+        if item.product_data:
+            load_cap = item.product_data.get('load_capacity', 0)
+
+        if not load_cap and item.product_data and item.product_data.get('id'):
+            try:
+                from parking_products.models import ParkingProduct
+                p_obj = ParkingProduct.objects.filter(id=item.product_data.get('id')).first()
+                if p_obj and p_obj.load_capacity:
+                    load_cap = float(p_obj.load_capacity)
+            except Exception:
+                pass
+
+        load_cap_str = ""
+        if load_cap:
+            try:
+                val = float(load_cap)
+                if val >= 1000:
+                    ton_val = val / 1000.0
+                    if ton_val.is_integer():
+                        load_cap_str = f"{int(ton_val)} Ton Capacity"
+                    else:
+                        load_cap_str = f"{ton_val:.1f} Ton Capacity"
+                elif val > 0:
+                    if val.is_integer():
+                        load_cap_str = f"{int(val)} Ton Capacity"
+                    else:
+                        load_cap_str = f"{val:.1f} Ton Capacity"
+            except Exception:
+                load_cap_str = f"{load_cap} Capacity"
 
         product_name_full = item.product_data.get('name', '') if item.product_data else ''
         description = item.description or product_name_full or "Parking System"
+
+        if load_cap_str and "Capacity" not in description and "Ton" not in description and "KG" not in description:
+            description = f"{description}\n{load_cap_str}"
+
+        inst_amt = Decimal(str(getattr(item, 'mathadi_charges', None) or 0))
+        inst_fmt = _fmt_inr(inst_amt) if inst_amt > 0 else '—'
 
         line_items.append({
             'description': description,
             'quantity': qty,
             'unit_price': unit_price,
             'unit_price_fmt': _fmt_inr(unit_price),
-            'installation': Decimal('0'),
-            'installation_fmt': '—',
+            'installation': inst_amt,
+            'installation_fmt': inst_fmt,
             'cars': total_cars,
             'total': line_total_basic,
             'total_fmt': _fmt_inr(line_total_basic),
@@ -263,9 +355,49 @@ def _build_simple_quotation_context(quotation, version):
     # Get cached base64 logo (fast!)
     base64_logo = _get_base64_logo()
 
+    # Format dynamic Offer No: NNIT/{MM}-{YYYY}/{SEQ}RV{VERSION_NUM} (e.g. NNIT/08-2026/003RV3)
+    raw_no = quotation.quotation_no or ""
+    date_ref = version.created_at if (version and getattr(version, 'created_at', None)) else (quotation.created_at if getattr(quotation, 'created_at', None) else datetime.now())
+    m_str = date_ref.strftime("%m")
+    y_str = date_ref.strftime("%Y")
+    seq_str = f"{quotation.id:03d}" if quotation.id else "001"
+
+    if "/" in raw_no:
+        parts = raw_no.split("/")
+        last_p = parts[-1]
+        for delim in ["RV", "-R", "R"]:
+            if delim in last_p:
+                last_p = last_p.split(delim)[0]
+                break
+        parts[-1] = last_p
+        base_offer_no = "/".join(parts)
+    else:
+        base_offer_no = f"NNIT/{m_str}-{y_str}/{seq_str}"
+
+    if not base_offer_no.startswith("NNIT/"):
+        base_offer_no = f"NNIT/{m_str}-{y_str}/{seq_str}"
+
+    v_str = str(getattr(version, 'version_no', '') or '')
+    version_num = "1"
+    if "R" in v_str:
+        num_part = v_str.split("R")[-1]
+        if num_part.isdigit():
+            version_num = num_part
+
+    formatted_offer_no = f"{base_offer_no}RV{version_num}"
+
+    # Contact person / Signatory name for NNIT Car Parking Systems Pvt Ltd
+    contact_person_name = getattr(quotation, 'contact_person', None)
+    if not contact_person_name or contact_person_name.strip() == "" or (quotation.customer and contact_person_name == quotation.customer.name):
+        contact_person_name = "Nilesh Sali"
+
+    quotation_date_str = date_ref.strftime("%d/%m/%Y")
+    base64_signature = _get_base64_signature()
+
     return {
         'quotation': quotation,
         'version': version,
+        'formatted_offer_no': formatted_offer_no,
         'project_name': project_name,
         'product_name': product_name,
         'category_name': category_name,
@@ -285,6 +417,9 @@ def _build_simple_quotation_context(quotation, version):
         'amount_in_words': grand_total_words,
         'terms': processed_terms,
         'base64_logo': base64_logo,  # Cached base64 logo
+        'base64_signature': base64_signature,
+        'contact_person_name': contact_person_name,
+        'quotation_date': quotation_date_str,
     }
 
 

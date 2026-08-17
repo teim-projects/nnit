@@ -26,9 +26,13 @@ function StatCard({ icon: Icon, label, value, color, sub }) {
 /* ── status badge ── */
 function StatusBadge({ status }) {
   const map = {
-    open:       "bg-indigo-50 text-indigo-700 border-indigo-100",
-    in_process: "bg-amber-50 text-amber-700 border-amber-100",
-    closed:     "bg-emerald-50 text-emerald-700 border-emerald-100",
+    open:        "bg-indigo-50 text-indigo-700 border-indigo-100",
+    close_win:   "bg-emerald-50 text-emerald-700 border-emerald-100",
+    closed_win:  "bg-emerald-50 text-emerald-700 border-emerald-100",
+    close_loss:  "bg-rose-50 text-rose-700 border-rose-100",
+    closed_loss: "bg-rose-50 text-rose-700 border-rose-100",
+    in_process:  "bg-amber-50 text-amber-700 border-amber-100",
+    closed:      "bg-emerald-50 text-emerald-700 border-emerald-100",
   };
   return (
     <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${map[status] || "bg-slate-50 text-slate-600 border-slate-100"}`}>

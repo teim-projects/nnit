@@ -23,10 +23,10 @@
             margin: 0;
             padding: 0;
             font-family: DejaVu Sans, sans-serif;
-            font-size: 17px;
+            font-size: 14px;
             color: #000;
             background: #fff;
-            line-height: 1.5;
+            line-height: 1.4;
         }
 
         .page {
@@ -133,29 +133,57 @@
         }
 
         /* ============================================================
-               TITLE (31px as requested)
+               TITLE
             ============================================================ */
         .doc-title {
             text-align: center;
-            font-size: 31px;
+            font-size: 26px;
             font-weight: bold;
-            margin: 0 0 20px 0;
+            margin: 0 0 16px 0;
             padding: 0;
-            text-transform: uppercase;
             color: #000;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
         }
 
         /* ============================================================
-               PROJECT BOX
+               COVER OFFER HEADER TABLE (Page 1 - Single vertical column layout matching photo!)
+            ============================================================ */
+        .offer-details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+            margin-bottom: 20px;
+            font-size: 14.5px;
+            line-height: 1.85;
+        }
+
+        .offer-details-table td {
+            vertical-align: top;
+            padding: 2px 0;
+            border: none;
+        }
+
+        .offer-details-table td.label-col {
+            width: 175px;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .offer-details-table td.val-col {
+            color: #000;
+        }
+
+        /* ============================================================
+               PROJECT BOX (Attached to table top)
             ============================================================ */
         .project-box {
             border: 2px solid #000;
-            padding: 12px 16px;
-            margin-bottom: 18px;
-            font-size: 17px;
-            line-height: 1.6;
-            background: rgba(255, 255, 255, 0.95);
+            border-bottom: 0;
+            padding: 10px 14px;
+            margin-bottom: 0;
+            font-size: 14px;
+            line-height: 1.5;
+            background: #fff;
         }
 
         .project-box strong {
@@ -164,92 +192,83 @@
         }
 
         /* ============================================================
-               MAIN TABLE - WeasyPrint 60.1 Compatible
+               MAIN TABLE - Pixel-perfect grid layout with NO overflow
             ============================================================ */
         .main-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 17px;
-            table-layout: auto;
-            background: rgba(255, 255, 255, 0.95);
+            font-size: 13px;
+            table-layout: fixed;
+            background: #fff;
         }
 
         .main-table th {
             border: 2px solid #000;
             background: #fff;
-            padding: 10px 6px;
+            padding: 6px 3px;
             text-align: center;
             font-weight: bold;
             vertical-align: middle;
-            word-wrap: break-word;
-            font-size: 17px;
+            font-size: 13px;
+            line-height: 1.3;
         }
 
         .main-table td {
             border: 2px solid #000;
-            padding: 10px 8px;
+            padding: 6px 4px;
             vertical-align: middle;
+            font-size: 13px;
+            line-height: 1.3;
             word-wrap: break-word;
-            font-size: 17px;
+            overflow: hidden;
         }
 
-        .main-table td.center {
+        .main-table td.center-val {
             text-align: center;
         }
-        .main-table td.right {
+
+        .main-table td.right-val {
             text-align: right;
-        }
-        .main-table td.mid {
-            vertical-align: middle;
+            padding-right: 4px;
         }
 
-        /* ============================================================
-               TOTALS TABLE - WeasyPrint 60.1 Compatible
-            ============================================================ */
-        .totals-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 17px;
-            table-layout: auto;
-            background: rgba(255, 255, 255, 0.95);
+        .main-table td.left-val {
+            text-align: left;
         }
 
-        .totals-table td {
+        .main-table .total-label {
+            text-align: right;
+            font-weight: bold;
+            padding-right: 8px;
+            font-size: 14px;
+        }
+
+        .main-table .bold-val {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .main-table tfoot tr td {
             border: 2px solid #000;
-            padding: 10px 10px;
-            word-wrap: break-word;
-            font-size: 17px;
+            padding: 6px 4px;
         }
 
-        .totals-table td.right {
-            text-align: right;
+        .grand-row td {
             font-weight: bold;
-        }
-        .totals-table td.center {
-            text-align: center;
-            font-weight: bold;
-        }
-
-        .row-basic {
-            background: #fff;
-        }
-        .row-grand {
-            background: #fff;
-            font-weight: bold;
-            font-size: 17px;
+            font-size: 15px !important;
         }
 
         /* ============================================================
-               AMOUNT IN WORDS (17px as requested)
+               AMOUNT IN WORDS (Attached to main table bottom)
             ============================================================ */
         .amount-words {
             border: 2px solid #000;
             border-top: 0;
-            padding: 12px 16px;
-            font-size: 17px;
-            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 12px;
+            font-size: 13.5px;
+            background: #fff;
             font-weight: 500;
-            line-height: 1.5;
+            line-height: 1.4;
         }
 
         .amount-words strong {
@@ -257,12 +276,123 @@
         }
 
         /* ============================================================
+               TERMS & CONDITIONS (Page 1 Style)
+            ============================================================ */
+        .terms-section {
+            margin-top: 10px;
+        }
+
+        .terms-main-heading {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 20px 0 14px 0;
+            color: #000;
+        }
+
+        .term-item {
+            margin-bottom: 12px;
+            page-break-inside: avoid;
+        }
+
+        .term-item-title {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .term-item-content {
+            font-size: 13.5px;
+            line-height: 1.5;
+            text-align: justify;
+        }
+
+        .term-item-content p {
+            margin: 0 0 6px 0;
+        }
+
+        /* ============================================================
+               TERMS CLOSING SIGNATURE BLOCK (Page 1 - Exact photo match!)
+            ============================================================ */
+        .terms-closing-signature {
+            margin-top: 25px;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            font-size: 14px;
+            line-height: 1.4;
+            color: #000;
+        }
+
+        .terms-closing-signature .thank-you-text {
+            font-size: 15px;
+            margin: 0 0 10px 0;
+            color: #000;
+        }
+
+        .terms-closing-signature .company-heading {
+            font-size: 16px;
+            font-weight: bold;
+            margin: 0 0 10px 0;
+            color: #000;
+        }
+
+        .terms-closing-signature .signature-img-container {
+            margin: 10px 0;
+            min-height: 40px;
+        }
+
+        .terms-closing-signature .signature-img {
+            height: 48px;
+            width: auto;
+            display: block;
+        }
+
+        .terms-closing-signature .signature-line-graphic {
+            margin: 5px 0;
+            display: inline-block;
+        }
+
+        .terms-closing-signature .signature-line-graphic .sign-font {
+            font-family: DejaVu Sans, sans-serif;
+            font-style: italic;
+            font-size: 22px;
+            font-weight: bold;
+            color: #1e3a8a;
+            letter-spacing: -1px;
+            display: block;
+        }
+
+        .terms-closing-signature .signature-line-graphic .blue-line {
+            border-bottom: 2px solid #1e3a8a;
+            width: 140px;
+            margin-top: 2px;
+        }
+
+        .terms-closing-signature .signatory-name {
+            font-weight: bold;
+            font-size: 15px;
+            margin: 6px 0 0 0;
+            color: #000;
+        }
+
+        .terms-closing-signature .signatory-title {
+            font-size: 13.5px;
+            margin: 1px 0 0 0;
+            color: #000;
+        }
+
+        .terms-closing-signature .signatory-date {
+            font-size: 13.5px;
+            margin: 1px 0 0 0;
+            color: #000;
+        }
+
+        /* ============================================================
                FOOTER SIGNATURE - Table-based for WeasyPrint 60.1
             ============================================================ */
         .footer {
-            margin-top: 40px;
+            margin-top: 30px;
             width: 100%;
-            font-size: 15px;
+            font-size: 13.5px;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
         }
@@ -289,201 +419,126 @@
         }
 
         .sig-line {
-            margin-top: 45px;
+            margin-top: 35px;
             border-top: 1px solid #000;
-            padding-top: 5px;
-            font-size: 14px;
+            padding-top: 4px;
+            font-size: 12.5px;
             min-width: 200px;
             text-align: center;
             display: inline-block;
-        }
-
-        /* ============================================================
-               OFFER HEADER BOX AT TOP OF PAGE 1
-            ============================================================ */
-        .offer-header-box {
-            margin-bottom: 25px;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-        }
-
-        .offer-header-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 17px;
-            line-height: 1.6;
-        }
-
-        .offer-header-table td.lbl {
-            font-weight: bold;
-            width: 30%;
-            padding: 3px 0;
-            color: #000;
-            vertical-align: top;
-        }
-
-        .offer-header-table td.val {
-            width: 70%;
-            padding: 3px 0;
-            color: #000;
-            vertical-align: top;
-        }
-
-        /* ============================================================
-               TERMS & CONDITIONS — INLINE STYLING APPROACH
-               Keep Calibri font for Terms & Conditions
-            ============================================================ */
-        .terms-section {
-            font-size: 16px;
-            line-height: 1.5;
-            color: #000;
-            font-family: 'Calibri', 'Arial', sans-serif;
-        }
-
-        /* Print-specific overrides */
-        @media print {
-            .terms-section > div {
-                page-break-inside: avoid !important;
-            }
-        }
-
-        /* -------- lists inside terms -------- */
-        .terms-section ol,
-        .terms-section ul {
-            list-style-position: inside;
-            margin: 8px 0 8px 15px;
-            padding: 0;
-            font-family: 'Calibri', 'Arial', sans-serif;
-        }
-
-        .terms-section li {
-            margin: 5px 0;
-            padding: 0 0 0 5px;
-            list-style-position: inside;
-            text-align: justify;
-            font-family: 'Calibri', 'Arial', sans-serif;
-        }
-
-        .terms-section p {
-            margin: 0 0 8px 0 !important;
-            padding: 0 !important;
-            text-align: justify !important;
-            line-height: 1.5 !important;
-            display: block !important;
-            font-size: 16px !important;
-            font-family: 'Calibri', 'Arial', sans-serif !important;
-        }
-
-        .terms-section p:before {
-            content: none !important;
-            display: none !important;
-        }
-
-        .terms-section div {
-            list-style: none !important;
         }
     </style>
 </head>
 <body>
 
-    <!-- FIXED HEADER – REPEATS ON EVERY PAGE -->
+    <!-- REPEATING HEADER IMAGE -->
     <div class="fixed-header">
         <div class="header-image">
             {% if base64_logo %}
-            <img src="data:image/jpeg;base64,{{ base64_logo }}" alt="NNIT Header">
+            <img src="data:image/jpeg;base64,{{ base64_logo }}" alt="NNIT Car Parking Systems">
             {% else %}
             <div class="fallback">NNIT CAR PARKING SYSTEMS PVT. LTD.</div>
             {% endif %}
         </div>
     </div>
 
-    <!-- FOOTER STRIPS – REPEATS ON EVERY PAGE -->
+    <!-- REPEATING FOOTER STRIPS -->
     <div class="footer-strips">
         <div class="footer-orange"></div>
         <div class="footer-blue"></div>
     </div>
 
     <!-- ============================================================
-    TERMS & CONDITIONS SECTION WITH OFFER HEADER
+    PAGE 1 – OFFER COVER HEADER + TERMS & CONDITIONS (Exact photo!)
     ============================================================ -->
-    {% if terms %}
     <div class="page">
         <div class="content">
 
-            <!-- OFFER HEADER INFORMATION BLOCK -->
-            <div class="offer-header-box">
-                <table class="offer-header-table">
-                    <tr>
-                        <td class="lbl">Offer No:</td>
-                        <td class="val">{{ quotation.quotation_no }}</td>
-                    </tr>
-                    <tr>
-                        <td class="lbl">Company Name:</td>
-                        <td class="val">M/s {{ quotation.customer.name|default:"—" }}</td>
-                    </tr>
-                    <tr>
-                        <td class="lbl">Kind Attn:</td>
-                        <td class="val">Mr. {{ quotation.customer.poc_name|default:quotation.customer.name|default:"—" }}</td>
-                    </tr>
-                    <tr>
-                        <td class="lbl">Contact no:</td>
-                        <td class="val">{{ quotation.customer.contact_number|default:"—" }}</td>
-                    </tr>
-                    <tr>
-                        <td class="lbl">Parking Systems:</td>
-                        <td class="val">{{ parking_systems_display|default:product_name }}</td>
-                    </tr>
-                    <tr>
-                        <td class="lbl">Supplier:</td>
-                        <td class="val">NNIT Car Parking Systems Pvt Ltd</td>
-                    </tr>
-                    <tr>
-                        <td class="lbl">Contact Person:</td>
-                        <td class="val">Nilesh Sali</td>
-                    </tr>
-                    <tr>
-                        <td class="lbl">Contact No.:</td>
-                        <td class="val">9518377159</td>
-                    </tr>
-                    <tr>
-                        <td class="lbl">Date:</td>
-                        <td class="val">{{ version.created_at|date:"d/m/Y" }}</td>
-                    </tr>
-                </table>
-            </div>
+            <!-- OFFER HEADER DETAILS TABLE (Exact order & layout from your photo!) -->
+            <table class="offer-details-table">
+                <tr>
+                    <td class="label-col">Offer No:</td>
+                    <td class="val-col">{{ formatted_offer_no|default:quotation.quotation_no }}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Company Name:</td>
+                    <td class="val-col">M/s {{ quotation.customer.company_name|default:quotation.customer.name }}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Kind Attn:</td>
+                    <td class="val-col">Mr. {{ quotation.customer.name }}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Contact no:</td>
+                    <td class="val-col">{{ quotation.customer.contact_number|default:"" }}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Parking Systems:</td>
+                    <td class="val-col">{{ parking_systems_display|default:product_name }}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Supplier:</td>
+                    <td class="val-col">NNIT Car Parking Systems Pvt Ltd</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Contact Person:</td>
+                    <td class="val-col">Nilesh Sali</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Contact No.:</td>
+                    <td class="val-col">9518377159</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Date:</td>
+                    <td class="val-col">{{ version.created_at|date:"d/m/Y" }}</td>
+                </tr>
+            </table>
 
-            <div class="doc-title" style="text-align: left; font-size: 24px; font-weight: bold; margin-top: 15px; margin-bottom: 12px; text-transform: none; font-family: 'Calibri', 'Arial', sans-serif;">Terms &amp; Conditions:</div>
-
+            <!-- TERMS & CONDITIONS SECTION (Starts Right Below Details Table on Page 1!) -->
+            {% if terms %}
+            <div class="terms-main-heading">Terms &amp; Conditions:</div>
             <div class="terms-section">
-                {% for term in terms %}
-                <!--
-                Using inline styles with WeasyPrint-specific page-break properties
-                Each term is a single block that should not be split across pages
-                -->
-                <div style="page-break-inside: avoid; -webkit-column-break-inside: avoid; display: block; margin-bottom: 12px; width: 100%;">
-                    <div style="font-weight: bold; font-size: 18px; margin-bottom: 4px; color: #000; line-height: 1.4; display: inline; font-family: 'Calibri', 'Arial', sans-serif;">
-                        {{ term.sequence }}. {{ term.title }}:
-                        {% if term.is_customized %}
-                        <span style="font-size:10px; background:#e0d4ff; padding:1px 4px; border-radius:2px; color:#6b21a8; font-weight:normal; margin-left:3px;">[CUSTOMIZED]</span>
-                        {% endif %}
-                    </div>
-                    <div style="color: #000; text-align: justify; line-height: 1.5; font-size: 16px; display: inline; font-family: 'Calibri', 'Arial', sans-serif;">
-                        {% autoescape off %}
-                        {{ term.content|safe }}
-                        {% endautoescape %}
+                {% for t in terms %}
+                <div class="term-item">
+                    <div class="term-item-title">{{ t.sequence }}. {{ t.title }}</div>
+                    <div class="term-item-content">
+                        {{ t.content|safe }}
                     </div>
                 </div>
                 {% endfor %}
             </div>
+            {% endif %}
 
-        </div><!-- /content -->
-    </div><!-- /page -->
-    {% endif %}
+            <!-- CLOSING SIGNATURE SECTION AFTER TERMS & CONDITIONS (Exact match to photo!) -->
+            <div class="terms-closing-signature">
+                <p class="thank-you-text">Thanking You</p>
+                <p class="company-heading">For, NNIT Car Parking Systems Pvt Ltd</p>
+                
+                <div class="signature-img-container">
+                    {% if base64_signature %}
+                    <img src="data:image/png;base64,{{ base64_signature }}" alt="Signature" class="signature-img">
+                    {% else %}
+                    <div class="signature-line-graphic">
+                        <span class="sign-font">Nilesh Sali</span>
+                        <div class="blue-line"></div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="signatory-details">
+                    <p class="signatory-name">({{ contact_person_name|default:"Nilesh Sali" }})</p>
+                    <p class="signatory-title">Authorized Signatory</p>
+                    <p class="signatory-date">Date: {{ quotation_date }}</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
 
     <!-- ============================================================
-    ANNEXURE I – QUOTATION TABLE SECTION
+    PAGE 2 – ANNEXURE I – QUOTATION TABLE SECTION (Matching Image 1!)
     ============================================================ -->
-    <div class="page" {% if terms %}style="page-break-before: always;"{% endif %}>
+    <div class="page" style="page-break-before: always;">
 
         <!-- WATERMARK BACKGROUND -->
         <div class="watermark-container">
@@ -494,90 +549,86 @@
 
         <div class="content">
 
+            <!-- TITLE -->
             <div class="doc-title">Annexure I</div>
 
-            <!-- PROJECT BOX -->
+            <!-- PROJECT BOX (Attached to main table top) -->
             <div class="project-box">
-                <strong>Project Name:</strong> {{ project_name }}<br>
-                <strong>Product Name:</strong> {{ product_name }}
+                <strong>Project Name:</strong> “ {{ project_name }} ”{% if site_location_str %}{{ site_location_str }}{% endif %}<br>
+                <strong>Product Name:</strong> {{ parking_systems_display|default:product_name }}
             </div>
 
-            <!-- MAIN TABLE - Auto layout for WeasyPrint 60.1 -->
+            <!-- MAIN TABLE - Grid layout with zero right text overflow -->
             <table class="main-table">
                 <thead>
                     <tr>
-                        <th>Parking Solution</th>
-                        <th>No. of Units</th>
-                        <th>Rate per Units (Rs.)</th>
-                        <th>Installation Per system (Rs.)</th>
-                        <th>No. Of Cars</th>
-                        <th>Total Value (Rs.)</th>
+                        <th style="width: 28%;">Parking Solution</th>
+                        <th style="width: 12%;">No. of<br>Units/<br>Systems</th>
+                        <th style="width: 15%;">Rate per<br>Unit/ Car<br>(Rs.)</th>
+                        <th style="width: 14%;">Installation<br>Per system<br>(Rs.)</th>
+                        <th style="width: 11%;">No. Of<br>Cars</th>
+                        <th style="width: 20%;">Total Value<br>(Rs.)</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in line_items %}
                     <tr>
-                        <td class="mid">{{ item.description }}</td>
-                        <td class="center">{{ item.quantity }}</td>
-                        <td class="right">{{ item.unit_price_fmt }}</td>
-                        <td class="right">{{ item.installation_fmt }}</td>
-                        <td class="center">{{ item.cars }}</td>
-                        <td class="right">{{ item.total_fmt }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% for i in filler_rows %}
-                    <tr>
-                        <td style="height:25px">&nbsp;</td>
-                        <td></td><td></td><td></td><td></td><td></td>
+                        <td class="left-val">
+                            <strong>{{ item.description }}</strong>
+                        </td>
+                        <td class="center-val">
+                            <strong>{{ item.quantity }}</strong><br>
+                            <strong>Units</strong>
+                        </td>
+                        <td class="right-val">{{ item.unit_price_fmt }}</td>
+                        <td class="right-val">{% if item.installation and item.installation > 0 %}{{ item.installation_fmt }}{% endif %}</td>
+                        <td class="center-val" style="font-weight: 500;">{{ item.cars }}</td>
+                        <td class="right-val" style="font-weight: 500;">{{ item.total_fmt }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
+                <tfoot>
+                    <!-- Basic Total Value -->
+                    <tr>
+                        <td colspan="5" class="total-label">Basic Total Value</td>
+                        <td class="right-val bold-val">{{ basic_total_fmt }}</td>
+                    </tr>
+
+                    {% if gst_type == "CGST_SGST" %}
+                    <tr>
+                        <td colspan="5" class="total-label">Add: SGST @ {{ sgst_pct }}%</td>
+                        <td class="right-val">{{ sgst_fmt }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" class="total-label">Add: CGST @ {{ cgst_pct }}%</td>
+                        <td class="right-val">{{ cgst_fmt }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="total-label">Add: IGST @ {{ igst_pct }}%</td>
+                        <td class="right-val">{{ igst_fmt }}</td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Grand Total Value -->
+                    <tr class="grand-row">
+                        <td colspan="5" class="total-label">Grand Total Value</td>
+                        <td class="right-val bold-val">{{ grand_total_fmt }}</td>
+                    </tr>
+                </tfoot>
             </table>
 
-            <!-- TOTALS - Auto layout for WeasyPrint 60.1 -->
-            <table class="totals-table">
-                <tr class="row-basic">
-                    <td colspan="5" style="text-align:right; font-weight:bold; padding-right:12px;">Basic Total Value</td>
-                    <td class="right">{{ basic_total_fmt }}</td>
-                </tr>
-                {% if gst_type == "CGST_SGST" %}
-                <tr>
-                    <td colspan="2"></td>
-                    <td colspan="2" style="font-weight:bold; text-align:left; padding-left:12px;">Add: SGST</td>
-                    <td class="center">@ {{ sgst_pct }}%</td>
-                    <td class="right">{{ sgst_fmt }}</td>
-                </tr>
-                <tr>
-                    <td colspan="2"></td>
-                    <td colspan="2" style="font-weight:bold; text-align:left; padding-left:12px;">Add: CGST</td>
-                    <td class="center">@ {{ cgst_pct }}%</td>
-                    <td class="right">{{ cgst_fmt }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="2"></td>
-                    <td colspan="2" style="font-weight:bold; text-align:left; padding-left:12px;">Add: IGST</td>
-                    <td class="center">@ {{ igst_pct }}%</td>
-                    <td class="right">{{ igst_fmt }}</td>
-                </tr>
-                {% endif %}
-                <tr class="row-grand">
-                    <td colspan="5" style="text-align:right; font-weight:bold; padding-right:12px;">Grand Total Value</td>
-                    <td class="right" style="font-size:17px; font-weight:bold;">{{ grand_total_fmt }}</td>
-                </tr>
-            </table>
-
-            <!-- AMOUNT IN WORDS -->
+            <!-- AMOUNT IN WORDS (Attached to main table bottom) -->
             <div class="amount-words">
                 <strong>Total Contract Value in words:</strong> Rs. {{ amount_in_words }}
             </div>
 
-            <!-- FOOTER SIGNATURES - Table-based for WeasyPrint 60.1 -->
+            <!-- FOOTER SIGNATURES -->
             <div class="footer">
                 <table class="footer-table">
                     <tr>
                         <td>
-                            <div style="font-weight:bold;">Customer's Seal & Signature</div>
+                            <div style="font-weight:bold;">Customer's Seal &amp; Signature</div>
                             <div class="sig-line">&nbsp;</div>
                         </td>
                         <td>
@@ -593,7 +644,3 @@
 
 </body>
 </html>
-
-
-
-

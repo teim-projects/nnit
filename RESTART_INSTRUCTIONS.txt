@@ -1,0 +1,33 @@
+================================
+  PRODUCT REQUIREMENTS - FIXED!
+================================
+
+The 401 Unauthorized error has been FIXED in the code.
+
+YOU MUST RESTART THE BACKEND SERVER FOR IT TO WORK!
+
+HOW TO RESTART:
+---------------
+1. Find the terminal/command prompt running: python manage.py runserver
+2. Press Ctrl+C to stop it
+3. Type: python manage.py runserver
+4. Press Enter
+5. Wait for "Starting development server..."
+
+THEN TEST:
+----------
+1. Refresh your browser (F5)
+2. Go to Product Requirements page
+3. Should work now - no more 401 errors!
+
+================================
+  WHAT WAS FIXED
+================================
+Added JWTAuthentication to all parking_products endpoints:
+- /parking/categories/
+- /parking/products/  
+- /parking/requirements/
+
+The fix matches how other endpoints in your project work.
+
+================================
