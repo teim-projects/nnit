@@ -139,12 +139,59 @@ export default function Dashboard() {
     const go=async()=>{
       const hdr=token?{Authorization:`Bearer ${token}`}:{};
       const safe=async(u)=>{try{const r=await fetch(u,{headers:hdr});return r.ok?r.json():null;}catch{return null;}};
-      const [ld,cu,qu,pr]=await Promise.all([safe(`${BASE_API}/lead/lead/?page_size=1000`),safe(`${BASE_API}/lead/customer/?page_size=1000`),safe(`${BASE_API}/api/quotation/quotation/?page_size=1000`),safe(`${BASE_API}/parking/products/?page_size=100`)]);
+      
+      // Try dedicated dashboard-stats API first
+      const statsRes = await safe(`${BASE_API}/lead/lead/dashboard-stats/`);
+      if (statsRes && typeof statsRes.totalLeads === "number") {
+        setStats({
+          totalLeads: statsRes.totalLeads,
+          totalCustomers: statsRes.totalCustomers,
+          totalQuotations: statsRes.totalQuotations,
+          totalProducts: statsRes.totalProducts,
+          openLeads: statsRes.openLeads,
+          closedLeads: statsRes.closedLeads,
+          inProcessLeads: statsRes.inProcessLeads,
+          overdueFollowups: statsRes.overdueFollowups,
+          todayFollowups: statsRes.todayFollowups,
+          avgResponseDays: statsRes.avgResponseDays
+        });
+        setMonthly(statsRes.monthly || []);
+        setStatusData([
+          { name: "Open", value: statsRes.openLeads, fill: C.indigo },
+          { name: "Close Win", value: statsRes.closedLeads, fill: C.emerald },
+          { name: "In Process", value: statsRes.inProcessLeads, fill: C.orange },
+          { name: "Close Loss", value: statsRes.lossLeads || 0, fill: "#EF4444" }
+        ]);
+        setSrcData(statsRes.srcData || []);
+        setPortfolioData([
+          { name: "Leads", value: statsRes.totalLeads, fill: C.indigo },
+          { name: "Customers", value: statsRes.totalCustomers, fill: C.emerald },
+          { name: "Quotations", value: statsRes.totalQuotations, fill: C.orange },
+          { name: "Products", value: statsRes.totalProducts, fill: C.violet }
+        ].filter(d => d.value > 0));
+        setRecent(statsRes.recent || []);
+        return;
+      }
+
+      // Fallback if dashboard-stats endpoint unavailable
+      const [ld,cu,qu,pr]=await Promise.all([
+        safe(`${BASE_API}/lead/lead/?page_size=10000`),
+        safe(`${BASE_API}/lead/customer/?page_size=10000`),
+        safe(`${BASE_API}/api/quotation/quotation/?page_size=10000`),
+        safe(`${BASE_API}/parking/products/?page_size=1000`)
+      ]);
+      const getCount=(d, arr)=> d?.count != null ? d.count : arr.length;
       const arr=d=>d?(Array.isArray(d)?d:d?.results||[]):[];
       const L=arr(ld),Cu=arr(cu),Q=arr(qu),P=arr(pr);
+      const totalL = getCount(ld, L);
+      const totalCu = getCount(cu, Cu);
+      const totalQ = getCount(qu, Q);
+      const totalP = getCount(pr, P);
+
       const today=new Date();today.setHours(0,0,0,0);
       const open=L.filter(l=>l.status==="open").length;
       const win=L.filter(l=>l.status==="close_win"||l.status==="closed_win"||l.status==="closed").length;
+      const inProc=L.filter(l=>l.status==="in_process").length;
       const loss=L.filter(l=>l.status==="close_loss"||l.status==="closed_loss").length;
       const tFU=L.filter(l=>{if(!l.followup_date)return false;const d=new Date(l.followup_date);d.setHours(0,0,0,0);return d.getTime()===today.getTime();}).length;
       const ov=L.filter(l=>{if(!l.followup_date)return false;const d=new Date(l.followup_date);d.setHours(0,0,0,0);return d<today;}).length;
@@ -159,20 +206,19 @@ export default function Dashboard() {
       const rt=L.filter(l=>l.followup_date&&(l.created_at||l.date)).map(l=>Math.max(0,Math.round((new Date(l.followup_date)-new Date(l.created_at||l.date))/864e5)));
       const avg=rt.length?Math.round(rt.reduce((a,b)=>a+b,0)/rt.length):0;
       
-      setStats({totalLeads:L.length,totalCustomers:Cu.length,totalQuotations:Q.length,totalProducts:P.length,openLeads:open,closedLeads:win,inProcessLeads:loss,overdueFollowups:ov,todayFollowups:tFU,avgResponseDays:avg});
+      setStats({totalLeads:totalL,totalCustomers:totalCu,totalQuotations:totalQ,totalProducts:totalP,openLeads:open,closedLeads:win,inProcessLeads:inProc,overdueFollowups:ov,todayFollowups:tFU,avgResponseDays:avg});
       setMonthly(last6.map(k=>mon[k]));
-      setStatusData([{name:"Open",value:open,fill:C.indigo},{name:"Close Win",value:win,fill:C.emerald},{name:"Close Loss",value:loss,fill:"#EF4444"}]);
+      setStatusData([{name:"Open",value:open,fill:C.indigo},{name:"Close Win",value:win,fill:C.emerald},{name:"In Process",value:inProc,fill:C.orange},{name:"Close Loss",value:loss,fill:"#EF4444"}]);
       setSrcData(Object.entries(sc).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value).slice(0,6));
       
-      // CRM Portfolio Distribution Pie Data
       setPortfolioData([
-        { name:"Leads", value:L.length, fill:C.indigo },
-        { name:"Customers", value:Cu.length, fill:C.emerald },
-        { name:"Quotations", value:Q.length, fill:C.orange },
-        { name:"Products", value:P.length, fill:C.violet }
+        { name:"Leads", value:totalL, fill:C.indigo },
+        { name:"Customers", value:totalCu, fill:C.emerald },
+        { name:"Quotations", value:totalQ, fill:C.orange },
+        { name:"Products", value:totalP, fill:C.violet }
       ].filter(d=>d.value>0));
       
-      setRecent(L.sort((a,b)=>new Date(b.created_at||b.date)-new Date(a.created_at||a.date)).slice(0,6).map(l=>({id:l.id,name:l.customer_name,date:l.date||l.created_at,status:l.status,src:l.lead_source})));
+      setRecent(L.sort((a,b)=>new Date(b.created_at||b.date)-new Date(a.created_at||a.date)).slice(0,6).map(l=>({id:l.id,name:l.customer_name||l.customer?.name,date:l.date||l.created_at,status:l.status,src:l.lead_source})));
     };
     go();
   },[BASE_API,token]);

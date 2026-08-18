@@ -32,6 +32,13 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
   const [gstPercent, setGstPercent] = useState(18);
   const [selectedTerms, setSelectedTerms] = useState([]);
 
+  // Additional Charges State (in ₹)
+  const [transportCharges, setTransportCharges] = useState("");
+  const [packingForwardingCharges, setPackingForwardingCharges] = useState("");
+  const [loadingUnloadingCharges, setLoadingUnloadingCharges] = useState("");
+  const [insuranceCharges, setInsuranceCharges] = useState("");
+  const [miscellaneousCharges, setMiscellaneousCharges] = useState("");
+
   // Multi-product items state (same form layout)
   const [items, setItems] = useState([
     {
@@ -80,6 +87,11 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
         const d = res.data;
         setCustomerId(String(d.customer ?? ""));
         setGstPercent(d.gst_percent ?? 18);
+        setTransportCharges(d.transportation_charges ? String(d.transportation_charges) : "");
+        setPackingForwardingCharges(d.packing_forwarding_charges ? String(d.packing_forwarding_charges) : "");
+        setLoadingUnloadingCharges(d.loading_unloading_charges ? String(d.loading_unloading_charges) : "");
+        setInsuranceCharges(d.insurance_charges ? String(d.insurance_charges) : "");
+        setMiscellaneousCharges(d.miscellaneous_charges ? String(d.miscellaneous_charges) : "");
 
         if (Array.isArray(d.items) && d.items.length > 0) {
           setItems(
@@ -186,18 +198,28 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
       };
     });
 
+    const trans = parseFloat(transportCharges) || 0;
+    const pack = parseFloat(packingForwardingCharges) || 0;
+    const loadChg = parseFloat(loadingUnloadingCharges) || 0;
+    const ins = parseFloat(insuranceCharges) || 0;
+    const misc = parseFloat(miscellaneousCharges) || 0;
+    const addChargesTotalRs = trans + pack + loadChg + ins + misc;
+    const addChargesLakhs = addChargesTotalRs / 100000;
+
     const gst = parseFloat(gstPercent) || 0;
     const gstLakhs = (subtotalLakhs * gst) / 100;
-    const grandTotalLakhs = subtotalLakhs + gstLakhs;
+    const grandTotalLakhs = subtotalLakhs + gstLakhs + addChargesLakhs;
 
     return {
       computedItems,
       subtotalLakhs,
       gstLakhs,
+      addChargesTotalRs,
+      addChargesLakhs,
       grandTotalLakhs,
       totalCarsCount
     };
-  }, [items, products, gstPercent]);
+  }, [items, products, gstPercent, transportCharges, packingForwardingCharges, loadingUnloadingCharges, insuranceCharges, miscellaneousCharges]);
 
   // Submit
   const handleSubmit = async (e) => {
@@ -237,6 +259,11 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
       customer: parseInt(customerId),
       items: itemsPayload,
       gst_percent: parseFloat(gstPercent) || 18,
+      transportation_charges: parseFloat(transportCharges) || 0,
+      packing_forwarding_charges: parseFloat(packingForwardingCharges) || 0,
+      loading_unloading_charges: parseFloat(loadingUnloadingCharges) || 0,
+      insurance_charges: parseFloat(insuranceCharges) || 0,
+      miscellaneous_charges: parseFloat(miscellaneousCharges) || 0,
       terms_ids: selectedTerms,
     };
 
@@ -426,7 +453,76 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
                 </div>
               </div>
 
-              {/* Summary Box (Exact as screenshot) */}
+              {/* Additional Charges Section */}
+              <div className="p-4 rounded-lg border border-slate-200 bg-white space-y-3">
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide border-b border-slate-100 pb-2">
+                  Additional Charges (Optional)
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">Transport Charges (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 15000"
+                      value={transportCharges}
+                      onChange={(e) => setTransportCharges(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-indigo-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">Packing & Forwarding Charges (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 5000"
+                      value={packingForwardingCharges}
+                      onChange={(e) => setPackingForwardingCharges(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-indigo-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">Loading & Unloading Charges (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 8000"
+                      value={loadingUnloadingCharges}
+                      onChange={(e) => setLoadingUnloadingCharges(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-indigo-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">Insurance Charges (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 3000"
+                      value={insuranceCharges}
+                      onChange={(e) => setInsuranceCharges(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-indigo-400"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block font-medium text-slate-700 mb-1">Miscellaneous Charges (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 2000"
+                      value={miscellaneousCharges}
+                      onChange={(e) => setMiscellaneousCharges(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-indigo-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary Box */}
               <div className="p-4 rounded-md border border-slate-200 bg-slate-50 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">Basic Subtotal:</span>
@@ -436,6 +532,12 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
                   <span className="text-slate-600">GST ({gstPercent}%):</span>
                   <span className="font-semibold text-slate-800">{fmtLakhs(summary.gstLakhs)}</span>
                 </div>
+                {summary.addChargesTotalRs > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Additional Charges Total:</span>
+                    <span className="font-semibold text-slate-800">₹{summary.addChargesTotalRs.toLocaleString("en-IN")} ({fmtLakhs(summary.addChargesLakhs)})</span>
+                  </div>
+                )}
                 <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
                   <span className="text-sm font-bold text-slate-800">Total Amount:</span>
                   <span className="text-xl font-bold text-blue-600">{fmtLakhs(summary.grandTotalLakhs)}</span>

@@ -479,6 +479,11 @@ def simple_quotation_detail(request, pk):
         "parking_product_name": first_item.product_data.get("name") if first_item and first_item.product_data else "",
         "subtotal": float(version.subtotal) if version else 0,
         "gst_amount": float(version.gst_amount) if version else 0,
+        "transportation_charges": float(getattr(version, "transportation_charges", 0) or 0) if version else 0,
+        "packing_forwarding_charges": float(getattr(version, "packing_forwarding_charges", 0) or 0) if version else 0,
+        "loading_unloading_charges": float(getattr(version, "loading_unloading_charges", 0) or 0) if version else 0,
+        "insurance_charges": float(getattr(version, "insurance_charges", 0) or 0) if version else 0,
+        "miscellaneous_charges": float(getattr(version, "miscellaneous_charges", 0) or 0) if version else 0,
         "grand_total": float(version.grand_total) if version else 0,
         "items": items_list
     }
@@ -498,6 +503,12 @@ def simple_quotation_update(request, pk):
     quotation = get_object_or_404(Quotation, pk=pk)
     data = request.data
     gst_percent = float(data.get("gst_percent", 18))
+
+    trans_chg = float(data.get("transportation_charges") or data.get("transport_charges") or 0)
+    pack_chg = float(data.get("packing_forwarding_charges") or data.get("packing_charges") or 0)
+    load_chg = float(data.get("loading_unloading_charges") or data.get("loading_charges") or 0)
+    ins_chg = float(data.get("insurance_charges") or data.get("insurance") or 0)
+    misc_chg = float(data.get("miscellaneous_charges") or data.get("miscellaneous") or 0)
 
     raw_items = data.get("items")
     if not raw_items or not isinstance(raw_items, list) or len(raw_items) == 0:
@@ -539,6 +550,11 @@ def simple_quotation_update(request, pk):
         is_active=True,
         gst_type="CGST_SGST",
         created_by=request.user,
+        transportation_charges=trans_chg,
+        packing_forwarding_charges=pack_chg,
+        loading_unloading_charges=load_chg,
+        insurance_charges=ins_chg,
+        miscellaneous_charges=misc_chg,
     )
 
     total_subtotal = 0.0
@@ -592,7 +608,8 @@ def simple_quotation_update(request, pk):
     version.sgst_amount = half_gst
     version.igst_amount = 0
     version.total_amount = total_subtotal + total_gst_amount
-    version.grand_total = total_subtotal + total_gst_amount
+    add_charges = trans_chg + pack_chg + load_chg + ins_chg + misc_chg
+    version.grand_total = total_subtotal + total_gst_amount + add_charges
     version.save()
 
     return Response({"id": quotation.id, "quotation_no": quotation.quotation_no, "version": new_version_no})

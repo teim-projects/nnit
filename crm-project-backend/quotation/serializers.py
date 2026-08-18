@@ -194,7 +194,14 @@ class QuotationSerializer(serializers.ModelSerializer):
         version.subtotal = version_subtotal
         version.gst_amount = version_gst_total
         version.total_amount = version_subtotal + version_gst_total
-        version.grand_total = version.total_amount
+        add_charges = (
+            float(version.transportation_charges or 0) +
+            float(version.packing_forwarding_charges or 0) +
+            float(version.loading_unloading_charges or 0) +
+            float(version.insurance_charges or 0) +
+            float(version.miscellaneous_charges or 0)
+        )
+        version.grand_total = version.total_amount + add_charges
     
         version.save()
 
@@ -397,6 +404,13 @@ class SimpleQuotationSerializer(serializers.Serializer):
         quotation.quotation_no = f"NNIT/{month}-{year}/{seq}"
         quotation.save(update_fields=["quotation_no"])
 
+        # Extract 5 additional charges
+        trans_chg = float(validated_data.get("transportation_charges") or validated_data.get("transport_charges") or 0)
+        pack_chg = float(validated_data.get("packing_forwarding_charges") or validated_data.get("packing_charges") or 0)
+        load_chg = float(validated_data.get("loading_unloading_charges") or validated_data.get("loading_charges") or 0)
+        ins_chg = float(validated_data.get("insurance_charges") or validated_data.get("insurance") or 0)
+        misc_chg = float(validated_data.get("miscellaneous_charges") or validated_data.get("miscellaneous") or 0)
+
         # Create version
         version = QuotationVersion.objects.create(
             quotation=quotation,
@@ -404,6 +418,11 @@ class SimpleQuotationSerializer(serializers.Serializer):
             is_active=True,
             gst_type="CGST_SGST",
             created_by=request.user if request else None,
+            transportation_charges=trans_chg,
+            packing_forwarding_charges=pack_chg,
+            loading_unloading_charges=load_chg,
+            insurance_charges=ins_chg,
+            miscellaneous_charges=misc_chg,
         )
 
         total_subtotal = 0.0
@@ -457,7 +476,7 @@ class SimpleQuotationSerializer(serializers.Serializer):
         version.sgst_amount = half_gst
         version.igst_amount = 0
         version.total_amount = total_subtotal + total_gst_amount
-        version.grand_total = total_subtotal + total_gst_amount
+        version.grand_total = total_subtotal + total_gst_amount + trans_chg + pack_chg + load_chg + ins_chg + misc_chg
         version.save()
 
         # Create Terms & Conditions for quotation
