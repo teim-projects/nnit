@@ -68,6 +68,14 @@ class QuotationVersion(models.Model):
     sgst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     igst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    # Additional Charges
+    transportation_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    packing_forwarding_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    loading_unloading_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    insurance_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    miscellaneous_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 

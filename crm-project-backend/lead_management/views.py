@@ -189,6 +189,98 @@ class LeadViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    @action(detail=False, methods=['get'], url_path='dashboard-stats')
+    def dashboard_stats(self, request):
+        from quotation.models import Quotation
+        from parking_products.models import ParkingProduct
+        from django.db.models import Count
+        import calendar
+
+        user = request.user
+        role_name = getattr(getattr(user, 'role', None), 'name', '').lower()
+
+        leads_qs = lead_management.objects.all()
+        if role_name == "sales":
+            leads_qs = leads_qs.filter(assign_to=user)
+
+        today = timezone.localdate()
+        total_leads = leads_qs.count()
+        total_customers = Customer.objects.filter(is_lead_only=False).count()
+        total_quotations = Quotation.objects.count()
+        
+        try:
+            total_products = ParkingProduct.objects.count()
+        except Exception:
+            total_products = 0
+
+        open_leads = leads_qs.filter(status='open').count()
+        win_leads = leads_qs.filter(status__in=['close_win', 'closed_win', 'closed']).count()
+        loss_leads = leads_qs.filter(status__in=['close_loss', 'closed_loss']).count()
+        in_process_leads = leads_qs.filter(status='in_process').count()
+
+        today_followups = leads_qs.filter(followup_date=today).exclude(status__in=['close_win', 'closed_win', 'closed', 'close_loss', 'closed_loss']).count()
+        overdue_followups = leads_qs.filter(followup_date__lt=today).exclude(status__in=['close_win', 'closed_win', 'closed', 'close_loss', 'closed_loss']).count()
+
+        # Monthly breakdown for last 6 months
+        monthly = []
+        for i in range(5, -1, -1):
+            # calculate target month & year
+            month_calc = today.month - i
+            target_year = today.year
+            if month_calc <= 0:
+                month_calc += 12
+                target_year -= 1
+            
+            l_count = leads_qs.filter(created_at__year=target_year, created_at__month=month_calc).count()
+            c_count = Customer.objects.filter(is_lead_only=False, created_at__year=target_year, created_at__month=month_calc).count()
+            q_count = Quotation.objects.filter(created_at__year=target_year, created_at__month=month_calc).count()
+            
+            monthly.append({
+                "month": calendar.month_abbr[month_calc],
+                "leads": l_count,
+                "customers": c_count,
+                "quotations": q_count
+            })
+
+        # Lead source breakdown
+        sources_qs = leads_qs.values('lead_source').annotate(count=Count('id')).order_by('-count')[:6]
+        src_data = [{"name": (item['lead_source'] or "Unknown").replace("_", " ").title(), "value": item['count']} for item in sources_qs]
+
+        # Recent leads
+        recent_qs = leads_qs.select_related('customer').order_by('-created_at')[:6]
+        recent_leads = [
+            {
+                "id": l.id,
+                "name": l.customer.name if l.customer else "Unknown",
+                "date": l.created_at.strftime("%Y-%m-%d") if l.created_at else None,
+                "status": l.status,
+                "src": l.lead_source
+            }
+            for l in recent_qs
+        ]
+
+        # Avg response days
+        rt = leads_qs.filter(followup_date__isnull=False, created_at__isnull=False).values('followup_date', 'created_at')
+        days_list = [max(0, (item['followup_date'] - item['created_at'].date()).days) for item in rt]
+        avg_response_days = round(sum(days_list) / len(days_list)) if days_list else 0
+
+        return Response({
+            "totalLeads": total_leads,
+            "totalCustomers": total_customers,
+            "totalQuotations": total_quotations,
+            "totalProducts": total_products,
+            "openLeads": open_leads,
+            "closedLeads": win_leads,
+            "inProcessLeads": in_process_leads,
+            "lossLeads": loss_leads,
+            "todayFollowups": today_followups,
+            "overdueFollowups": overdue_followups,
+            "avgResponseDays": avg_response_days,
+            "monthly": monthly,
+            "srcData": src_data,
+            "recent": recent_leads
+        })
+
     @action(detail=True, methods=['post'], url_path='convert-to-customer')
     def convert_to_customer(self, request, pk=None):
         """

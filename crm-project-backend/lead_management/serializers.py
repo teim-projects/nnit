@@ -80,6 +80,7 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
             "discussion_notes",
             # Interaction details
             "site_name",
+            "site_photo",
             "followup_question",
             "interaction_type",
             "client_response",

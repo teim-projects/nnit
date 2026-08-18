@@ -400,6 +400,15 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                               </p>
                             )}
 
+                            {fu.site_photo && (
+                              <div className="mb-4">
+                                <p className="text-xs font-semibold text-gray-500 mb-1">📷 Site Photo:</p>
+                                <a href={fu.site_photo} target="_blank" rel="noopener noreferrer">
+                                  <img src={fu.site_photo} alt="Site Photo" className="h-28 w-auto rounded-xl border border-gray-200 shadow-sm hover:opacity-90 transition object-cover" />
+                                </a>
+                              </div>
+                            )}
+
                             <p className="text-sm text-gray-700 mb-4 font-medium leading-relaxed">{fu.remarks || fu.discussion_notes || "No discussion notes recorded."}</p>
 
                             {fu.followup_question && (

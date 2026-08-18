@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Swal from "sweetalert2";
 import { MdClose } from "react-icons/md";
-import { FiPhone, FiVideo, FiMapPin } from "react-icons/fi";
+import { FiPhone, FiVideo, FiMapPin, FiCamera, FiTrash2 } from "react-icons/fi";
 import { IoLogoWhatsapp } from "react-icons/io5";
 import { HiOutlineMail, HiOutlineUserGroup, HiOutlineClipboardList } from "react-icons/hi";
 
@@ -113,6 +113,15 @@ const FollowupHistoryModal = ({ open, onClose, lead }) => {
                         <p className="text-sm text-indigo-700 font-semibold mb-2">
                           📍 Site: {fu.site_name}
                         </p>
+                      )}
+
+                      {fu.site_photo && (
+                        <div className="mb-3">
+                          <p className="text-xs font-semibold text-gray-500 mb-1">📷 Site Photo:</p>
+                          <a href={fu.site_photo} target="_blank" rel="noopener noreferrer">
+                            <img src={fu.site_photo} alt="Site Photo" className="h-28 w-auto rounded-lg border border-gray-300 shadow-sm hover:opacity-90 transition object-cover" />
+                          </a>
+                        </div>
                       )}
 
                       {/* Discussion & Questions */}
@@ -303,6 +312,8 @@ export default function AddLeadFollowUpFormNew({
 
   // Follow-up mode & details
   const [siteName, setSiteName] = useState("");
+  const [sitePhoto, setSitePhoto] = useState(null);
+  const [sitePhotoPreview, setSitePhotoPreview] = useState(null);
   const [followupQuestion, setFollowupQuestion] = useState("");
   const [followupMode, setFollowupMode] = useState("call");
   const [followupStatus, setFollowupStatus] = useState("completed");
@@ -507,6 +518,7 @@ export default function AddLeadFollowUpFormNew({
 
       // Followup mode, site, questions, conducted by, etc.
       setSiteName(followup.site_name ?? "");
+      setSitePhotoPreview(followup.site_photo ?? null);
       setFollowupQuestion(followup.followup_question ?? "");
       setFollowupMode(followup.interaction_type ?? "call");  // Changed from followup_mode
       setFollowupStatus(followup.followup_status ?? "completed");  // Added
@@ -754,13 +766,29 @@ export default function AddLeadFollowUpFormNew({
         : `${BASE_API}/lead/lead-followups/`;
       const method = followup ? "PATCH" : "POST";
 
+      let body;
+      let headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      if (sitePhoto instanceof File) {
+        const formData = new FormData();
+        Object.keys(payload).forEach((k) => {
+          if (typeof payload[k] === "object" && payload[k] !== null) {
+            formData.append(k, JSON.stringify(payload[k]));
+          } else if (payload[k] !== null && payload[k] !== undefined) {
+            formData.append(k, payload[k]);
+          }
+        });
+        formData.append("site_photo", sitePhoto);
+        body = formData;
+      } else {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify(payload);
+      }
+
       const res = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
+        headers,
+        body,
       });
 
       let data;
@@ -866,17 +894,69 @@ export default function AddLeadFollowUpFormNew({
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Site Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Enter site name / project location"
-                    value={siteName}
-                    onChange={(e) => setSiteName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Site Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter site name / project location"
+                      value={siteName}
+                      onChange={(e) => setSiteName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Site Photo (optional)
+                    </label>
+                    {sitePhotoPreview ? (
+                      <div className="flex items-center justify-between w-full px-3 h-[42px] bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={sitePhotoPreview}
+                            alt="Site Preview"
+                            className="h-7 w-7 object-cover rounded border border-slate-300 shadow-sm shrink-0"
+                          />
+                          <span className="text-xs font-medium text-slate-700 truncate whitespace-nowrap">
+                            {sitePhoto?.name || "Photo Attached"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setSitePhoto(null); setSitePhotoPreview(null); }}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition shrink-0 ml-2"
+                          title="Remove Photo"
+                        >
+                          <FiTrash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center justify-between w-full px-3 h-[42px] border border-dashed border-gray-300 rounded-lg cursor-pointer bg-slate-50/60 hover:bg-orange-50/50 hover:border-orange-400 transition group overflow-hidden">
+                        <div className="flex items-center gap-2 min-w-0 text-slate-600 group-hover:text-orange-600">
+                          <FiCamera className="w-4 h-4 text-slate-400 group-hover:text-orange-500 transition shrink-0" />
+                          <span className="text-xs font-medium truncate whitespace-nowrap">Upload Site Photo</span>
+                        </div>
+                        <span className="text-[11px] font-semibold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-md group-hover:bg-orange-600 group-hover:text-white transition shrink-0 ml-2">
+                          Browse
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              setSitePhoto(file);
+                              setSitePhotoPreview(URL.createObjectURL(file));
+                            }
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
               </div>
 
