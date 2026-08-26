@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MdClose, MdPhone, MdEmail, MdLocationOn } from "react-icons/md";
-import { FiArrowLeft, FiPlus } from "react-icons/fi";
+import { FiArrowLeft, FiPlus, FiSend } from "react-icons/fi";
 import { HiCheckCircle } from "react-icons/hi";
 import { AiOutlineFileText } from "react-icons/ai";
 import axios from "axios";
@@ -15,6 +16,7 @@ const getOrdinal = (n) => {
 };
 
 const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation, inline = false }) => {
+  const navigate = useNavigate();
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -105,6 +107,38 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
       })
       .then(response => setLead(response.data))
       .catch(err => console.error("Failed to refresh lead:", err));
+    }
+  };
+
+  const handleDirectCadUpload = async (e) => {
+    if (!e.target.files || !e.target.files[0] || !leadId) return;
+    const file = e.target.files[0];
+    const formDataObj = new FormData();
+    formDataObj.append("cad_file", file);
+
+    try {
+      Swal.showLoading();
+      const res = await axios.patch(`${baseApi}/lead/lead/${leadId}/upload-cad/`, formDataObj, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      setLead(res.data);
+      Swal.fire({
+        icon: "success",
+        title: "CAD File Uploaded!",
+        text: "CAD Design file uploaded successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      console.error("CAD Upload error:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Upload Failed",
+        text: err.response?.data?.error || err.response?.data?.detail || "Failed to upload CAD file.",
+      });
     }
   };
 
@@ -254,6 +288,17 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                   <FiPlus className="w-5 h-5 text-gray-500" /> Add Follow-up
                 </button>
 
+                {/* Send to Designer Button */}
+                <button 
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm text-sm transition-all cursor-pointer" 
+                  onClick={() => {
+                    if (onClose) onClose();
+                    navigate(`/design-drawings?tab=sales&send=true&leadId=${lead.id}`);
+                  }}
+                >
+                  <FiSend className="w-4 h-4 text-white" /> Send Lead to Designer
+                </button>
+
                 {lead.is_converted && lead.converted_at && (
                   <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
                     <HiCheckCircle className="w-4 h-4 shrink-0" />
@@ -261,63 +306,48 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                   </div>
                 )}
 
-                {/* Designer CAD Drawing & Work Card */}
-                {(() => {
-                  const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
-                  const custName = (lead?.customer_name || lead?.contact_person_name || "").toLowerCase();
-                  const foundDesignReq = existingReqs.find(r => 
-                    r.leadId === lead?.id || 
-                    (r.customerName && custName && custName.includes(r.customerName.toLowerCase())) ||
-                    (r.customerName && custName && r.customerName.toLowerCase().includes(custName))
-                  );
+                {/* CAD Design Card */}
+                <div className="bg-gradient-to-br from-indigo-50 to-blue-50/80 p-4 rounded-2xl border border-indigo-200 shadow-xs space-y-2.5 text-xs mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-indigo-900 text-sm flex items-center gap-1.5">
+                      📐 CAD Design Drawing
+                    </span>
+                    {lead.cad_file ? (
+                      <span className="px-2 py-0.5 rounded-full font-bold uppercase text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        Uploaded
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full font-bold uppercase text-[10px] bg-amber-100 text-amber-800 border border-amber-300">
+                        Pending
+                      </span>
+                    )}
+                  </div>
 
-                  if (!foundDesignReq) return null;
-
-                  return (
-                    <div className="bg-gradient-to-br from-purple-50 to-indigo-50/60 p-4 rounded-2xl border border-purple-200 shadow-sm space-y-2 text-xs mt-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-purple-900 text-sm flex items-center gap-1.5">
-                          🎨 Designer CAD Drawing
-                        </span>
-                        <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
-                          foundDesignReq.status === "drawing_completed" || foundDesignReq.status === "attached_to_quotation"
-                            ? "bg-emerald-100 text-emerald-800 border border-emerald-300" 
-                            : "bg-amber-100 text-amber-800 border border-amber-300"
-                        }`}>
-                          {foundDesignReq.status === "drawing_completed" || foundDesignReq.status === "attached_to_quotation" 
-                            ? "✅ Drawing Completed" 
-                            : "⏳ In Designer Queue"}
-                        </span>
-                      </div>
-
-                      {foundDesignReq.drawingTitle ? (
-                        <div className="space-y-1 pt-1 border-t border-purple-100">
-                          <div className="font-bold text-slate-900 text-xs">{foundDesignReq.drawingTitle}</div>
-                          <div className="text-slate-600 font-medium">{foundDesignReq.drawingSpecs}</div>
-                          {foundDesignReq.designerNotes && (
-                            <div className="text-slate-500 italic">"{foundDesignReq.designerNotes}"</div>
-                          )}
-
-                          {foundDesignReq.drawingUrl && (
-                            <a
-                              href={foundDesignReq.drawingUrl}
-                              download={foundDesignReq.fileName || "Drawing.dwg"}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition shadow-sm"
-                            >
-                              📥 Download {foundDesignReq.fileName || "CAD Drawing"}
-                            </a>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-slate-500 text-[11px]">
-                          Lead is currently in Designer Queue. CAD drawing will appear here once uploaded by Designer.
-                        </div>
-                      )}
+                  {lead.cad_file && (
+                    <div className="pt-1">
+                      <a
+                        href={lead.cad_file}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition shadow-xs"
+                      >
+                        📥 View CAD ({lead.cad_file_name || 'File'})
+                      </a>
                     </div>
-                  );
-                })()}
+                  )}
+
+                  <div className="pt-1">
+                    <label className="cursor-pointer inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-slate-50 text-indigo-700 font-bold rounded-lg border border-indigo-300 text-xs transition shadow-xs">
+                      <span>📁 {lead.cad_file ? "Replace CAD File" : "Upload CAD Design File"}</span>
+                      <input
+                        type="file"
+                        accept=".dwg,.dxf,.pdf,.png,.jpg,.jpeg,.zip,.rar"
+                        className="hidden"
+                        onChange={handleDirectCadUpload}
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
             {/* RIGHT (8 Cols) — reuse same tab content */}

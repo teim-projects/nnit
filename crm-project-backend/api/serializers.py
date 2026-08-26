@@ -87,7 +87,8 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        rep['full_name'] = f"{instance.first_name or ''} {instance.last_name or ''}"
+        name = f"{instance.first_name or ''} {instance.last_name or ''}".strip()
+        rep['full_name'] = name if name else (instance.email or f"User #{instance.id}")
         return rep
     
 

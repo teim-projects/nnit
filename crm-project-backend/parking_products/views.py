@@ -6,15 +6,14 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from api.permissions import HasModulePermission
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import ProductCategory, ParkingProduct, ProductConfiguration, ProductRequirement
+from .models import ProductCategory, ParkingProduct, ProductConfiguration
 from .serializers import (
     ProductCategorySerializer,
     ParkingProductSerializer,
     ParkingProductListSerializer,
     ProductConfigurationSerializer,
     ProductRecommendationSerializer,
-    RecommendedProductSerializer,
-    ProductRequirementSerializer
+    RecommendedProductSerializer
 )
 
 
@@ -184,21 +183,3 @@ class ProductConfigurationViewSet(viewsets.ModelViewSet):
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
         return queryset
-
-
-class ProductRequirementViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for Product Requirements.
-    Filtering by category is done via django-filter using the category ID.
-    """
-    queryset = ProductRequirement.objects.select_related('category', 'product').all()
-    serializer_class = ProductRequirementSerializer
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['category']          # filters by category ID (foreign key)
-    search_fields = ['product__product_name', 'category__display_name']
-    ordering_fields = ['created_at', 'price']
-    ordering = ['-created_at']
-    
-    # The custom get_queryset override has been removed to avoid conflict with the filter backend.

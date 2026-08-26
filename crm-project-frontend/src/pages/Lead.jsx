@@ -5,10 +5,12 @@ import LeadDetails from "../components/lead/LeadDetails";
 import AddLeadFollowUpFormNew from "../components/lead/AddLeadFollowUpForm";
 import AddLeadForm from "../components/lead/AddLeadForm";
 import { IoLogoWhatsapp } from "react-icons/io5";
-import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd, MdEdit } from "react-icons/md";
+import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd, MdEdit, MdFileUpload } from "react-icons/md";
 import Swal from "sweetalert2";
 import { useModulePermissions } from '../hooks/useAuth';
 import AddQuotation from "../components/quotations/AddQuotation";
+import BulkImportModal from "../components/BulkImportModal";
+import SendEmailModal from "../components/SendEmailModal";
 
 
 export default function Lead() {
@@ -78,6 +80,9 @@ export default function Lead() {
   // modal / edit state
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailModalData, setEmailModalData] = useState({});
 
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [leadDetailsId, setLeadDetailsId] = useState(null);
@@ -428,13 +433,11 @@ export default function Lead() {
   };
 
   const columns = [
-    { key: "sr", label: "Sr.No", render: (_, idx) => (currentPage - 1) * PAGE_SIZE + (idx + 1) },
-    { key: "date", label: "Date", render: (r) => formatDate(r.date) },
-    { key: "followup_date", label: "Followup Date", render: (r) => formatDate(r.followup_date) },
-    { key: "name", label: "Name", render: (r) => r.customer_name },
+    { key: "id", label: "Lead ID", render: (r) => `#${r.id}` },
+    { key: "date", label: "Date", render: (r) => r.date || (r.created_at ? r.created_at.slice(0, 10) : "") },
+    { key: "customer_name", label: "Customer", render: (r) => r.customer_name },
+    { key: "project_name", label: "Project", render: (r) => r.project_name || "-" },
     { key: "contact", label: "Contact", render: (r) => r.customer_contact },
-    // { key: "email", label: "Email", render: (r) => r.customer_email },
-    // { key: "hvac_application", label: "HVAC Application", render: (r) => r.hvac_application },
     { key: "lead_source", label: "Source", render: (r) => r.lead_source },
     { key: "status", label: "Status", render: (r) => {
         const s = (r.status || "open").toLowerCase();
@@ -445,12 +448,57 @@ export default function Lead() {
         return <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full font-bold text-xs">Open</span>;
       }
     },
+    {
+      key: "cad_file",
+      label: "CAD Design",
+      render: (r) => (
+        r.cad_file ? (
+          <div className="flex items-center gap-1">
+            <a
+              href={r.cad_file}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg text-xs font-bold transition shadow-xs"
+              onClick={(e) => e.stopPropagation()}
+              title={r.cad_file_name || "View CAD File"}
+            >
+              📐 View CAD
+            </a>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleUploadCadModal(r);
+              }}
+              className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] font-bold"
+              title="Replace / Update CAD File"
+            >
+              ✏️
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleUploadCadModal(r);
+            }}
+            className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-50 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 rounded-md text-[11px] font-medium transition"
+          >
+            + Add CAD
+          </button>
+        )
+      )
+    },
     // ✅ SHOW ONLY IF USER IS NOT SALES
     ...(userRole?.name !== "sales"
       ? [{
         key: "assign_to",
         label: "Assign To",
-        render: (r) => r.assign_to_details?.full_name || "-"
+        render: (r) => {
+          const name = r.assign_to_details?.full_name?.trim();
+          if (name) return name;
+          if (r.assign_to_details?.email) return r.assign_to_details.email;
+          return "-";
+        }
       }]
       : [])
   ];
@@ -459,28 +507,55 @@ export default function Lead() {
   const actionsRenderer = useCallback((row) => {
     const handleWhatsApp = (e) => {
       e.stopPropagation();
-      const contact = row.customer_contact;
-      if (!contact) {
-        Swal.fire({ icon: 'warning', title: 'No Contact', text: 'No contact number available' });
-        return;
-      }
-      const cleanNumber = contact.replace(/[^0-9]/g, '');
-      const whatsappNumber = cleanNumber.startsWith('91') ? cleanNumber : `91${cleanNumber}`;
-      window.open(`https://wa.me/${whatsappNumber}`, '_blank');
+      setEmailModalData({
+        recipientEmail: row.customer_email || "",
+        recipientName: row.customer_name || "",
+        recipientPhone: row.customer_contact || "",
+        siteName: row.project_name || row.company_name || row.customer_address || "",
+        requirements: row.requirements_details || "",
+        followupCount: row.followups?.length || 0,
+        type: "lead",
+        initialChannel: "whatsapp"
+      });
+      setShowEmailModal(true);
     };
 
     const handleEmail = (e) => {
       e.stopPropagation();
-      const email = row.customer_email;
-      if (!email) {
-        Swal.fire({ icon: 'warning', title: 'No Email', text: 'No email address available' });
-        return;
-      }
-      window.location.href = `mailto:${email}`;
+      setEmailModalData({
+        recipientEmail: row.customer_email || "",
+        recipientName: row.customer_name || "",
+        recipientPhone: row.customer_contact || "",
+        siteName: row.project_name || row.company_name || row.customer_address || "",
+        requirements: row.requirements_details || "",
+        followupCount: row.followups?.length || 0,
+        type: "lead",
+        initialChannel: "email"
+      });
+      setShowEmailModal(true);
     };
 
     return (
       <div className="flex items-center justify-center gap-1">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (row.cad_file) {
+              window.open(row.cad_file, "_blank");
+            } else {
+              handleUploadCadModal(row);
+            }
+          }}
+          className={`inline-flex items-center px-2 py-1 border rounded-lg text-xs font-bold transition-colors gap-1 ${
+            row.cad_file
+              ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300"
+              : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
+          }`}
+          title={row.cad_file ? `Click to View CAD File (${row.cad_file_name || 'File'})` : "Click to Upload CAD Design"}
+        >
+          <span>📐 CAD</span>
+        </button>
+
         <button
           onClick={handleWhatsApp}
           className="inline-flex items-center px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium transition-colors"
@@ -728,13 +803,22 @@ export default function Lead() {
           </div>
           <div className="flex items-center gap-3">
             {canCreate && !isDesignerRole && (
-              <button
-                onClick={() => { setEditingLead(null); setShowLeadForm(true); }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm"
-              >
-                <MdAdd className="w-5 h-5" />
-                Add Lead
-              </button>
+              <>
+                <button
+                  onClick={() => setShowBulkImportModal(true)}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors shadow-sm"
+                >
+                  <MdFileUpload className="w-5 h-5" />
+                  Import Leads (CSV)
+                </button>
+                <button
+                  onClick={() => { setEditingLead(null); setShowLeadForm(true); }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm"
+                >
+                  <MdAdd className="w-5 h-5" />
+                  Add Lead
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -791,6 +875,32 @@ export default function Lead() {
           }}
         />
       )}
+
+      <BulkImportModal
+        open={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        onSuccess={() => fetchData(currentPage)}
+        title="Import Leads (CSV)"
+        sampleCsvUrl={`${BASE_API}/lead/lead/sample-csv/`}
+        importEndpoint={`${BASE_API}/lead/lead/import-bulk/`}
+        token={token}
+        type="leads"
+      />
+
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        recipientPhone={emailModalData.recipientPhone}
+        siteName={emailModalData.siteName}
+        requirements={emailModalData.requirements}
+        followupCount={emailModalData.followupCount}
+        type={emailModalData.type || "lead"}
+        initialChannel={emailModalData.initialChannel || "email"}
+        baseApi={BASE_API}
+        token={token}
+      />
 
     </Base>
   );

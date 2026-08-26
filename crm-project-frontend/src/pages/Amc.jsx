@@ -1,14 +1,28 @@
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import Base from "../components/Base";
 import AmcList from "../components/amc/AmcList";
+import AmcCalendarView from "../components/amc/AmcCalendarView";
+import ContractDetailModal from "../components/amc/ContractDetailModal";
 import { useModulePermissions } from "../hooks/useAuth";
-import { MdAssignmentTurnedIn, MdOutlineHourglassTop, MdAutorenew, MdAttachMoney } from "react-icons/md";
+import {
+  MdAssignmentTurnedIn,
+  MdOutlineHourglassTop,
+  MdAutorenew,
+  MdAttachMoney,
+  MdCalendarMonth,
+  MdListAlt
+} from "react-icons/md";
 
 export default function AmcPage() {
   const baseApi = import.meta.env.VITE_BASE_API_URL;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
 
   const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("amc");
+  const [activeTab, setActiveTab] = useState(tabParam === "calendar" ? "calendar" : "contracts");
   const [filters, setFilters] = useState({});
+  const [modalContract, setModalContract] = useState(null);
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -22,6 +36,37 @@ export default function AmcPage() {
     localStorage.getItem("token") ||
     ""
   ), []);
+
+  useEffect(() => {
+    if (tabParam === "calendar") {
+      setActiveTab("calendar");
+    } else {
+      setActiveTab("contracts");
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+    setSearchParams({ tab: key });
+  };
+
+  const handleViewContractById = async (contractId) => {
+    if (!baseApi || !contractId) return;
+    try {
+      const res = await fetch(`${baseApi}/amc/contracts/${contractId}/`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setModalContract(data);
+      }
+    } catch (e) {
+      console.error("Failed to load contract for modal:", e);
+    }
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -128,16 +173,62 @@ export default function AmcPage() {
           </div>
         </div>
 
-        {/* Main Contract List Component */}
-        <AmcList
+        {/* Tab Navigation (2 Tabs) */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+          <button
+            onClick={() => handleTabChange("contracts")}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 transition ${
+              activeTab === "contracts"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            <MdListAlt size={16} /> AMC Contracts List
+          </button>
+
+          <button
+            onClick={() => handleTabChange("calendar")}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 transition ${
+              activeTab === "calendar"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            <MdCalendarMonth size={16} /> Service Visits & Expiry Calendar
+          </button>
+        </div>
+
+        {/* Tab Content Rendering */}
+        {activeTab === "contracts" && (
+          <AmcList
+            baseApi={baseApi}
+            token={token}
+            filters={filters}
+            canCreate={canCreate}
+            canEdit={canEdit}
+            canDelete={canDelete}
+          />
+        )}
+
+        {activeTab === "calendar" && (
+          <AmcCalendarView
+            baseApi={baseApi}
+            token={token}
+            onViewContract={handleViewContractById}
+          />
+        )}
+      </div>
+
+      {/* Contract Detail Modal */}
+      {modalContract && (
+        <ContractDetailModal
+          contract={modalContract}
+          onClose={() => setModalContract(null)}
           baseApi={baseApi}
           token={token}
-          filters={filters}
-          canCreate={canCreate}
-          canEdit={canEdit}
-          canDelete={canDelete}
+          onRefresh={() => handleViewContractById(modalContract.id)}
         />
-      </div>
+      )}
     </Base>
   );
 }

@@ -60,6 +60,8 @@ export default function AddLeadForm({
     remarks: "",
   });
 
+  const [cadFile, setCadFile] = useState(null);
+
   const cities = useMemo(() => {
     if (!formData.state) return [];
     const selectedState = states.find(state => state.name === formData.state);
@@ -273,6 +275,7 @@ export default function AddLeadForm({
         followupDate: lead.followup_date || "",
         remarks: lead.remarks || "",
       });
+      setCadFile(lead.cad_file || null);
       contactRef.current = lead.customer_contact || "";
       setCustomerId(lead.customer ?? null);
       setAssignId(lead.assign_to ?? null);
@@ -280,6 +283,7 @@ export default function AddLeadForm({
       setIsQualified(lead.is_qualified || false);
       setQualifyingAnswers(lead.qualifying_answers || {});
     } else {
+      setCadFile(null);
       setFormData({
         enquiry_date: "",
         clientName: "",
@@ -683,13 +687,31 @@ export default function AddLeadForm({
       const url = lead ? `${API_URL}${lead.id}/` : API_URL;
       const method = lead ? "PATCH" : "POST";
 
+      let body;
+      let headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+
+      if (cadFile instanceof File) {
+        const formDataObj = new FormData();
+        Object.keys(payload).forEach((k) => {
+          if (payload[k] !== null && payload[k] !== undefined) {
+            if (typeof payload[k] === "object") {
+              formDataObj.append(k, JSON.stringify(payload[k]));
+            } else {
+              formDataObj.append(k, payload[k]);
+            }
+          }
+        });
+        formDataObj.append("cad_file", cadFile);
+        body = formDataObj;
+      } else {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify(payload);
+      }
+
       const res = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify(payload),
+        headers,
+        body,
       });
 
       let data;
@@ -1472,6 +1494,30 @@ export default function AddLeadForm({
                     }}
                     className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   />
+                </div>
+
+                <div className="md:col-span-2 bg-gradient-to-r from-indigo-50/50 to-blue-50/50 p-4 rounded-xl border border-indigo-100 space-y-2 mt-1">
+                  <label className="block text-xs font-bold text-indigo-900">
+                    📐 CAD Design Drawing File (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept=".dwg,.dxf,.pdf,.png,.jpg,.jpeg,.zip,.rar"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setCadFile(e.target.files[0]);
+                      }
+                    }}
+                    className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs text-slate-800 bg-white focus:ring-2 focus:ring-indigo-400"
+                  />
+                  {cadFile && (
+                    <div className="flex items-center gap-2 text-xs text-emerald-700 font-semibold pt-1">
+                      <span>📁 File Selected: {typeof cadFile === "string" ? cadFile.split("/").pop() : cadFile.name}</span>
+                      {typeof cadFile === "string" && (
+                        <a href={cadFile} target="_blank" rel="noreferrer" className="text-indigo-600 underline text-[11px]">View Current CAD</a>
+                      )}
+                    </div>
+                  )}
                 </div>
               </>
             )}

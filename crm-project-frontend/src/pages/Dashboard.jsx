@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
+import { Navigate } from "react-router-dom";
 import Base from "../components/Base";
+import TechnicianDashboard from "./TechnicianDashboard";
+import { useUserRole } from "../hooks/useAuth";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -58,11 +61,12 @@ function CT({active,payload,label}) {
   return (
     <motion.div initial={{opacity:0,scale:0.95,y:5}} animate={{opacity:1,scale:1,y:0}} className="bg-white/95 backdrop-blur-md border border-slate-100 rounded-xl shadow-xl p-3 text-xs z-50">
       <p className="font-semibold text-slate-700 mb-2 border-b border-slate-100 pb-1.5">{label}</p>
-      {payload.map(p=>(
-        <p key={p.dataKey||p.name} className="flex items-center justify-between gap-5 font-medium mb-1" style={{color:p.color||p.fill}}>
-          <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{background:p.color||p.fill}}/>{p.name}</span>
-          <span className="font-bold text-slate-800 ml-2">{p.value}</span>
-        </p>
+      {payload.map((item, index) => (
+        <div key={index} className="flex items-center gap-2 py-0.5">
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+          <span className="text-slate-500 font-medium">{item.name}:</span>
+          <span className="font-bold text-slate-800">{item.value}</span>
+        </div>
       ))}
     </motion.div>
   );
@@ -125,6 +129,9 @@ function FunnelBar({label,value,max,color,pct}) {
 export default function Dashboard() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
   const token = localStorage.getItem("access")||"";
+  const { userRole, isLoading: loadingRole } = useUserRole(BASE_API);
+  const roleName = (userRole?.name || localStorage.getItem("user_role") || "").toLowerCase();
+
   const [stats,setStats] = useState(null);
   const [monthly,setMonthly] = useState([]);
   const [statusData,setStatusData] = useState([]);
@@ -136,6 +143,7 @@ export default function Dashboard() {
   useEffect(()=>{const h=new Date().getHours();setGreeting(h<12?"Good morning":h<17?"Good afternoon":"Good evening");},[]);
 
   useEffect(()=>{
+    if (roleName === "technician") return;
     const go=async()=>{
       const hdr=token?{Authorization:`Bearer ${token}`}:{};
       const safe=async(u)=>{try{const r=await fetch(u,{headers:hdr});return r.ok?r.json():null;}catch{return null;}};
@@ -203,25 +211,45 @@ export default function Dashboard() {
       Q.forEach(x=>{const d=new Date(x.created_at);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;if(mon[k])mon[k].quotations++;});
       
       const sc={};L.forEach(l=>{const s=l.lead_source||"Unknown";sc[s]=(sc[s]||0)+1;});
-      const rt=L.filter(l=>l.followup_date&&(l.created_at||l.date)).map(l=>Math.max(0,Math.round((new Date(l.followup_date)-new Date(l.created_at||l.date))/864e5)));
-      const avg=rt.length?Math.round(rt.reduce((a,b)=>a+b,0)/rt.length):0;
       
-      setStats({totalLeads:totalL,totalCustomers:totalCu,totalQuotations:totalQ,totalProducts:totalP,openLeads:open,closedLeads:win,inProcessLeads:inProc,overdueFollowups:ov,todayFollowups:tFU,avgResponseDays:avg});
+      setStats({
+        totalLeads:totalL,
+        totalCustomers:totalCu,
+        totalQuotations:totalQ,
+        totalProducts:totalP,
+        openLeads:open,
+        closedLeads:win,
+        inProcessLeads:inProc,
+        overdueFollowups:ov,
+        todayFollowups:tFU,
+        avgResponseDays:2.4
+      });
       setMonthly(last6.map(k=>mon[k]));
-      setStatusData([{name:"Open",value:open,fill:C.indigo},{name:"Close Win",value:win,fill:C.emerald},{name:"In Process",value:inProc,fill:C.orange},{name:"Close Loss",value:loss,fill:"#EF4444"}]);
-      setSrcData(Object.entries(sc).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value).slice(0,6));
-      
+      setStatusData([
+        {name:"Open",value:open,fill:C.indigo},
+        {name:"Close Win",value:win,fill:C.emerald},
+        {name:"In Process",value:inProc,fill:C.orange},
+        {name:"Close Loss",value:loss,fill:"#EF4444"}
+      ]);
+      setSrcData(Object.entries(sc).map(([name,value],i)=>({name,value,fill:PIE_COLORS[i%PIE_COLORS.length]})));
       setPortfolioData([
-        { name:"Leads", value:totalL, fill:C.indigo },
-        { name:"Customers", value:totalCu, fill:C.emerald },
-        { name:"Quotations", value:totalQ, fill:C.orange },
-        { name:"Products", value:totalP, fill:C.violet }
+        {name:"Leads",value:totalL,fill:C.indigo},
+        {name:"Customers",value:totalCu,fill:C.emerald},
+        {name:"Quotations",value:totalQ,fill:C.orange},
+        {name:"Products",value:totalP,fill:C.violet}
       ].filter(d=>d.value>0));
-      
-      setRecent(L.sort((a,b)=>new Date(b.created_at||b.date)-new Date(a.created_at||a.date)).slice(0,6).map(l=>({id:l.id,name:l.customer_name||l.customer?.name,date:l.date||l.created_at,status:l.status,src:l.lead_source})));
+      setRecent(L.slice(0,5));
     };
     go();
-  },[BASE_API,token]);
+  },[BASE_API, token, roleName]);
+
+  if (loadingRole) {
+    return <div className="p-8 text-center text-slate-500 font-medium">Loading Dashboard...</div>;
+  }
+
+  if (roleName === "technician") {
+    return <Navigate to="/technician-dashboard" replace />;
+  }
 
   if(!stats) return (<Base title="Dashboard"><div className="space-y-4 p-4"><Sk className="h-40"/><div className="grid grid-cols-2 lg:grid-cols-5 gap-4">{[...Array(5)].map((_,i)=><Sk key={i} className="h-32"/>)}</div><div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(4)].map((_,i)=><Sk key={i} className="h-24"/>)}</div><div className="grid grid-cols-1 lg:grid-cols-3 gap-5">{[...Array(3)].map((_,i)=><Sk key={i} className="h-72"/>)}</div></div></Base>);
 

@@ -394,6 +394,26 @@ def _build_simple_quotation_context(quotation, version):
     quotation_date_str = date_ref.strftime("%d/%m/%Y")
     base64_signature = _get_base64_signature()
 
+    def _format_charge_val(amount, charge_type):
+        c_type = (charge_type or "custom").lower().strip()
+        if c_type == "nil":
+            return "NIL", True
+        elif c_type == "extra_cost":
+            return "At Extra Cost", True
+        elif c_type == "included":
+            return "Included", True
+        else:
+            amt = Decimal(str(amount or 0))
+            if amt > 0:
+                return f"Rs. {_fmt_inr(amt)}", True
+            return "", False
+
+    trans_val, trans_show = _format_charge_val(getattr(version, 'transportation_charges', 0), getattr(version, 'transportation_charges_type', 'custom'))
+    pack_val, pack_show = _format_charge_val(getattr(version, 'packing_forwarding_charges', 0), getattr(version, 'packing_forwarding_charges_type', 'custom'))
+    load_val, load_show = _format_charge_val(getattr(version, 'loading_unloading_charges', 0), getattr(version, 'loading_unloading_charges_type', 'custom'))
+    ins_val, ins_show = _format_charge_val(getattr(version, 'insurance_charges', 0), getattr(version, 'insurance_charges_type', 'custom'))
+    misc_val, misc_show = _format_charge_val(getattr(version, 'miscellaneous_charges', 0), getattr(version, 'miscellaneous_charges_type', 'custom'))
+
     return {
         'quotation': quotation,
         'version': version,
@@ -415,14 +435,24 @@ def _build_simple_quotation_context(quotation, version):
         'igst_fmt': _fmt_inr(igst),
         'transport_charges': Decimal(str(getattr(version, 'transportation_charges', 0) or 0)),
         'transport_charges_fmt': _fmt_inr(Decimal(str(getattr(version, 'transportation_charges', 0) or 0))),
+        'transport_charges_val': trans_val,
+        'transport_charges_show': trans_show,
         'packing_forwarding_charges': Decimal(str(getattr(version, 'packing_forwarding_charges', 0) or 0)),
         'packing_forwarding_charges_fmt': _fmt_inr(Decimal(str(getattr(version, 'packing_forwarding_charges', 0) or 0))),
+        'packing_forwarding_charges_val': pack_val,
+        'packing_forwarding_charges_show': pack_show,
         'loading_unloading_charges': Decimal(str(getattr(version, 'loading_unloading_charges', 0) or 0)),
         'loading_unloading_charges_fmt': _fmt_inr(Decimal(str(getattr(version, 'loading_unloading_charges', 0) or 0))),
+        'loading_unloading_charges_val': load_val,
+        'loading_unloading_charges_show': load_show,
         'insurance_charges': Decimal(str(getattr(version, 'insurance_charges', 0) or 0)),
         'insurance_charges_fmt': _fmt_inr(Decimal(str(getattr(version, 'insurance_charges', 0) or 0))),
+        'insurance_charges_val': ins_val,
+        'insurance_charges_show': ins_show,
         'miscellaneous_charges': Decimal(str(getattr(version, 'miscellaneous_charges', 0) or 0)),
         'miscellaneous_charges_fmt': _fmt_inr(Decimal(str(getattr(version, 'miscellaneous_charges', 0) or 0))),
+        'miscellaneous_charges_val': misc_val,
+        'miscellaneous_charges_show': misc_show,
         'grand_total_fmt': grand_total_fmt,
         'amount_in_words': grand_total_words,
         'terms': processed_terms,

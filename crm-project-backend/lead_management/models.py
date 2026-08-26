@@ -98,9 +98,20 @@ class lead_management(models.Model):
     # Customer conversion tracking
     is_converted = models.BooleanField(default=False)
     converted_at = models.DateTimeField(blank=True, null=True)
+    # Customer Provided Layout & Site Details for Designer
+    site_location = models.CharField(max_length=500, blank=True, null=True, help_text="Site Location / Project Address")
+    site_requirement = models.TextField(blank=True, null=True, help_text="Site Requirements & Design Specifications")
+    customer_layout = models.FileField(upload_to="customer_layouts/", blank=True, null=True, help_text="Layout drawing/file provided by customer")
+    customer_layout_name = models.CharField(max_length=255, blank=True, null=True)
+    customer_layout_url = models.TextField(blank=True, null=True, help_text="Data URL or Base64 or external link of customer layout")
+
+    # CAD Design File
+    cad_file = models.FileField(upload_to="lead_cad_files/", blank=True, null=True)
+    cad_file_name = models.CharField(max_length=255, blank=True, null=True)
     # Designer & Drawing Workflow Flags (boolean 0/1)
     is_sent = models.BooleanField(default=False)
     is_received = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

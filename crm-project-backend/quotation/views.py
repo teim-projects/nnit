@@ -484,6 +484,11 @@ def simple_quotation_detail(request, pk):
         "loading_unloading_charges": float(getattr(version, "loading_unloading_charges", 0) or 0) if version else 0,
         "insurance_charges": float(getattr(version, "insurance_charges", 0) or 0) if version else 0,
         "miscellaneous_charges": float(getattr(version, "miscellaneous_charges", 0) or 0) if version else 0,
+        "transportation_charges_type": getattr(version, "transportation_charges_type", "custom") if version else "custom",
+        "packing_forwarding_charges_type": getattr(version, "packing_forwarding_charges_type", "custom") if version else "custom",
+        "loading_unloading_charges_type": getattr(version, "loading_unloading_charges_type", "custom") if version else "custom",
+        "insurance_charges_type": getattr(version, "insurance_charges_type", "custom") if version else "custom",
+        "miscellaneous_charges_type": getattr(version, "miscellaneous_charges_type", "custom") if version else "custom",
         "grand_total": float(version.grand_total) if version else 0,
         "items": items_list
     }
@@ -509,6 +514,12 @@ def simple_quotation_update(request, pk):
     load_chg = float(data.get("loading_unloading_charges") or data.get("loading_charges") or 0)
     ins_chg = float(data.get("insurance_charges") or data.get("insurance") or 0)
     misc_chg = float(data.get("miscellaneous_charges") or data.get("miscellaneous") or 0)
+
+    trans_type = data.get("transportation_charges_type") or "custom"
+    pack_type = data.get("packing_forwarding_charges_type") or "custom"
+    load_type = data.get("loading_unloading_charges_type") or "custom"
+    ins_type = data.get("insurance_charges_type") or "custom"
+    misc_type = data.get("miscellaneous_charges_type") or "custom"
 
     raw_items = data.get("items")
     if not raw_items or not isinstance(raw_items, list) or len(raw_items) == 0:
@@ -555,6 +566,11 @@ def simple_quotation_update(request, pk):
         loading_unloading_charges=load_chg,
         insurance_charges=ins_chg,
         miscellaneous_charges=misc_chg,
+        transportation_charges_type=trans_type,
+        packing_forwarding_charges_type=pack_type,
+        loading_unloading_charges_type=load_type,
+        insurance_charges_type=ins_type,
+        miscellaneous_charges_type=misc_type,
     )
 
     total_subtotal = 0.0

@@ -19,10 +19,41 @@ class AMCCycleSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class SimpleTechnicianSerializer(serializers.ModelSerializer):
+    class Meta:
+        from service_management.models import Technician
+        model = Technician
+        fields = ('id', 'technician_id', 'name', 'phone', 'specialization', 'status')
+
+
+class SimpleServiceRequestSerializer(serializers.ModelSerializer):
+    assigned_technician_details = SimpleTechnicianSerializer(source="assigned_technician", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    service_type_display = serializers.CharField(source="get_service_type_display", read_only=True)
+
+    class Meta:
+        from service_management.models import ServiceRequest
+        model = ServiceRequest
+        fields = (
+            'id', 'service_id', 'service_type', 'service_type_display', 'title',
+            'product_name', 'description', 'status', 'status_display', 'priority',
+            'scheduled_date', 'assigned_technician', 'assigned_technician_details',
+            'service_cost', 'resolution_notes'
+        )
+
+
 class AMCContractSerializer(serializers.ModelSerializer):
     customer_details = CustomerSerializer(source="customer", read_only=True)
     support_coordinator_details = CustomUserDetailsSerializer(
         source="support_coordinator",
+        read_only=True
+    )
+    assigned_technician_details = SimpleTechnicianSerializer(
+        source="assigned_technician",
+        read_only=True
+    )
+    linked_service_details = SimpleServiceRequestSerializer(
+        source="linked_service",
         read_only=True
     )
     created_by_details = CustomUserDetailsSerializer(
@@ -30,6 +61,7 @@ class AMCContractSerializer(serializers.ModelSerializer):
         read_only=True
     )
     cycles = AMCCycleSerializer(many=True, read_only=True)
+    service_requests = SimpleServiceRequestSerializer(many=True, read_only=True)
     amc_type_display = serializers.CharField(source="get_amc_type_display", read_only=True)
     payment_frequency_display = serializers.CharField(source="get_payment_frequency_display", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
@@ -78,6 +110,9 @@ class AMCContractSerializer(serializers.ModelSerializer):
             )
             amc.sync_active_cycle_data()
 
+        # Generate scheduled service visits & calculate per_visit_amount
+        amc.generate_schedule()
+
         return amc
 
     @transaction.atomic
@@ -103,3 +138,93 @@ class AMCContractSerializer(serializers.ModelSerializer):
         return instance
 
 
+
+
+# ============================================================================
+# NEW SERIALIZERS FOR SERVICE SCHEDULES, VISITS, AND RENEWALS
+# ============================================================================
+
+from .models import AMCServiceSchedule, AMCServiceVisit, AMCRenewal
+
+
+class AMCServiceScheduleSerializer(serializers.ModelSerializer):
+    """Serializer for AMC Service Schedule (planned dates)"""
+    amc_contract_id = serializers.CharField(source='amc_contract.contract_id', read_only=True)
+    customer_name = serializers.CharField(source='amc_contract.customer.name', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = AMCServiceSchedule
+        fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'reminder_sent_at', 'completed_at', 'approved_at')
+
+
+class AMCServiceVisitSerializer(serializers.ModelSerializer):
+    """Serializer for AMC Service Visit (actual visits with technician allocation)"""
+    amc_contract_id = serializers.CharField(source='amc_contract.contract_id', read_only=True)
+    customer_name = serializers.CharField(source='amc_contract.customer.name', read_only=True)
+    customer_details = CustomerSerializer(source='amc_contract.customer', read_only=True)
+    
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    technician_details = SimpleTechnicianSerializer(source='technicians', many=True, read_only=True)
+    
+    crm_service_details = SimpleServiceRequestSerializer(source='crm_service', read_only=True)
+    allocation_status_display = serializers.CharField(source='get_allocation_status_display', read_only=True)
+    
+    class Meta:
+        model = AMCServiceVisit
+        fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at', 'crm_service_created_at')
+    
+    def validate(self, data):
+        """Validate that service date is not in the past (unless rescheduling)"""
+        service_date = data.get('service_date')
+        if service_date and service_date < timezone.now().date():
+            if not self.instance:  # Creating new visit
+                raise serializers.ValidationError({
+                    'service_date': 'Service date cannot be in the past'
+                })
+        return data
+
+
+class AMCRenewalSerializer(serializers.ModelSerializer):
+    """Serializer for AMC Renewal requests"""
+    amc_contract_id = serializers.CharField(source='amc_contract.contract_id', read_only=True)
+    customer_name = serializers.CharField(source='amc_contract.customer.name', read_only=True)
+    customer_details = CustomerSerializer(source='amc_contract.customer', read_only=True)
+    
+    admin_action_by_name = serializers.CharField(source='admin_action_by.get_full_name', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    new_cycle_details = AMCCycleSerializer(source='new_cycle', read_only=True)
+    
+    class Meta:
+        model = AMCRenewal
+        fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at', 'customer_requested_at', 'admin_action_at')
+
+
+# ============================================================================
+# DASHBOARD SERIALIZERS
+# ============================================================================
+
+class AMCDashboardStatsSerializer(serializers.Serializer):
+    """Serializer for dashboard statistics"""
+    total_contracts = serializers.IntegerField()
+    active_contracts = serializers.IntegerField()
+    expiring_soon = serializers.IntegerField()
+    expired_contracts = serializers.IntegerField()
+    renewal_requests_pending = serializers.IntegerField()
+    upcoming_visits_count = serializers.IntegerField()
+    visits_today = serializers.IntegerField()
+    visits_this_week = serializers.IntegerField()
+
+
+class CalendarEventSerializer(serializers.Serializer):
+    """Serializer for calendar events"""
+    title = serializers.CharField()
+    start = serializers.DateField()
+    end = serializers.DateField(required=False, allow_null=True)
+    backgroundColor = serializers.CharField()
+    borderColor = serializers.CharField()
+    extendedProps = serializers.DictField()
