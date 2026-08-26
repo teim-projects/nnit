@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     # 'inventory',  # Temporarily disabled - module removed
     'amc',
     'parking_products',
+    'service_management',
 ] 
 
 SITE_ID = 1
@@ -248,14 +249,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Password reset frontend URL
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173/password-reset-confirm')
 
-# ✅ SMTP Email Configuration
+# ✅ SMTP Email Configuration (Gmail App Password)
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@nnitparking.com')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'connectteim@gmail.com')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'ywthqsqgnzmuzpdn')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'connectteim@gmail.com')
 
 
 # JWT settings 

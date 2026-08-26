@@ -17,6 +17,8 @@ export default function AddCategoryModal({ open, onClose, onSuccess, baseApi, to
     { value: 'puzzle_parking', label: 'Puzzle Parking', icon: '🧩' },
     { value: 'tower_parking', label: 'Tower Parking', icon: '🏢' },
     { value: 'pit_parking', label: 'Pit Parking', icon: '⬇️' },
+    { value: 'pit_stack_parking', label: 'Pit Stack Parking', icon: '⬇️🏗️' },
+    { value: 'pit_puzzle_parking', label: 'Pit Puzzle Parking', icon: '⬇️🧩' },
     { value: 'cantilever', label: 'Cantilever Parking', icon: '🔧' },
   ];
 

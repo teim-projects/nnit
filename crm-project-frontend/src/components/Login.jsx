@@ -699,8 +699,26 @@ export default function App({ initialMode }) {
       }
       if (data.access) localStorage.setItem("access", data.access);
       if (data.refresh) localStorage.setItem("refresh", data.refresh);
+
+      let targetPath = "/dashboard";
+      try {
+        const meRes = await fetch(`${BASE_API}/auth/me/`, {
+          headers: { Authorization: `Bearer ${data.access}` },
+        });
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          const rName = meData.role?.name || (meData.is_superuser ? "admin" : "staff");
+          localStorage.setItem("user_role", rName);
+          if (rName.toLowerCase() === "technician") {
+            targetPath = "/technician-dashboard";
+          }
+        }
+      } catch (e) {
+        console.error("Error fetching user role on login:", e);
+      }
+
       window.dispatchEvent(new Event("authChange"));
-      window.location.href = "/dashboard";
+      window.location.href = targetPath;
     } catch {
       setError("Unable to connect to server. Please try again.");
     } finally {

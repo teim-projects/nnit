@@ -76,6 +76,13 @@ class QuotationVersion(models.Model):
     insurance_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     miscellaneous_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
+    # Additional Charges Types ("custom", "extra_cost", "nil", "included")
+    transportation_charges_type = models.CharField(max_length=50, default="custom", blank=True, null=True)
+    packing_forwarding_charges_type = models.CharField(max_length=50, default="custom", blank=True, null=True)
+    loading_unloading_charges_type = models.CharField(max_length=50, default="custom", blank=True, null=True)
+    insurance_charges_type = models.CharField(max_length=50, default="custom", blank=True, null=True)
+    miscellaneous_charges_type = models.CharField(max_length=50, default="custom", blank=True, null=True)
+
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 

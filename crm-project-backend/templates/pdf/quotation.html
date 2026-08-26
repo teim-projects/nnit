@@ -610,34 +610,34 @@
                     </tr>
                     {% endif %}
 
-                    {% if transport_charges and transport_charges > 0 %}
+                    {% if transport_charges_show %}
                     <tr>
                         <td colspan="5" class="total-label">Add: Transportation Charges</td>
-                        <td class="right-val">{{ transport_charges_fmt }}</td>
+                        <td class="right-val">{{ transport_charges_val }}</td>
                     </tr>
                     {% endif %}
-                    {% if packing_forwarding_charges and packing_forwarding_charges > 0 %}
+                    {% if packing_forwarding_charges_show %}
                     <tr>
                         <td colspan="5" class="total-label">Add: Packing &amp; Forwarding Charges</td>
-                        <td class="right-val">{{ packing_forwarding_charges_fmt }}</td>
+                        <td class="right-val">{{ packing_forwarding_charges_val }}</td>
                     </tr>
                     {% endif %}
-                    {% if loading_unloading_charges and loading_unloading_charges > 0 %}
+                    {% if loading_unloading_charges_show %}
                     <tr>
                         <td colspan="5" class="total-label">Add: Loading &amp; Unloading Charges</td>
-                        <td class="right-val">{{ loading_unloading_charges_fmt }}</td>
+                        <td class="right-val">{{ loading_unloading_charges_val }}</td>
                     </tr>
                     {% endif %}
-                    {% if insurance_charges and insurance_charges > 0 %}
+                    {% if insurance_charges_show %}
                     <tr>
                         <td colspan="5" class="total-label">Add: Insurance Charges</td>
-                        <td class="right-val">{{ insurance_charges_fmt }}</td>
+                        <td class="right-val">{{ insurance_charges_val }}</td>
                     </tr>
                     {% endif %}
-                    {% if miscellaneous_charges and miscellaneous_charges > 0 %}
+                    {% if miscellaneous_charges_show %}
                     <tr>
                         <td colspan="5" class="total-label">Add: Miscellaneous Charges</td>
-                        <td class="right-val">{{ miscellaneous_charges_fmt }}</td>
+                        <td class="right-val">{{ miscellaneous_charges_val }}</td>
                     </tr>
                     {% endif %}
 

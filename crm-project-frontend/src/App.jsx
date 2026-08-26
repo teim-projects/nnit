@@ -29,8 +29,12 @@ import RoleAccessManagement from './pages/RoleAccessManagement';
 import ReportsAnalytics from './pages/ReportsAnalytics';
 import DesignManagement from './pages/DesignManagement';
 import DesignerQueue from './pages/DesignerQueue';
-import ProductRequirementsList from './components/product-requirements/ProductRequirementsList';
-import ProductRequirementForm from './components/product-requirements/ProductRequirementForm';
+import TechnicianPage from './pages/TechnicianPage';
+import ServicePage from './pages/ServicePage';
+import TemplateManagement from './pages/TemplateManagement';
+import TechnicianWorkList from './pages/TechnicianWorkList';
+import CompletedWorkList from './pages/CompletedWorkList';
+import TechnicianDashboard from './pages/TechnicianDashboard';
 
 function AppRoutes() {
   const location  = useLocation();
@@ -71,10 +75,14 @@ function AppRoutes() {
         <main className={`flex-1 overflow-hidden ${hideNavbar ? "flex items-center justify-center" : ""}`}>
           <div className="w-full h-full overflow-auto">
             <Routes>
-              <Route path="/"  element={isLoggedIn ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
-              <Route path="/login"    element={isLoggedIn ? <Navigate to="/dashboard" replace /> : <Login />} />
+              <Route path="/"  element={isLoggedIn ? (localStorage.getItem("user_role") === "technician" ? <Navigate to="/technician-dashboard" replace /> : <Navigate to="/dashboard" replace />) : <Navigate to="/login" replace />} />
+              <Route path="/login"    element={isLoggedIn ? (localStorage.getItem("user_role") === "technician" ? <Navigate to="/technician-dashboard" replace /> : <Navigate to="/dashboard" replace />) : <Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
+              <Route path="/technician-work-list" element={<TechnicianWorkList />} />
+              <Route path="/work-list" element={<TechnicianWorkList />} />
+              <Route path="/completed-work-list" element={<CompletedWorkList />} />
               <Route path="/reports"  element={<ReportsAnalytics />} />
               <Route path="/reports-analytics" element={<ReportsAnalytics />} />
               <Route path="/profile"   element={<ProfileSection />} />
@@ -88,13 +96,13 @@ function AppRoutes() {
               <Route path="/parking-products"  element={<ParkingProducts />} />
               <Route path="/terms-conditions"  element={<TermsManagement />} />
               <Route path="/amc"       element={<AmcPage />} />
+              <Route path="/services"  element={<ServicePage />} />
+              <Route path="/technicians" element={<TechnicianPage />} />
               <Route path="/followup-management" element={<FollowupManagement />} />
               <Route path="/role-access" element={<RoleAccessManagement />} />
               <Route path="/design-drawings" element={<DesignManagement />} />
               <Route path="/designer-queue" element={<DesignerQueue />} />
-              <Route path="/product-requirements" element={<ProductRequirementsList />} />
-              <Route path="/product-requirements/add" element={<ProductRequirementForm />} />
-              <Route path="/product-requirements/edit/:id" element={<ProductRequirementForm />} />
+              <Route path="/templates" element={<TemplateManagement />} />
             </Routes>
           </div>
         </main>

@@ -404,12 +404,18 @@ class SimpleQuotationSerializer(serializers.Serializer):
         quotation.quotation_no = f"NNIT/{month}-{year}/{seq}"
         quotation.save(update_fields=["quotation_no"])
 
-        # Extract 5 additional charges
+        # Extract 5 additional charges & types
         trans_chg = float(validated_data.get("transportation_charges") or validated_data.get("transport_charges") or 0)
         pack_chg = float(validated_data.get("packing_forwarding_charges") or validated_data.get("packing_charges") or 0)
         load_chg = float(validated_data.get("loading_unloading_charges") or validated_data.get("loading_charges") or 0)
         ins_chg = float(validated_data.get("insurance_charges") or validated_data.get("insurance") or 0)
         misc_chg = float(validated_data.get("miscellaneous_charges") or validated_data.get("miscellaneous") or 0)
+
+        trans_type = validated_data.get("transportation_charges_type") or "custom"
+        pack_type = validated_data.get("packing_forwarding_charges_type") or "custom"
+        load_type = validated_data.get("loading_unloading_charges_type") or "custom"
+        ins_type = validated_data.get("insurance_charges_type") or "custom"
+        misc_type = validated_data.get("miscellaneous_charges_type") or "custom"
 
         # Create version
         version = QuotationVersion.objects.create(
@@ -423,6 +429,11 @@ class SimpleQuotationSerializer(serializers.Serializer):
             loading_unloading_charges=load_chg,
             insurance_charges=ins_chg,
             miscellaneous_charges=misc_chg,
+            transportation_charges_type=trans_type,
+            packing_forwarding_charges_type=pack_type,
+            loading_unloading_charges_type=load_type,
+            insurance_charges_type=ins_type,
+            miscellaneous_charges_type=misc_type,
         )
 
         total_subtotal = 0.0

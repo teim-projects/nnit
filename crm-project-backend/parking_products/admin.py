@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ProductCategory, ParkingProduct, ProductConfiguration, ProductRequirement
+from .models import ProductCategory, ParkingProduct, ProductConfiguration
 
 
 @admin.register(ProductCategory)
@@ -74,13 +74,3 @@ class ProductConfigurationAdmin(admin.ModelAdmin):
     list_filter = ['is_active', 'product__category']
     search_fields = ['product__product_name', 'variant_name']
     autocomplete_fields = ['product']
-
-
-
-@admin.register(ProductRequirement)
-class ProductRequirementAdmin(admin.ModelAdmin):
-    list_display = ['product', 'category', 'height', 'width', 'length', 'price', 'created_at']
-    list_filter = ['category', 'created_at']
-    search_fields = ['product__product_name', 'category__display_name']
-    autocomplete_fields = ['category', 'product']
-    ordering = ['-created_at']

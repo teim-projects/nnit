@@ -6,7 +6,9 @@ import { useModulePermissions } from "../hooks/useAuth";
 import AddCustomerForm from "../components/customers/AddCustomerForm";
 import CustomerDetails from "../components/customers/CustomerDetails";
 import { IoLogoWhatsapp } from "react-icons/io5";
-import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd, MdEdit } from "react-icons/md";
+import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd, MdEdit, MdFileUpload } from "react-icons/md";
+import BulkImportModal from "../components/BulkImportModal";
+import SendEmailModal from "../components/SendEmailModal";
 
 export default function Customer() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
@@ -35,6 +37,9 @@ export default function Customer() {
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [detailCustomerId, setDetailCustomerId] = useState(null);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailModalData, setEmailModalData] = useState({});
 
   const token = useMemo(() => (
     localStorage.getItem("access") ||
@@ -128,24 +133,30 @@ export default function Customer() {
   const actionsRenderer = useCallback((row) => {
     const handleWhatsApp = (e) => {
       e.stopPropagation();
-      const contact = row.contact_number;
-      if (!contact) {
-        Swal.fire({ icon: 'warning', title: 'No Contact', text: 'No contact number available' });
-        return;
-      }
-      const cleanNumber = contact.replace(/[^0-9]/g, '');
-      const whatsappNumber = cleanNumber.startsWith('91') ? cleanNumber : `91${cleanNumber}`;
-      window.open(`https://wa.me/${whatsappNumber}`, '_blank');
+      setEmailModalData({
+        recipientEmail: row.email || "",
+        recipientName: row.name || "",
+        recipientPhone: row.contact_number || "",
+        siteName: row.site_address || row.address || "",
+        type: "customer",
+        isCustomer: true,
+        initialChannel: "whatsapp"
+      });
+      setShowEmailModal(true);
     };
 
     const handleEmail = (e) => {
       e.stopPropagation();
-      const email = row.email;
-      if (!email) {
-        Swal.fire({ icon: 'warning', title: 'No Email', text: 'No email address available' });
-        return;
-      }
-      window.location.href = `mailto:${email}`;
+      setEmailModalData({
+        recipientEmail: row.email || "",
+        recipientName: row.name || "",
+        recipientPhone: row.contact_number || "",
+        siteName: row.site_address || row.address || "",
+        type: "customer",
+        isCustomer: true,
+        initialChannel: "email"
+      });
+      setShowEmailModal(true);
     };
 
     const handleDeleteClick = async (e) => {
@@ -267,13 +278,22 @@ export default function Customer() {
             </div>
             <div className="flex items-center gap-3">
               {canCreate && (
-                <button
-                  onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm"
-                >
-                  <MdAdd className="w-5 h-5" />
-                  Add Customer
-                </button>
+                <>
+                  <button
+                    onClick={() => setShowBulkImportModal(true)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors shadow-sm"
+                  >
+                    <MdFileUpload className="w-5 h-5" />
+                    Import Customers (CSV)
+                  </button>
+                  <button
+                    onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm"
+                  >
+                    <MdAdd className="w-5 h-5" />
+                    Add Customer
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -303,6 +323,30 @@ export default function Customer() {
           fetchData(editingCustomer ? currentPage : 1);
           setEditingCustomer(null);
         }}
+      />
+
+      <BulkImportModal
+        open={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        onSuccess={() => fetchData(1)}
+        title="Import Customers (CSV)"
+        sampleCsvUrl={`${BASE_API}/lead/customer/sample-csv/`}
+        importEndpoint={`${BASE_API}/lead/customer/import-bulk/`}
+        token={token}
+        type="customers"
+      />
+
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        recipientPhone={emailModalData.recipientPhone}
+        siteName={emailModalData.siteName}
+        type={emailModalData.type || "customer"}
+        initialChannel={emailModalData.initialChannel || "email"}
+        baseApi={BASE_API}
+        token={token}
       />
     </Base>
   );
