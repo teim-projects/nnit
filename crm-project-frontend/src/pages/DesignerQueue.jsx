@@ -131,8 +131,11 @@ export default function DesignerQueue() {
     const deduplicatedList = [];
     const seenKeys = new Set();
 
-    // 1. Process LocalStorage requests first
+    // 1. Process LocalStorage requests first (ONLY IF EXPLICITLY SENT BY SALES PERSON)
     localReqs.forEach(r => {
+      const isSent = r.is_sent === 1 || r.is_sent === true || r.is_sent === "1" || r.is_sent === "true";
+      if (!isSent) return; // Skip unsent leads
+
       const key = String(r.leadId || r.id || r.customerName || "").trim().toLowerCase();
       if (key && !seenKeys.has(key)) {
         seenKeys.add(key);
@@ -152,7 +155,7 @@ export default function DesignerQueue() {
           customerLayoutUrl: r.customerLayoutUrl || "",
           sentDate: r.sentDate || new Date().toLocaleString(),
           status: r.status || "pending_drawing",
-          is_sent: r.is_sent ?? 1,
+          is_sent: 1,
           is_received: r.is_received ?? 0,
           drawingTitle: r.drawingTitle || "",
           drawingSpecs: r.drawingSpecs || "",
@@ -164,8 +167,11 @@ export default function DesignerQueue() {
       }
     });
 
-    // 2. Add backend leads if not already in local storage list
+    // 2. Add backend leads ONLY IF l.is_sent is True/1 (Explicitly Sent by Sales Person)
     apiLeads.forEach(l => {
+      const isSent = l.is_sent === true || l.is_sent === 1 || l.is_sent === "true" || l.is_sent === "1";
+      if (!isSent) return; // Skip leads that Sales Person has NOT sent to designer!
+
       const idKey = String(l.id).toLowerCase();
       const drKey = `dr-${l.id}`;
       const custName = (l.contact_person_name || l.customer_name || l.customer?.name || "").trim().toLowerCase();
