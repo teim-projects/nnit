@@ -1,7 +1,8 @@
 import { useEffect, useState, forwardRef, useImperativeHandle, useCallback } from "react";
 import axios from "axios";
-import { FaWhatsapp } from "react-icons/fa";
+import { IoLogoWhatsapp } from "react-icons/io5";
 import { MdRemoveRedEye, MdDownload, MdEdit, MdDelete, MdEmail, MdHistory } from "react-icons/md";
+import SendEmailModal from "../SendEmailModal";
 
 const BASE_API = import.meta.env.VITE_BASE_API_URL;
 console.log("InvoiceList BASE_API =", BASE_API);
@@ -136,6 +137,36 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {}, canCreate = true,
     }
   };
 
+  const handleWhatsApp = (inv) => {
+    setEmailModalData({
+      recipientEmail: inv.buyer_email || "",
+      recipientName: inv.buyer_name || "",
+      recipientPhone: inv.buyer_mobile || inv.buyer_contact || "",
+      siteName: inv.consignee_name || "Site",
+      requirements: "Tax Invoice Delivery",
+      quotationNo: inv.invoice_no || "",
+      amount: inv.grand_total ? `₹${parseFloat(inv.grand_total).toLocaleString("en-IN")}` : "",
+      type: "invoice",
+      initialChannel: "whatsapp"
+    });
+    setShowEmailModal(true);
+  };
+
+  const handleEmail = (inv) => {
+    setEmailModalData({
+      recipientEmail: inv.buyer_email || "",
+      recipientName: inv.buyer_name || "",
+      recipientPhone: inv.buyer_mobile || inv.buyer_contact || "",
+      siteName: inv.consignee_name || "Site",
+      requirements: "Tax Invoice Delivery",
+      quotationNo: inv.invoice_no || "",
+      amount: inv.grand_total ? `₹${parseFloat(inv.grand_total).toLocaleString("en-IN")}` : "",
+      type: "invoice",
+      initialChannel: "email"
+    });
+    setShowEmailModal(true);
+  };
+
   /* ================= DELETE ================= */
 
   const handleDeleteInvoice = async (invoiceId) => {
@@ -234,11 +265,11 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {}, canCreate = true,
                       <MdDownload />
                     </button>
 
-                    <button className="px-2 py-1 bg-green-200 text-green-800 rounded hover:bg-green-300" title="WhatsApp">
-                      <FaWhatsapp />
+                    <button onClick={() => handleWhatsApp(inv)} className="px-2 py-1 bg-green-200 text-green-800 rounded hover:bg-green-300 transition-colors" title="Send WhatsApp">
+                      <IoLogoWhatsapp />
                     </button>
 
-                    <button className="px-2 py-1 bg-sky-200 text-sky-800 rounded hover:bg-sky-300" title="Email">
+                    <button onClick={() => handleEmail(inv)} className="px-2 py-1 bg-sky-200 text-sky-800 rounded hover:bg-sky-300 transition-colors" title="Send Email">
                       <MdEmail />
                     </button>
 
@@ -262,6 +293,23 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {}, canCreate = true,
           </tbody>
         </table>
       </div>
+
+      {/* Send Email / WhatsApp Modal */}
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        recipientPhone={emailModalData.recipientPhone}
+        siteName={emailModalData.siteName}
+        requirements={emailModalData.requirements}
+        quotationNo={emailModalData.quotationNo}
+        amount={emailModalData.amount}
+        type="invoice"
+        initialChannel={emailModalData.initialChannel || "email"}
+        baseApi={BASE_API}
+        token={localStorage.getItem("access")}
+      />
     </div>
   );
 });

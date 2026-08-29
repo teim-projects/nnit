@@ -36,6 +36,17 @@ class Quotation(models.Model):
     site_name = models.CharField(max_length=255, blank=True, null=True)
     thank_you_note = models.TextField(max_length=400)
 
+    sales_person = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="quotations_as_sales_person",
+        verbose_name="Sales Person"
+    )
+    sales_person_name = models.CharField(max_length=200, blank=True, null=True, verbose_name="Sales Person Name")
+    sales_person_phone = models.CharField(max_length=50, blank=True, null=True, verbose_name="Sales Person Mobile")
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

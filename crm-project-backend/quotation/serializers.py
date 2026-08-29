@@ -89,6 +89,9 @@ class QuotationSerializer(serializers.ModelSerializer):
     customer_contact = serializers.CharField(
         source="customer.contact_number", read_only=True
     )
+    customer_email = serializers.CharField(
+        source="customer.email", read_only=True, default=""
+    )
     
     branch_name = serializers.CharField(
         source="branch.name", read_only=True
@@ -342,9 +345,16 @@ class SimpleQuotationItemSerializer(serializers.Serializer):
 
 
 class SimpleQuotationSerializer(serializers.Serializer):
-    customer = serializers.IntegerField()
+    customer = serializers.IntegerField(required=False, allow_null=True)
+    contact_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    company_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    email = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     items = SimpleQuotationItemSerializer(many=True, required=False)
-    
+
+    sales_person = serializers.IntegerField(required=False, allow_null=True)
+    sales_person_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    sales_person_phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
     # Legacy fields for backward compatibility
     parking_product_id = serializers.IntegerField(required=False)
     quantity = serializers.IntegerField(min_value=1, required=False, default=1)
@@ -361,9 +371,33 @@ class SimpleQuotationSerializer(serializers.Serializer):
     def create(self, validated_data):
         from parking_products.models import ParkingProduct
         from lead_management.models import Customer
+        from django.contrib.auth import get_user_model
+        from django.db import models
+        User = get_user_model()
+
         request = self.context.get("request")
 
-        customer = Customer.objects.get(pk=validated_data["customer"])
+        cust_id = validated_data.get("customer")
+        customer = None
+        if cust_id:
+            customer = Customer.objects.filter(pk=cust_id).first()
+
+        if not customer:
+            mob = (validated_data.get("contact_number") or "").strip()
+            if mob:
+                customer = Customer.objects.filter(
+                    models.Q(contact_number__icontains=mob) |
+                    models.Q(secondary_contact_number__icontains=mob)
+                ).first()
+
+        if not customer:
+            cust_name = validated_data.get("company_name") or "New Customer"
+            customer = Customer.objects.create(
+                name=cust_name,
+                contact_number=validated_data.get("contact_number") or None,
+                email=validated_data.get("email") or None,
+                is_lead_only=False
+            )
         items_input = validated_data.get("items")
         gst_percent = float(validated_data.get("gst_percent", 18))
 
@@ -387,6 +421,16 @@ class SimpleQuotationSerializer(serializers.Serializer):
         first_product = ParkingProduct.objects.get(pk=first_product_id)
         subject = f"{first_product.product_name} - {first_product.category.display_name}"
 
+        # Resolve sales person
+        sp_id = validated_data.get("sales_person")
+        sp_obj = User.objects.filter(pk=sp_id).first() if sp_id else None
+        sp_name = validated_data.get("sales_person_name")
+        if not sp_name and sp_obj:
+            sp_name = f"{sp_obj.first_name or ''} {sp_obj.last_name or ''}".strip() or sp_obj.username
+        sp_phone = validated_data.get("sales_person_phone")
+        if not sp_phone and sp_obj:
+            sp_phone = getattr(sp_obj, 'mobile_no', '') or getattr(sp_obj, 'phone', '')
+
         # Create quotation
         quotation = Quotation.objects.create(
             quotation_no="TEMP",
@@ -394,6 +438,9 @@ class SimpleQuotationSerializer(serializers.Serializer):
             subject=subject,
             site_name="",
             thank_you_note="Thank you for choosing us. We look forward to serving you.",
+            sales_person=sp_obj,
+            sales_person_name=sp_name,
+            sales_person_phone=sp_phone,
         )
 
         from datetime import datetime as dt

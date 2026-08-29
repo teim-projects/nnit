@@ -155,13 +155,15 @@ class QuotationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='send-email')
     def send_email(self, request, pk=None):
-        """Send quotation via email"""
-        from django.core.mail import send_mail
+        """Send quotation via email with branded HTML template and PDF attachment"""
+        from django.core.mail import EmailMultiAlternatives
         from django.conf import settings
 
         quotation = self.get_object()
-        email = request.data.get('email', '')
-        note = request.data.get('note', '')
+        email = request.data.get('email') or request.data.get('recipient_email', '')
+        note = request.data.get('note') or request.data.get('text_content', '')
+        html_content = request.data.get('html_content', '')
+        subject = request.data.get('subject') or f"Quotation {quotation.quotation_no} - NNIT Car Parking Systems"
         version_id = request.data.get('version_id')
 
         if not email:
@@ -174,25 +176,63 @@ class QuotationViewSet(viewsets.ModelViewSet):
             version = QuotationVersion.objects.filter(quotation=quotation, is_active=True).first()
 
         try:
-            subject = f"Quotation {quotation.quotation_no} from Krishna Air"
-            body = f"Dear {quotation.customer_name},\n\n"
-            if note:
-                body += f"{note}\n\n"
-            body += f"Please find your quotation {quotation.quotation_no}"
-            if version:
-                body += f" ({version.version_no})"
-                body += f"\nTotal Amount: ₹{version.grand_total}"
-            body += "\n\nThank you for your business.\n\nKrishna Air"
+            cust_name = quotation.customer.name if (quotation.customer and quotation.customer.name) else "Valued Customer"
+            ver_name = version.version_no if version else ""
+            tot_amt = f"₹{version.grand_total:,.2f}" if (version and version.grand_total) else ""
 
-            send_mail(
-                subject,
-                body,
-                settings.DEFAULT_FROM_EMAIL,
-                [email],
-                fail_silently=False,
+            # Prepare text body cleanly without duplication
+            text_body = str(note).strip() if note else ""
+            if not text_body:
+                text_body = f"Dear {cust_name},\n\nPlease find attached Quotation {quotation.quotation_no}"
+                if ver_name:
+                    text_body += f" ({ver_name})"
+                if tot_amt:
+                    text_body += f"\nTotal Amount: {tot_amt}"
+                text_body += "\n\nThank you for choosing NNIT Car Parking Systems.\n\nBest Regards,\nNNIT Car Parking Systems Team"
+
+            HEADER_IMAGE_URL = "https://files.catbox.moe/4i67y4.jpg"
+            final_html = html_content
+
+            if not final_html or '<body' not in final_html:
+                final_html = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:'Segoe UI',sans-serif; background-color:#f4f6f9; margin:0; padding:20px; color:#333;">
+  <div style="max-width:600px; margin:0 auto; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.08); border:1px solid #e2e8f0;">
+    <img src="{HEADER_IMAGE_URL}" alt="NNIT Car Parking Systems Header" style="width:100%; display:block; margin:0; padding:0; border:0;" />
+    <div style="padding:25px; line-height:1.6; white-space:pre-wrap;">{text_body}</div>
+  </div>
+</body>
+</html>'''
+
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None) or getattr(settings, 'EMAIL_HOST_USER', 'connectteim@gmail.com')
+
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=text_body,
+                from_email=from_email,
+                to=[email],
             )
-            return Response({"detail": "Email sent successfully"}, status=status.HTTP_200_OK)
+            msg.attach_alternative(final_html, "text/html")
+
+            # Generate and attach Quotation PDF
+            if version:
+                try:
+                    pdf_bytes = build_quotation_pdf(
+                        quotation,
+                        version,
+                        base_url=request.build_absolute_uri('/')
+                    )
+                    clean_no = str(quotation.quotation_no).replace('/', '_').replace('\\', '_')
+                    filename = f"Quotation_{clean_no}_v{ver_name}.pdf"
+                    msg.attach(filename, pdf_bytes, 'application/pdf')
+                except Exception as pdf_err:
+                    logger.error(f"Could not generate PDF attachment for email: {str(pdf_err)}")
+
+            msg.send(fail_silently=False)
+            return Response({"detail": "Email sent successfully with PDF attachment"}, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(f"Error sending quotation email: {str(e)}")
             return Response({"detail": f"Email failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=["get"], url_path="latest-version")
@@ -411,6 +451,79 @@ class QuotationCustomerViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
 
 
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def fetch_lead_by_mobile(request):
+    """
+    GET /api/quotation/fetch-lead-by-mobile/?mobile=<number>
+    Searches Customer and lead_management by mobile number.
+    Returns complete lead & customer details for auto-filling Quotation form.
+    """
+    raw_mobile = request.query_params.get("mobile", "").strip()
+    if not raw_mobile:
+        return Response({"found": False, "detail": "Mobile number is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    import re
+    cleaned_mobile = re.sub(r'[^\d]', '', raw_mobile)
+    if cleaned_mobile.startswith('91') and len(cleaned_mobile) == 12:
+        cleaned_mobile = cleaned_mobile[2:]
+
+    from lead_management.models import Customer, lead_management
+    from django.db.models import Q
+
+    customer = Customer.objects.filter(
+        Q(contact_number__icontains=cleaned_mobile) |
+        Q(secondary_contact_number__icontains=cleaned_mobile)
+    ).first()
+
+    lead = None
+    if customer:
+        lead = customer.leads.order_by('-created_at', '-id').first()
+    else:
+        lead = lead_management.objects.filter(
+            Q(contact_person_number__icontains=cleaned_mobile) |
+            Q(customer__contact_number__icontains=cleaned_mobile)
+        ).select_related('customer', 'assign_to').order_by('-created_at', '-id').first()
+
+        if lead:
+            customer = lead.customer
+
+    if not customer and not lead:
+        return Response({"found": False, "detail": "No lead or customer found for this mobile number"}, status=status.HTTP_200_OK)
+
+    cust_id = customer.id if customer else None
+    cust_name = customer.name if customer else (lead.contact_person_name if lead else "")
+    contact_no = customer.contact_number if customer else (lead.contact_person_number if lead else cleaned_mobile)
+    company_name = (lead.company_name if lead else "") or getattr(customer, 'company_name', '') or cust_name
+    contact_person = (lead.contact_person_name if lead else "") or customer.poc_name or cust_name
+    email = customer.email if customer else ""
+    state = customer.state if customer else ""
+    city = customer.city if customer else ""
+    address = customer.address if customer else (lead.project_adderess if lead else "")
+
+    sp_id = lead.assign_to_id if (lead and lead.assign_to) else None
+    sp_name = f"{lead.assign_to.first_name or ''} {lead.assign_to.last_name or ''}".strip() if (lead and lead.assign_to) else ""
+    sp_phone = getattr(lead.assign_to, 'mobile_no', '') or getattr(lead.assign_to, 'phone', '') if (lead and lead.assign_to) else ""
+
+    return Response({
+        "found": True,
+        "customer_id": cust_id,
+        "customer_name": cust_name,
+        "contact_number": contact_no,
+        "company_name": company_name,
+        "contact_person": contact_person,
+        "email": email,
+        "state": state,
+        "city": city,
+        "address": address,
+        "sales_person_id": sp_id,
+        "sales_person_name": sp_name,
+        "sales_person_phone": sp_phone,
+        "project_name": lead.project_name if lead else ""
+    }, status=status.HTTP_200_OK)
+
+
 # =====================================================
 # SIMPLE QUOTATION VIEW
 # POST /quotation/simple-quotation/
@@ -471,6 +584,9 @@ def simple_quotation_detail(request, pk):
         "quotation_no": quotation.quotation_no,
         "customer": quotation.customer_id,
         "customer_name": quotation.customer.name if quotation.customer else "",
+        "sales_person": quotation.sales_person_id,
+        "sales_person_name": quotation.sales_person_name or "",
+        "sales_person_phone": quotation.sales_person_phone or "",
         "subject": quotation.subject,
         "quantity": first_item.quantity if first_item else 1,
         "unit_price": float(first_item.unit_price) if first_item else 0,
@@ -504,10 +620,22 @@ def simple_quotation_update(request, pk):
     Creates a new version with updated products/prices list.
     """
     from parking_products.models import ParkingProduct
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
 
     quotation = get_object_or_404(Quotation, pk=pk)
     data = request.data
     gst_percent = float(data.get("gst_percent", 18))
+
+    sp_id = data.get("sales_person")
+    if sp_id:
+        sp_obj = User.objects.filter(pk=sp_id).first()
+        quotation.sales_person = sp_obj
+
+    if "sales_person_name" in data:
+        quotation.sales_person_name = data.get("sales_person_name") or ""
+    if "sales_person_phone" in data:
+        quotation.sales_person_phone = data.get("sales_person_phone") or ""
 
     trans_chg = float(data.get("transportation_charges") or data.get("transport_charges") or 0)
     pack_chg = float(data.get("packing_forwarding_charges") or data.get("packing_charges") or 0)
@@ -541,7 +669,8 @@ def simple_quotation_update(request, pk):
 
     if first_product:
         quotation.subject = f"{first_product.product_name} - {first_product.category.display_name}"
-        quotation.save()
+    
+    quotation.save()
 
     # Deactivate old version
     old_version = quotation.versions.filter(is_active=True).first()

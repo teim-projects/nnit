@@ -109,14 +109,15 @@ function MiniCard({icon:Icon,label,value,color}) {
 }
 
 function FunnelBar({label,value,max,color,pct}) {
-  const w = max>0?Math.round((value/max)*100):0;
+  const w = max>0?Math.min(100, Math.max(3, Math.round((value/max)*100))):0;
+  const displayPct = pct!=null ? Math.min(100, Math.max(0, Math.round(pct))) : null;
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-slate-700">{label}</span>
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-slate-800">{value.toLocaleString()}</span>
-          {pct!=null&&<span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{background:color+"20",color}}>{pct}%</span>}
+          {displayPct!=null&&<span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{background:color+"20",color}}>{displayPct}%</span>}
         </div>
       </div>
       <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
@@ -253,12 +254,24 @@ export default function Dashboard() {
 
   if(!stats) return (<Base title="Dashboard"><div className="space-y-4 p-4"><Sk className="h-40"/><div className="grid grid-cols-2 lg:grid-cols-5 gap-4">{[...Array(5)].map((_,i)=><Sk key={i} className="h-32"/>)}</div><div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(4)].map((_,i)=><Sk key={i} className="h-24"/>)}</div><div className="grid grid-cols-1 lg:grid-cols-3 gap-5">{[...Array(3)].map((_,i)=><Sk key={i} className="h-72"/>)}</div></div></Base>);
 
-  const cRate=stats.totalLeads>0?Math.round((stats.totalCustomers/stats.totalLeads)*100):0;
-  const qRate=stats.totalLeads>0?Math.round((stats.totalQuotations/stats.totalLeads)*100):0;
-  const clRate=stats.totalLeads>0?Math.round((stats.closedLeads/stats.totalLeads)*100):0;
+  const funnelBase = Math.max(stats.totalLeads, stats.totalQuotations, stats.totalCustomers, stats.closedLeads, 1);
+  const cRate = stats.totalLeads > 0 
+    ? Math.min(100, Math.round((stats.closedLeads / stats.totalLeads) * 100)) 
+    : (stats.totalCustomers > 0 ? 100 : 0);
+  const qRate = funnelBase > 0 
+    ? Math.min(100, Math.round((stats.totalQuotations / funnelBase) * 100)) 
+    : 0;
+  const clRate = stats.totalLeads > 0 
+    ? Math.min(100, Math.round((stats.closedLeads / stats.totalLeads) * 100)) 
+    : 0;
   const sBg=s=>s==="open"?"bg-indigo-50 text-indigo-600":s==="closed"?"bg-emerald-50 text-emerald-600":"bg-orange-50 text-orange-600";
   const sCol=s=>s==="open"?C.indigo:s==="closed"?C.emerald:C.orange;
-  const funnelData=[{name:"Leads",val:stats.totalLeads,pct:null},{name:"Quotations",val:stats.totalQuotations,pct:qRate},{name:"Customers",val:stats.totalCustomers,pct:cRate},{name:"Closed",val:stats.closedLeads,pct:clRate}];
+  const funnelData=[
+    {name:"Leads",val:stats.totalLeads,pct:funnelBase>0?Math.min(100,Math.round((stats.totalLeads/funnelBase)*100)):0},
+    {name:"Quotations",val:stats.totalQuotations,pct:qRate},
+    {name:"Customers",val:stats.totalCustomers,pct:funnelBase>0?Math.min(100,Math.round((stats.totalCustomers/funnelBase)*100)):0},
+    {name:"Closed",val:stats.closedLeads,pct:clRate}
+  ];
 
   const containerVariants = {
     hidden: { opacity: 0 },
