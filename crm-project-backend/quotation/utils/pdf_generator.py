@@ -39,6 +39,39 @@ def _get_base64_logo():
     return _BASE64_LOGO_CACHE
 
 
+_BASE64_WATERMARK_CACHE = None
+
+def _get_base64_watermark():
+    """Get cached base64 encoded SVG watermark logo or load and cache it."""
+    global _BASE64_WATERMARK_CACHE
+    if _BASE64_WATERMARK_CACHE is not None:
+        return _BASE64_WATERMARK_CACHE
+
+    try:
+        candidate_paths = [
+            os.path.join(settings.BASE_DIR, 'static', 'images', 'logo-nnit.svg'),
+            os.path.join(settings.BASE_DIR, 'static', 'images', 'logo.svg'),
+        ]
+        found_path = None
+        for p in candidate_paths:
+            if os.path.exists(p):
+                found_path = p
+                break
+
+        if found_path:
+            with open(found_path, 'rb') as f:
+                _BASE64_WATERMARK_CACHE = base64.b64encode(f.read()).decode('utf-8')
+                logger.info("Watermark SVG cached successfully")
+        else:
+            logger.warning("Watermark SVG file not found")
+            _BASE64_WATERMARK_CACHE = ''
+    except Exception as e:
+        logger.warning(f"Could not load watermark SVG: {str(e)}")
+        _BASE64_WATERMARK_CACHE = ''
+
+    return _BASE64_WATERMARK_CACHE
+
+
 _BASE64_SIGNATURE_CACHE = None
 
 def _get_base64_signature():
@@ -386,10 +419,21 @@ def _build_simple_quotation_context(quotation, version):
 
     formatted_offer_no = f"{base_offer_no}RV{version_num}"
 
-    # Contact person / Signatory name for NNIT Car Parking Systems Pvt Ltd
-    contact_person_name = getattr(quotation, 'contact_person', None)
-    if not contact_person_name or contact_person_name.strip() == "" or (quotation.customer and contact_person_name == quotation.customer.name):
-        contact_person_name = "Nilesh Sali"
+    # Sales Person details for Offer Header Table
+    sp_name = quotation.sales_person_name or (
+        f"{quotation.sales_person.first_name or ''} {quotation.sales_person.last_name or ''}".strip()
+        if getattr(quotation, 'sales_person', None) else ""
+    )
+    if not sp_name or sp_name.strip() == "" or (quotation.customer and sp_name == quotation.customer.name):
+        sp_name = "Nilesh Sali"
+
+    sp_phone = quotation.sales_person_phone or (
+        getattr(quotation.sales_person, 'mobile_no', '') or getattr(quotation.sales_person, 'phone', '')
+        if getattr(quotation, 'sales_person', None) else ""
+    )
+
+    # Fixed Authorized Signatory for NNIT Car Parking Systems Pvt Ltd
+    contact_person_name = "Nilesh Sali"
 
     quotation_date_str = date_ref.strftime("%d/%m/%Y")
     base64_signature = _get_base64_signature()
@@ -457,8 +501,11 @@ def _build_simple_quotation_context(quotation, version):
         'amount_in_words': grand_total_words,
         'terms': processed_terms,
         'base64_logo': base64_logo,  # Cached base64 logo
+        'base64_watermark': _get_base64_watermark(),  # Cached base64 watermark SVG
         'base64_signature': base64_signature,
         'contact_person_name': contact_person_name,
+        'sales_person_name': sp_name,
+        'sales_person_phone': sp_phone,
         'quotation_date': quotation_date_str,
     }
 

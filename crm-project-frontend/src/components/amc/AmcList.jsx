@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { 
   MdEdit, 
   MdDelete, 
@@ -7,12 +7,16 @@ import {
   MdToggleOn, 
   MdToggleOff, 
   MdAssignmentInd, 
-  MdClose 
+  MdClose,
+  MdEmail,
+  MdHistory
 } from "react-icons/md";
+import { IoLogoWhatsapp } from "react-icons/io5";
 import Swal from "sweetalert2";
 import AddAmcForm from "./AddAmcForm";
 import ContractDetailModal from "./ContractDetailModal";
 import RenewAmcModal from "./RenewAmcModal";
+import SendEmailModal from "../SendEmailModal";
 
 export default function AmcList({ baseApi, token, filters = {} }) {
   const [contracts, setContracts] = useState([]);
@@ -23,10 +27,13 @@ export default function AmcList({ baseApi, token, filters = {} }) {
   const [filterType, setFilterType] = useState("all"); // all, active, expiring_soon, expired, scheduled, renewed
   const [detailContract, setDetailContract] = useState(null);
   const [renewContract, setRenewContract] = useState(null);
+  const [expandedCyclesRowId, setExpandedCyclesRowId] = useState(null);
 
   // Assign Technician Modal State
   const [assignAmcModal, setAssignAmcModal] = useState(null);
   const [selectedTechId, setSelectedTechId] = useState("");
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailModalData, setEmailModalData] = useState({});
 
   const fetchContracts = async () => {
     setLoading(true);
@@ -149,6 +156,38 @@ export default function AmcList({ baseApi, token, filters = {} }) {
     } catch (err) {
       Swal.fire({ icon: "error", title: "Error", text: err.message });
     }
+  };
+
+  const handleWhatsApp = (item) => {
+    const cust = item.customer_details || {};
+    setEmailModalData({
+      recipientEmail: cust.email || "",
+      recipientName: cust.name || cust.company_name || "",
+      recipientPhone: cust.contact_number || "",
+      siteName: cust.site_name || cust.city || "Site",
+      requirements: item.product || "AMC Contract",
+      quotationNo: item.contract_id || "AMC-001",
+      amount: item.annual_value ? `₹${parseFloat(item.annual_value).toLocaleString("en-IN")}` : "",
+      type: "amc",
+      initialChannel: "whatsapp"
+    });
+    setShowEmailModal(true);
+  };
+
+  const handleEmail = (item) => {
+    const cust = item.customer_details || {};
+    setEmailModalData({
+      recipientEmail: cust.email || "",
+      recipientName: cust.name || cust.company_name || "",
+      recipientPhone: cust.contact_number || "",
+      siteName: cust.site_name || cust.city || "Site",
+      requirements: item.product || "AMC Contract",
+      quotationNo: item.contract_id || "AMC-001",
+      amount: item.annual_value ? `₹${parseFloat(item.annual_value).toLocaleString("en-IN")}` : "",
+      type: "amc",
+      initialChannel: "email"
+    });
+    setShowEmailModal(true);
   };
 
   const handleAssignTechnicianSubmit = async (e) => {
@@ -304,7 +343,8 @@ export default function AmcList({ baseApi, token, filters = {} }) {
                   const assignedTech = item.assigned_technician_details;
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                    <Fragment key={item.id}>
+                      <tr className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-4 py-3 text-slate-500 font-medium">{index + 1}</td>
                       <td className="px-4 py-3 font-bold text-blue-600">{item.contract_id || "—"}</td>
                       <td className="px-4 py-3 font-semibold text-slate-800">{customerName}</td>
@@ -357,11 +397,36 @@ export default function AmcList({ baseApi, token, filters = {} }) {
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
+                            onClick={() => setExpandedCyclesRowId(prev => (prev === item.id ? null : item.id))}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              expandedCyclesRowId === item.id
+                                ? "bg-purple-600 text-white shadow-sm"
+                                : "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                            }`}
+                            title="Renewal History & Old AMC Versions"
+                          >
+                            <MdHistory size={16} />
+                          </button>
+                          <button
                             onClick={() => setDetailContract(item)}
                             className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
                             title="View Contract Details"
                           >
                             <MdVisibility size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleWhatsApp(item)}
+                            className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors"
+                            title="Send WhatsApp"
+                          >
+                            <IoLogoWhatsapp size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleEmail(item)}
+                            className="p-1.5 bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100 transition-colors"
+                            title="Send Email"
+                          >
+                            <MdEmail size={16} />
                           </button>
                           {item.amc_type === "warranty" && (
                             <button
@@ -420,6 +485,95 @@ export default function AmcList({ baseApi, token, filters = {} }) {
                         </div>
                       </td>
                     </tr>
+                    {expandedCyclesRowId === item.id && (
+                      <tr key={`cycles-${item.id}`} className="bg-slate-50/90 border-b border-purple-100">
+                        <td colSpan="12" className="px-6 py-4">
+                          <div className="bg-white p-4 rounded-xl border border-purple-200 shadow-sm space-y-3">
+                            {/* Header bar */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-purple-900 font-bold text-sm">
+                                <MdHistory className="w-5 h-5 text-purple-600" />
+                                <span>AMC Contract Cycles ({(item.cycles && item.cycles.length > 0) ? item.cycles.length : 1} cycles)</span>
+                              </div>
+
+                              <button
+                                onClick={() => setRenewContract(item)}
+                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+                              >
+                                <MdAutorenew className="w-4 h-4" /> Renew Contract Now
+                              </button>
+                            </div>
+
+                            {/* Cycles Table */}
+                            <div className="overflow-x-auto rounded-lg border border-slate-200">
+                              <table className="w-full text-xs text-left">
+                                <thead className="bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
+                                  <tr>
+                                    <th className="px-3 py-2">CYCLE</th>
+                                    <th className="px-3 py-2">STATUS</th>
+                                    <th className="px-3 py-2">PERIOD (START - END)</th>
+                                    <th className="px-3 py-2 text-right">ANNUAL VALUE (₹)</th>
+                                    <th className="px-3 py-2">PAYMENT FREQUENCY</th>
+                                    <th className="px-3 py-2">CREATED ON</th>
+                                    <th className="px-3 py-2">CREATED / RENEWED BY</th>
+                                    <th className="px-3 py-2">NOTES / REMARKS</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 bg-white">
+                                  {(item.cycles && item.cycles.length > 0
+                                    ? item.cycles
+                                    : [
+                                        {
+                                          cycle_number: 1,
+                                          status: item.status,
+                                          status_display: item.status_display || item.status,
+                                          start_date: item.start_date,
+                                          end_date: item.end_date,
+                                          annual_value: item.annual_value,
+                                          payment_frequency_display: item.payment_frequency_display || item.payment_frequency,
+                                          created_at: item.created_at,
+                                          created_by_details: item.created_by_details,
+                                          remarks: "Initial Contract Cycle",
+                                        },
+                                      ]
+                                  ).map((cyc, cIdx, arr) => (
+                                    <tr key={cyc.id || cIdx} className="hover:bg-slate-50 transition-colors">
+                                      <td className="px-3 py-2.5 font-bold text-purple-700">
+                                        Cycle #{cyc.cycle_number || (arr.length - cIdx)}
+                                      </td>
+                                      <td className="px-3 py-2.5 whitespace-nowrap">
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${getStatusBadgeClass(cyc.status)}`}>
+                                          {cyc.status_display || cyc.status}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2.5 whitespace-nowrap text-slate-700 font-medium">
+                                        {cyc.start_date || "—"} to {cyc.end_date || "—"}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-right font-bold text-emerald-700 whitespace-nowrap">
+                                        ₹{parseFloat(cyc.annual_value || 0).toLocaleString("en-IN")}
+                                      </td>
+                                      <td className="px-3 py-2.5 capitalize text-slate-600 whitespace-nowrap">
+                                        {cyc.payment_frequency_display || cyc.payment_frequency || "—"}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
+                                        {cyc.created_at ? cyc.created_at.split("T")[0] : "—"}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-slate-700 font-medium whitespace-nowrap">
+                                        {cyc.created_by_details?.first_name || cyc.created_by_details?.username || "System"}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-slate-500 max-w-xs truncate">
+                                        {cyc.remarks || (cIdx === arr.length - 1 ? "Initial Contract Cycle" : "—")}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })
               )}
@@ -541,6 +695,23 @@ export default function AmcList({ baseApi, token, filters = {} }) {
           </div>
         </div>
       )}
+
+      {/* Send Email / WhatsApp Modal */}
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        recipientPhone={emailModalData.recipientPhone}
+        siteName={emailModalData.siteName}
+        requirements={emailModalData.requirements}
+        quotationNo={emailModalData.quotationNo}
+        amount={emailModalData.amount}
+        type="amc"
+        initialChannel={emailModalData.initialChannel || "email"}
+        baseApi={baseApi}
+        token={token}
+      />
     </div>
   );
 }

@@ -418,6 +418,29 @@
             text-align: right;
         }
 
+        /* ============================================================
+               FIXED WATERMARK LOGO – REPEATS ON EVERY PAGE IN BACKGROUND
+            ============================================================ */
+        .fixed-watermark {
+            position: fixed;
+            top: 28%;
+            left: 10%;
+            width: 80%;
+            height: auto;
+            opacity: 0.08;
+            z-index: -1000;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .fixed-watermark img {
+            width: 100%;
+            max-width: 520px;
+            height: auto;
+            margin: 0 auto;
+            display: block;
+        }
+
         .sig-line {
             margin-top: 35px;
             border-top: 1px solid #000;
@@ -430,6 +453,13 @@
     </style>
 </head>
 <body>
+
+    <!-- REPEATING WATERMARK LOGO -->
+    <div class="fixed-watermark">
+        {% if base64_watermark %}
+        <img src="data:image/svg+xml;base64,{{ base64_watermark }}" alt="NNIT Watermark Logo">
+        {% endif %}
+    </div>
 
     <!-- REPEATING HEADER IMAGE -->
     <div class="fixed-header">
@@ -482,11 +512,11 @@
                 </tr>
                 <tr>
                     <td class="label-col">Contact Person:</td>
-                    <td class="val-col">Nilesh Sali</td>
+                    <td class="val-col">{{ sales_person_name|default:"Nilesh Sali" }}</td>
                 </tr>
                 <tr>
                     <td class="label-col">Contact No.:</td>
-                    <td class="val-col">9518377159</td>
+                    <td class="val-col">{{ sales_person_phone|default:"9518377159" }}</td>
                 </tr>
                 <tr>
                     <td class="label-col">Date:</td>

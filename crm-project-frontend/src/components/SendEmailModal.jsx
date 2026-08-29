@@ -14,6 +14,8 @@ export default function SendEmailModal({
   requirements = "",
   quotationNo = "",
   amount = "",
+  quotationId = null,
+  versionId = null,
   followupCount = 0,
   type = "lead",
   initialChannel = "email", // "email" or "whatsapp"
@@ -72,7 +74,7 @@ export default function SendEmailModal({
       setChannel(initialChannel || "email");
 
       const autoId = getAutoTemplateId({
-        type,
+        type: quotationId ? "quotation" : type,
         followupCount,
         quotationNo,
         amount,
@@ -85,7 +87,7 @@ export default function SendEmailModal({
         setSelectedTemplateId(matched.id);
       }
     }
-  }, [open, initialChannel, recipientEmail, recipientPhone, recipientName, followupCount, quotationNo, amount, type, availableTemplates]);
+  }, [open, initialChannel, recipientEmail, recipientPhone, recipientName, followupCount, quotationNo, amount, type, quotationId, availableTemplates]);
 
   // Helper to replace dynamic placeholders
   const replacePlaceholders = (textStr = "") => {
@@ -111,8 +113,8 @@ export default function SendEmailModal({
       setSubject(replacePlaceholders(currentTemplate.subject || ""));
       setCustomText(replacePlaceholders(currentTemplate.body || ""));
     } else {
-      setSubject(`Notice for ${recipientName || 'Customer'}`);
-      setCustomText(`Dear ${recipientName || 'Customer'},\n\nThank you for reaching out to NNIT Car Parking Systems.\n\nBest Regards,\nNNIT Team`);
+      setSubject(quotationNo ? `Quotation ${quotationNo} — NNIT Car Parking Systems` : `Notice for ${recipientName || 'Customer'}`);
+      setCustomText(`Dear ${recipientName || 'Customer'},\n\nPlease find details for ${quotationNo ? `Quotation ${quotationNo}` : 'your inquiry'}.\n\nBest Regards,\nNNIT Car Parking Systems`);
     }
   }, [currentTemplate, recipientName, recipientPhone, siteName, requirements, quotationNo, amount]);
 
@@ -181,28 +183,46 @@ export default function SendEmailModal({
 
     setSending(true);
     try {
-      const url = `${baseApi || import.meta.env.VITE_BASE_API_URL}/lead/send-email/`;
+      const authToken = token || localStorage.getItem("access");
+      const baseApiUrl = baseApi || import.meta.env.VITE_BASE_API_URL;
+      
+      let url = `${baseApiUrl}/lead/send-email/`;
+      let payload = {
+        recipient_email: emailTo,
+        subject: subject,
+        html_content: renderedHtml,
+        text_content: customText
+      };
+
+      if (quotationId) {
+        url = `${baseApiUrl}/api/quotation/quotation/${quotationId}/send-email/`;
+        payload = {
+          email: emailTo,
+          recipient_email: emailTo,
+          subject: subject,
+          html_content: renderedHtml,
+          text_content: customText,
+          note: customText,
+          version_id: versionId
+        };
+      }
+
       const res = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
         },
-        body: JSON.stringify({
-          recipient_email: emailTo,
-          subject: subject,
-          html_content: renderedHtml,
-          text_content: customText
-        })
+        body: JSON.stringify(payload)
       });
 
       const resData = await res.json();
 
-      if (!res.ok || resData.error) {
+      if (!res.ok || resData.error || (resData.detail && resData.detail.toLowerCase().includes("failed"))) {
         Swal.fire({
           icon: "error",
           title: "Email Delivery Failed",
-          text: resData.error || "Could not deliver email to recipient. Please check recipient address or credentials.",
+          text: resData.error || resData.detail || "Could not deliver email to recipient. Please check recipient address or credentials.",
           confirmButtonColor: "#ef4444"
         });
         return;
@@ -211,7 +231,7 @@ export default function SendEmailModal({
       Swal.fire({
         icon: "success",
         title: "Email Sent Successfully!",
-        text: resData.message || `Email dispatched to ${emailTo}`,
+        text: resData.message || resData.detail || `Email dispatched with PDF attachment to ${emailTo}`,
         confirmButtonColor: "#4f46e5"
       });
       onClose();

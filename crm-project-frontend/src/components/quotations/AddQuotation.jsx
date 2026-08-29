@@ -29,6 +29,18 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
   const [refLoading, setRefLoading] = useState(true);
 
   const [customerId, setCustomerId] = useState("");
+  const [salesPersons, setSalesPersons] = useState([]);
+  const [salesPersonId, setSalesPersonId] = useState("");
+  const [salesPersonName, setSalesPersonName] = useState("");
+  const [salesPersonPhone, setSalesPersonPhone] = useState("");
+
+  // Lead Information State
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [emailAddress, setEmailAddress] = useState("");
+  const [leadFetchLoading, setLeadFetchLoading] = useState(false);
+  const [leadFetchMsg, setLeadFetchMsg] = useState("");
+
   const [gstPercent, setGstPercent] = useState(18);
   const [selectedTerms, setSelectedTerms] = useState([]);
 
@@ -68,12 +80,19 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
     const load = async () => {
       setRefLoading(true);
       try {
-        const [custRes, prodRes] = await Promise.all([
+        const [custRes, prodRes, staffRes] = await Promise.all([
           api.get("lead/customer/?page_size=500&is_lead_only=false"),
           api.get("parking/products/?is_active=true&page_size=500"),
+          api.get("auth/staff/?page_size=200").catch(() => null),
         ]);
         setCustomers(Array.isArray(custRes.data) ? custRes.data : custRes.data?.results || []);
         setProducts(Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.results || []);
+        const sData = staffRes ? (Array.isArray(staffRes.data) ? staffRes.data : staffRes.data?.results || []) : [];
+        const salesOnly = sData.filter((u) => {
+          const rName = (typeof u.role === "object" ? u.role?.name : u.role) || "";
+          return rName.toLowerCase() === "sales";
+        });
+        setSalesPersons(salesOnly.length > 0 ? salesOnly : sData);
       } catch (e) {
         console.error("Reference data failed", e);
       } finally {
@@ -82,6 +101,62 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
     };
     load();
   }, []);
+
+  const handleSalesPersonSelect = (spId) => {
+    setSalesPersonId(spId);
+    if (!spId) return;
+    const found = salesPersons.find((sp) => String(sp.id) === String(spId));
+    if (found) {
+      const full = `${found.first_name || ""} ${found.last_name || ""}`.trim() || found.username || "";
+      const mob = found.mobile_no || found.phone || found.contact_number || "";
+      if (full) setSalesPersonName(full);
+      if (mob) setSalesPersonPhone(mob);
+    }
+  };
+
+  const handleCustomerSelect = (cId) => {
+    setCustomerId(cId);
+    if (!cId) return;
+    const c = customers.find((cust) => String(cust.id) === String(cId));
+    if (c) {
+      if (c.contact_number) setMobileNumber(c.contact_number);
+      if (c.company_name || c.name) setCompanyName(c.company_name || c.name);
+      if (c.email) setEmailAddress(c.email);
+    }
+  };
+
+  const handleMobileNumberChange = async (val) => {
+    setMobileNumber(val);
+    const clean = val.replace(/\D/g, "");
+    if (clean.length >= 10) {
+      setLeadFetchLoading(true);
+      setLeadFetchMsg("Fetching lead data...");
+      try {
+        const res = await api.get(`api/quotation/fetch-lead-by-mobile/?mobile=${clean}`);
+        if (res.data && res.data.found) {
+          const d = res.data;
+          if (d.customer_id) setCustomerId(String(d.customer_id));
+          if (d.company_name) setCompanyName(d.company_name);
+          if (d.email) setEmailAddress(d.email);
+          if (d.sales_person_id) {
+            setSalesPersonId(String(d.sales_person_id));
+            if (d.sales_person_name) setSalesPersonName(d.sales_person_name);
+            if (d.sales_person_phone) setSalesPersonPhone(d.sales_person_phone);
+          }
+          setLeadFetchMsg(`✓ Lead fetched: ${d.customer_name || d.company_name}`);
+        } else {
+          setLeadFetchMsg("No existing lead found. Enter details below.");
+        }
+      } catch (err) {
+        console.error("Mobile fetch error:", err);
+        setLeadFetchMsg("");
+      } finally {
+        setLeadFetchLoading(false);
+      }
+    } else {
+      setLeadFetchMsg("");
+    }
+  };
 
   // Pre-fill customer from lead
   useEffect(() => {
@@ -95,6 +170,9 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
       .then((res) => {
         const d = res.data;
         setCustomerId(String(d.customer ?? ""));
+        setSalesPersonId(d.sales_person ? String(d.sales_person) : "");
+        setSalesPersonName(d.sales_person_name || "");
+        setSalesPersonPhone(d.sales_person_phone || "");
         setGstPercent(d.gst_percent ?? 18);
 
         setTransportChargesType(d.transportation_charges_type || "custom");
@@ -245,8 +323,8 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
     e.preventDefault();
     setError(null);
 
-    if (!customerId) {
-      setError("Please select a customer.");
+    if (!customerId && !mobileNumber && !companyName) {
+      setError("Please enter a Mobile Number or select a Customer.");
       return;
     }
 
@@ -275,7 +353,13 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
     }));
 
     const payload = {
-      customer: parseInt(customerId),
+      customer: customerId ? parseInt(customerId) : null,
+      contact_number: mobileNumber,
+      company_name: companyName,
+      email: emailAddress,
+      sales_person: salesPersonId ? parseInt(salesPersonId) : null,
+      sales_person_name: salesPersonName,
+      sales_person_phone: salesPersonPhone,
       items: itemsPayload,
       gst_percent: parseFloat(gstPercent) || 18,
       transportation_charges: transportChargesType === "custom" ? (parseFloat(transportCharges) || 0) : 0,
@@ -351,23 +435,119 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
           ) : (
             <form id="quotation-modal-form" onSubmit={handleSubmit} className="space-y-4">
               
-              {/* Select Customer (Exact as screenshot) */}
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Select Customer <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition bg-white"
-                >
-                  <option value="">Choose customer</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.company_name ? `(${c.company_name})` : ""}
-                    </option>
-                  ))}
-                </select>
+              {/* LEAD INFORMATION SECTION (Exact match to uploaded image media_1788005386089.png) */}
+              <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    LEAD INFORMATION
+                  </span>
+                  {leadFetchLoading && (
+                    <span className="text-[11px] font-semibold text-indigo-600 animate-pulse">
+                      Fetching lead data...
+                    </span>
+                  )}
+                  {!leadFetchLoading && leadFetchMsg && (
+                    <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      {leadFetchMsg}
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {/* Mobile Number Field (Auto-fetches Lead/Customer data!) */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Mobile Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter mobile number to fetch lead data..."
+                      value={mobileNumber}
+                      onChange={(e) => handleMobileNumberChange(e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white shadow-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Customer / Company Name */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Customer / Company Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Customer / Company Name"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                      />
+                    </div>
+
+                    {/* Email Address */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="contact@company.com"
+                        value={emailAddress}
+                        onChange={(e) => setEmailAddress(e.target.value)}
+                        className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sales Representative / Executive Details */}
+              <div className="p-3 bg-indigo-50/50 rounded-lg border border-indigo-100 space-y-3">
+                <div className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                  👤 Sales Person / Executive Details
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Select Staff / Executive
+                    </label>
+                    <select
+                      value={salesPersonId}
+                      onChange={(e) => handleSalesPersonSelect(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-md border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                    >
+                      <option value="">Choose Staff / Executive</option>
+                      {salesPersons.map((sp) => (
+                        <option key={sp.id} value={sp.id}>
+                          {`${sp.first_name || ''} ${sp.last_name || ''}`.trim() || sp.username} {sp.mobile_no ? `(${sp.mobile_no})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Sales Person Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Nilesh Sali"
+                      value={salesPersonName}
+                      onChange={(e) => setSalesPersonName(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-md border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Sales Person Mobile No
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 9518377159"
+                      value={salesPersonPhone}
+                      onChange={(e) => setSalesPersonPhone(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-md border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Product Details Section (Supports multiple products in exact original layout!) */}

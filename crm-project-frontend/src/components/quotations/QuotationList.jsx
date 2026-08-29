@@ -6,9 +6,10 @@ import Swal from "sweetalert2";
 import {
   MdRemoveRedEye, MdDownload, MdEdit, MdDelete,
   MdEmail, MdExpandMore, MdExpandLess, MdPrint,
-  MdSend, MdClose, MdHistory, MdOutlineNavigateBefore, MdOutlineNavigateNext
+  MdClose, MdHistory, MdOutlineNavigateBefore, MdOutlineNavigateNext
 } from "react-icons/md";
-import { FaWhatsapp } from "react-icons/fa";
+import { IoLogoWhatsapp } from "react-icons/io5";
+import SendEmailModal from "../SendEmailModal";
 
 const BASE_API = import.meta.env.VITE_BASE_API_URL;
 console.log("QuotationList BASE_API =", BASE_API);
@@ -49,81 +50,13 @@ function VersionBadge({ versionNo, isLatest }) {
   );
 }
 
-// ── Send Quotation Modal ──────────────────────────────────────────────────────
-function SendModal({ quotation, version, onClose }) {
-  const [email, setEmail] = useState(quotation?.customer_contact || "");
-  const [note, setNote] = useState("");
-  const [sending, setSending] = useState(false);
-
-  const handleWhatsApp = () => {
-    const phone = quotation?.customer_contact?.replace(/\D/g, "") || "";
-    const text = encodeURIComponent(
-      `Dear ${quotation?.customer_name},\n\nPlease find your quotation ${quotation?.quotation_no} (${version?.version_no}).\n\n${note}`
-    );
-    window.open(`https://wa.me/91${phone}?text=${text}`, "_blank");
-    onClose();
-  };
-
-  const handleEmail = async () => {
-    setSending(true);
-    try {
-      await api.post(`api/quotation/quotation/${quotation.id}/send-email/`, {
-        email,
-        note,
-        version_id: version?.id,
-      });
-      Swal.fire({ icon: "success", text: "Email sent!", timer: 1500, showConfirmButton: false });
-      onClose();
-    } catch {
-      Swal.fire({ icon: "error", text: "Email failed. Check backend config." });
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute right-3 top-3 text-slate-500 hover:text-slate-900"><MdClose size={20} /></button>
-        <h3 className="text-lg font-bold mb-4">Send Quotation</h3>
-        <p className="text-sm text-slate-500 mb-4">
-          <span className="font-semibold text-slate-700">{quotation?.quotation_no}</span> — <VersionBadge versionNo={version?.version_no} isLatest={version?.is_active} />
-        </p>
-
-        <div className="space-y-3">
-          <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1">Email / Phone</label>
-            <input className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm"
-              value={email} onChange={e => setEmail(e.target.value)} placeholder="customer@email.com" />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1">Note (optional)</label>
-            <textarea className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm" rows={3}
-              value={note} onChange={e => setNote(e.target.value)} placeholder="Add a personal note..." />
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-5">
-          <button onClick={handleWhatsApp}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md text-sm font-medium">
-            <FaWhatsapp size={16} /> WhatsApp
-          </button>
-          <button onClick={handleEmail} disabled={sending}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium disabled:opacity-50">
-            <MdEmail size={16} /> {sending ? "Sending…" : "Email"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main QuotationList ────────────────────────────────────────────────────────
 export default function QuotationList({ onAdd, onEdit, filters = {}, canCreate = true, canEdit = true, canDelete = true }) {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expandedRows, setExpandedRows] = useState({});   // { [quotation.id]: bool }
-  const [sendModal, setSendModal] = useState(null);        // { quotation, version }
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailModalData, setEmailModalData] = useState({});
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const PAGE_SIZE = 15;
@@ -161,6 +94,49 @@ export default function QuotationList({ onAdd, onEdit, filters = {}, canCreate =
   const getLatestVersion = (q) => q.versions?.find((v) => v.is_active);
   const getOldVersions = (q) => (q.versions || []).filter((v) => !v.is_active).sort((a, b) => b.id - a.id);
   const toggleRow = (id) => setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  // ── WhatsApp & Email Modals (Matches Lead.jsx) ──────────────────────────────
+  const handleWhatsApp = (q, v) => {
+    const latest = getLatestVersion(q);
+    const ver = v || latest;
+    const custEmail = q.customer_email || (q.customer_contact && q.customer_contact.includes("@") ? q.customer_contact : "");
+    const custPhone = (q.customer_contact && !q.customer_contact.includes("@") ? q.customer_contact : "") || q.customer_phone || "";
+    setEmailModalData({
+      recipientEmail: custEmail,
+      recipientName: q.customer_name || q.customer?.name || "",
+      recipientPhone: custPhone,
+      siteName: q.site_name_detail || q.site_name || "",
+      requirements: q.subject || "Car Parking Systems & Automation",
+      quotationNo: q.quotation_no || "",
+      amount: ver?.grand_total ? `₹${fmt(ver.grand_total)}` : "",
+      quotationId: q.id,
+      versionId: ver?.id,
+      type: "quotation",
+      initialChannel: "whatsapp"
+    });
+    setShowEmailModal(true);
+  };
+
+  const handleEmail = (q, v) => {
+    const latest = getLatestVersion(q);
+    const ver = v || latest;
+    const custEmail = q.customer_email || (q.customer_contact && q.customer_contact.includes("@") ? q.customer_contact : "");
+    const custPhone = (q.customer_contact && !q.customer_contact.includes("@") ? q.customer_contact : "") || q.customer_phone || "";
+    setEmailModalData({
+      recipientEmail: custEmail,
+      recipientName: q.customer_name || q.customer?.name || "",
+      recipientPhone: custPhone,
+      siteName: q.site_name_detail || q.site_name || "",
+      requirements: q.subject || "Car Parking Systems & Automation",
+      quotationNo: q.quotation_no || "",
+      amount: ver?.grand_total ? `₹${fmt(ver.grand_total)}` : "",
+      quotationId: q.id,
+      versionId: ver?.id,
+      type: "quotation",
+      initialChannel: "email"
+    });
+    setShowEmailModal(true);
+  };
 
   // ── PDF actions ─────────────────────────────────────────────────────────────
   const openPDF = async (quotationId, versionId, download = false) => {
@@ -270,10 +246,10 @@ export default function QuotationList({ onAdd, onEdit, filters = {}, canCreate =
     });
   };
 
-  // ── Action buttons (reused for main row and version rows) ──────────────────
+  // ── Action buttons (reused for main row and version rows — matches Lead.jsx) ──
   function ActionButtons({ q, v, isLatest = false }) {
     return (
-      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+      <div className="flex items-center justify-center gap-1 flex-wrap">
         {/* View CAD / PDF Drawing */}
         <button onClick={() => handleViewQuotationDrawing(q)}
           title="View Attached Design Drawing"
@@ -302,11 +278,22 @@ export default function QuotationList({ onAdd, onEdit, filters = {}, canCreate =
           <MdDownload size={16} />
         </button>
 
-        {/* Send (WhatsApp / Email) */}
-        <button onClick={() => setSendModal({ quotation: q, version: v })}
-          title="Send"
-          className="p-1.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200">
-          <MdSend size={16} />
+        {/* Send WhatsApp (Matches Lead.jsx style) */}
+        <button
+          onClick={() => handleWhatsApp(q, v)}
+          className="inline-flex items-center px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium transition-colors"
+          title="Send WhatsApp"
+        >
+          <IoLogoWhatsapp className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Send Email with PDF Attachment (Matches Lead.jsx style) */}
+        <button
+          onClick={() => handleEmail(q, v)}
+          className="inline-flex items-center px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-medium transition-colors"
+          title="Send Email (PDF Attached)"
+        >
+          <MdEmail className="w-3.5 h-3.5" />
         </button>
 
         {/* Edit — only on latest version */}
@@ -527,14 +514,24 @@ export default function QuotationList({ onAdd, onEdit, filters = {}, canCreate =
         )}
       </div>
 
-      {/* ── Send Modal ───────────────────────────────────────────────────────── */}
-      {sendModal && (
-        <SendModal
-          quotation={sendModal.quotation}
-          version={sendModal.version}
-          onClose={() => setSendModal(null)}
-        />
-      )}
+      {/* ── Send Email / WhatsApp Modal (Matches Lead.jsx) ────────────────────── */}
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        recipientPhone={emailModalData.recipientPhone}
+        siteName={emailModalData.siteName}
+        requirements={emailModalData.requirements}
+        quotationNo={emailModalData.quotationNo}
+        amount={emailModalData.amount}
+        quotationId={emailModalData.quotationId}
+        versionId={emailModalData.versionId}
+        type="quotation"
+        initialChannel={emailModalData.initialChannel || "email"}
+        baseApi={BASE_API}
+        token={localStorage.getItem("access")}
+      />
     </div>
   );
 }
