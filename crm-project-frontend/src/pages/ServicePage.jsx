@@ -17,7 +17,10 @@ import {
   MdShoppingBag,
   MdVisibility,
   MdArticle,
-  MdPerson
+  MdPerson,
+  MdEmail,
+  MdMarkEmailRead,
+  MdNotificationsActive
 } from "react-icons/md";
 import Swal from "sweetalert2";
 
@@ -34,6 +37,7 @@ export default function ServicePage() {
   const [technicians, setTechnicians] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [productList, setProductList] = useState([]);
+  const [amcContracts, setAmcContracts] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -161,6 +165,19 @@ export default function ServicePage() {
         console.warn("Primary product lookup failed", e);
       }
       setProductList(fetchedProds);
+
+      // 4. Fetch Active AMC Contracts
+      try {
+        const amcRes = await fetch(`${baseApi}/amc/contracts/`, {
+          headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+        });
+        if (amcRes.ok) {
+          const data = await amcRes.json();
+          setAmcContracts(Array.isArray(data) ? data : data.results || []);
+        }
+      } catch (e) {
+        console.warn("AMC contract lookup failed", e);
+      }
 
     } catch (err) {
       console.error("Error loading dropdown data:", err);
@@ -352,6 +369,77 @@ export default function ServicePage() {
     }
   };
 
+  const handleSend2DayReminders = async () => {
+    const confirm = await Swal.fire({
+      title: "Send 2-Day Service Reminders?",
+      text: "This will send email notifications to Customer, Assigned Technician, and Admin for all services scheduled in 2 days.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Yes, Send Emails",
+      confirmButtonColor: "#4f46e5"
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const res = await fetch(`${baseApi}/api/services/service-requests/send-2day-reminders/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ days: 2 })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const count = data.summary?.processed || 0;
+        Swal.fire({
+          icon: "success",
+          title: "Reminders Dispatched",
+          text: `Processed 2-day reminder emails for ${count} scheduled service(s).`
+        });
+        fetchServices();
+      } else {
+        throw new Error("Failed to send 2-day reminders");
+      }
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "Error", text: err.message });
+    }
+  };
+
+  const handleSendSingle2DayReminder = async (srv) => {
+    const confirm = await Swal.fire({
+      title: `Send Reminder for ${srv.service_id}?`,
+      text: "Sends email notifications to Customer, Technician, and Admin right now.",
+      icon: "info",
+      showCancelButton: true,
+      confirmButtonText: "Send Email Now",
+      confirmButtonColor: "#4f46e5"
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const res = await fetch(`${baseApi}/api/services/service-requests/${srv.id}/send-2day-reminder/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+
+      if (res.ok) {
+        Swal.fire({ icon: "success", title: "Reminder Sent", text: `Emails dispatched for ${srv.service_id}.`, timer: 2000, showConfirmButton: false });
+        fetchServices();
+      } else {
+        throw new Error("Failed to send reminder email");
+      }
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "Error", text: err.message });
+    }
+  };
+
   // Helper to reliably get customer display name
   const getCustomerDisplayName = (srv) => {
     if (!srv) return "No Customer";
@@ -392,13 +480,23 @@ export default function ServicePage() {
               Create service calls, assign field technicians & track job resolution
             </p>
           </div>
-          <button
-            onClick={handleOpenAdd}
-            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium shadow-sm transition duration-150 shrink-0"
-          >
-            <MdAdd className="w-5 h-5" />
-            Create Service Call
-          </button>
+          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+            <button
+              onClick={handleSend2DayReminders}
+              title="Send 2-Day Prior Service Reminders to Customer, Technician & Admin"
+              className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl font-semibold border border-slate-200 shadow-sm transition duration-150 text-sm"
+            >
+              <MdNotificationsActive className="w-4 h-4 text-indigo-600" />
+              Send 2-Day Reminders
+            </button>
+            <button
+              onClick={handleOpenAdd}
+              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium shadow-sm transition duration-150"
+            >
+              <MdAdd className="w-5 h-5" />
+              Create Service Call
+            </button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -578,10 +676,19 @@ export default function ServicePage() {
                         </td>
 
                         <td className="py-3.5 px-4 text-xs font-medium text-slate-600 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 font-semibold text-slate-700">
                             <MdCalendarToday className="text-slate-400" />
                             {srv.scheduled_date || "Not Scheduled"}
                           </div>
+                          {srv.reminder_2days_sent ? (
+                            <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                              <MdMarkEmailRead className="w-3 h-3 text-emerald-600" /> Reminder Sent
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-[10px] text-slate-400">
+                              Reminder Pending
+                            </div>
+                          )}
                         </td>
 
                         <td className="py-3.5 px-4 whitespace-nowrap">
@@ -681,6 +788,13 @@ export default function ServicePage() {
                               <MdAssignmentInd className="w-4 h-4" />
                             </button>
                             <button
+                              onClick={() => handleSendSingle2DayReminder(srv)}
+                              title="Send 2-Day Service Reminder Email Now"
+                              className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                            >
+                              <MdEmail className="w-4 h-4" />
+                            </button>
+                            <button
                               onClick={() => handleOpenEdit(srv)}
                               title="Edit Service Call"
                               className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
@@ -755,9 +869,46 @@ export default function ServicePage() {
                   {formData.service_type === "amc" && (
                     <div className="mt-2.5 p-2.5 bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-lg flex items-center gap-2">
                       <span className="font-bold">⚙️ AMC Service Call:</span>
-                      <span>Covered under active AMC Contract (Service Cost: ₹0.00).</span>
+                      <span>Covered under active AMC Contract. Select contract below to auto-fill details.</span>
                     </div>
                   )}
+                </div>
+
+                {/* AMC Contract Link & Auto-fill */}
+                <div className="bg-indigo-50/70 p-3.5 rounded-xl border border-indigo-200">
+                  <label className="block text-xs font-bold text-indigo-900 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span>⚙️ Link AMC Contract (Auto-fills Customer, Product & Details)</span>
+                    <span className="text-[10px] text-indigo-600 font-semibold">Auto-Sync</span>
+                  </label>
+                  <select
+                    value={formData.amc_contract || ""}
+                    onChange={(e) => {
+                      const amcId = e.target.value;
+                      const selectedAMC = amcContracts.find(a => String(a.id) === String(amcId));
+                      if (selectedAMC) {
+                        setFormData(prev => ({
+                          ...prev,
+                          amc_contract: amcId,
+                          service_type: "amc",
+                          customer: selectedAMC.customer?.id || selectedAMC.customer || prev.customer,
+                          product_name: selectedAMC.product || prev.product_name,
+                          assigned_technician: selectedAMC.assigned_technician?.id || selectedAMC.assigned_technician || prev.assigned_technician,
+                          description: selectedAMC.default_work_description || selectedAMC.scope_of_support || prev.description,
+                          service_cost: selectedAMC.annual_value ? String(selectedAMC.annual_value) : prev.service_cost
+                        }));
+                      } else {
+                        setFormData(prev => ({ ...prev, amc_contract: amcId }));
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 border border-indigo-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white font-medium text-slate-800"
+                  >
+                    <option value="">-- Select Active AMC Contract to Auto-fill All Details --</option>
+                    {amcContracts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.contract_id || `AMC #${a.id}`} - {a.customer_name || a.customer?.name || "Customer"} ({a.product || "Product"}) - ₹{a.annual_value}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Customer Dropdown */}

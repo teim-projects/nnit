@@ -367,3 +367,42 @@ class ServiceRequestViewSet(viewsets.ModelViewSet):
             print(f"Error in customers lookup: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @action(detail=False, methods=['post'], url_path='send-2day-reminders')
+    def send_2day_reminders_batch(self, request):
+        """Triggers 2-day prior email reminders for all services scheduled 2 days from today."""
+        try:
+            from .notifications import process_all_2day_service_reminders
+            from datetime import datetime, timedelta
+            
+            days_str = request.data.get('days', 2)
+            date_str = request.data.get('date')
+            force = request.data.get('force', False)
+            
+            if date_str:
+                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            else:
+                target_date = timezone.now().date() + timedelta(days=int(days_str))
+                
+            summary = process_all_2day_service_reminders(target_date=target_date, force=bool(force))
+            return Response({
+                "message": f"Successfully processed 2-day reminders for target date {target_date}.",
+                "summary": summary
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], url_path='send-2day-reminder')
+    def send_2day_reminder_single(self, request, pk=None):
+        """Triggers 2-day email reminder for a single service request immediately."""
+        try:
+            from .notifications import send_2day_service_reminder
+            service = self.get_object()
+            res = send_2day_service_reminder(service)
+            return Response({
+                "message": f"Reminder emails dispatched for service {service.service_id or service.id}.",
+                "result": res
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+

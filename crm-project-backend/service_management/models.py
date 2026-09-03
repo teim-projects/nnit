@@ -146,6 +146,8 @@ class ServiceRequest(models.Model):
     customer_signature = models.TextField(blank=True, null=True, verbose_name="Customer Signature")
     customer_approval = models.BooleanField(default=False, verbose_name="Customer Approved")
     is_allocated = models.BooleanField(default=False, verbose_name="Is Allocated")
+    reminder_2days_sent = models.BooleanField(default=False, verbose_name="2-Day Reminder Email Sent")
+    reminder_2days_sent_at = models.DateTimeField(null=True, blank=True, verbose_name="2-Day Reminder Sent At")
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

@@ -202,8 +202,8 @@ export default function Dashboard() {
       const win=L.filter(l=>l.status==="close_win"||l.status==="closed_win"||l.status==="closed").length;
       const inProc=L.filter(l=>l.status==="in_process").length;
       const loss=L.filter(l=>l.status==="close_loss"||l.status==="closed_loss").length;
-      const tFU=L.filter(l=>{if(!l.followup_date)return false;const d=new Date(l.followup_date);d.setHours(0,0,0,0);return d.getTime()===today.getTime();}).length;
-      const ov=L.filter(l=>{if(!l.followup_date)return false;const d=new Date(l.followup_date);d.setHours(0,0,0,0);return d<today;}).length;
+      const tFU=L.filter(l=>{if(!l.followup_date)return false;const s=(l.status||"").toLowerCase();if(s==="close_win"||s==="closed_win"||s==="close_loss"||s==="closed_loss"||s==="closed")return false;const d=new Date(l.followup_date);d.setHours(0,0,0,0);return d.getTime()===today.getTime();}).length;
+      const ov=L.filter(l=>{if(!l.followup_date)return false;const s=(l.status||"").toLowerCase();if(s==="close_win"||s==="closed_win"||s==="close_loss"||s==="closed_loss"||s==="closed")return false;const d=new Date(l.followup_date);d.setHours(0,0,0,0);return d<today;}).length;
       
       const mon={};const last6=[];
       for(let i=5;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;last6.push(k);mon[k]={month:d.toLocaleDateString("en-IN",{month:"short"}),leads:0,customers:0,quotations:0};}

@@ -411,7 +411,12 @@ export default function Lead() {
   };
 
   const getRowClassName = (lead) => {
-    if (!lead.followup_date) return "";
+    if (!lead || !lead.followup_date) return "";
+
+    const s = (lead.status || "").toLowerCase();
+    if (s === "close_win" || s === "closed_win" || s === "close_loss" || s === "closed_loss" || s === "closed") {
+      return "";
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);

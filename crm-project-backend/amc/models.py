@@ -109,6 +109,7 @@ class AMCContract(models.Model):
         verbose_name="Renewal Status"
     )
     renewal_requested_at = models.DateTimeField(null=True, blank=True, verbose_name="Renewal Requested At")
+    expiry_reminder_2days_sent = models.BooleanField(default=False, verbose_name="2-Day Expiry Reminder Email Sent")
 
     status = models.CharField(
         max_length=50,
@@ -283,11 +284,14 @@ class AMCContract(models.Model):
                     is_allocated=False,
                     assigned_technician=self.assigned_technician,
                     scheduled_date=scheduled_d,
-                    service_cost=calc_per_visit,
+                    service_cost=ann_val,
                     created_by=self.created_by
                 )
                 created_services.append(srv)
             else:
+                if existing.service_cost != ann_val and ann_val > 0:
+                    existing.service_cost = ann_val
+                    existing.save(update_fields=['service_cost'])
                 created_services.append(existing)
 
         return created_services
@@ -499,6 +503,10 @@ class AMCServiceVisit(models.Model):
         null=True,
         verbose_name="Reschedule Reason"
     )
+    
+    # Reminder tracking
+    reminder_sent = models.BooleanField(default=False, verbose_name="Reminder Email Sent")
+    reminder_sent_at = models.DateTimeField(null=True, blank=True, verbose_name="Reminder Sent At")
     
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Created At")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Updated At")
