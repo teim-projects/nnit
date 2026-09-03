@@ -24,7 +24,7 @@ class LeadFilter(django_filters.FilterSet):
             return queryset.filter(
                 followup_date__lt=today,
                 followup_date__isnull=False
-            ).exclude(status="closed")
+            ).exclude(status__in=["closed", "close_win", "closed_win", "close_loss", "closed_loss"])
         return queryset
 
     def filter_followup_today(self, queryset, name, value):

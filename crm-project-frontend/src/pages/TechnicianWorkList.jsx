@@ -325,12 +325,6 @@ export default function TechnicianWorkList() {
                           >
                             Details
                           </button>
-                          <button
-                            onClick={() => openServicePdf(task)}
-                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-md shadow-xs transition flex items-center gap-1"
-                          >
-                            📄 View PDF
-                          </button>
                         </div>
                       </td>
                     </tr>

@@ -73,15 +73,27 @@ class TechnicianSerializer(serializers.ModelSerializer):
 
 class SimpleAMCContractSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
+    assigned_technician_name = serializers.SerializerMethodField()
 
     class Meta:
         from amc.models import AMCContract
         model = AMCContract
-        fields = ('id', 'contract_id', 'product', 'project_name', 'amc_type', 'status', 'customer_name')
+        fields = (
+            'id', 'contract_id', 'product', 'project_name', 'amc_type', 'status',
+            'start_date', 'end_date', 'annual_value', 'payment_frequency',
+            'scope_of_support', 'default_customer_contact', 'default_customer_address',
+            'default_gps_location', 'default_work_description', 'customer_name',
+            'assigned_technician', 'assigned_technician_name'
+        )
 
     def get_customer_name(self, obj):
         if obj.customer:
             return getattr(obj.customer, 'company_name', None) or getattr(obj.customer, 'name', None) or str(obj.customer)
+        return ""
+
+    def get_assigned_technician_name(self, obj):
+        if obj.assigned_technician:
+            return getattr(obj.assigned_technician, 'name', None) or str(obj.assigned_technician)
         return ""
 
 
@@ -105,12 +117,30 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated and "created_by" not in validated_data:
             validated_data["created_by"] = request.user
 
-        # If AMC contract provided, auto-link customer & product from contract if not explicitly passed
+        # Auto-fetch and sync all details from AMC contract if linked
         amc_contract = validated_data.get("amc_contract")
         if amc_contract:
-            if "customer" not in validated_data and amc_contract.customer:
+            if not validated_data.get("customer") and amc_contract.customer:
                 validated_data["customer"] = amc_contract.customer
             if not validated_data.get("product_name") and amc_contract.product:
                 validated_data["product_name"] = amc_contract.product
+            if not validated_data.get("assigned_technician") and amc_contract.assigned_technician:
+                validated_data["assigned_technician"] = amc_contract.assigned_technician
+            if not validated_data.get("description"):
+                validated_data["description"] = amc_contract.default_work_description or amc_contract.scope_of_support
+            if not validated_data.get("service_cost") or validated_data.get("service_cost") == 0:
+                validated_data["service_cost"] = amc_contract.annual_value
 
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        amc_contract = validated_data.get("amc_contract", instance.amc_contract)
+        if amc_contract:
+            if not validated_data.get("customer") and not instance.customer and amc_contract.customer:
+                validated_data["customer"] = amc_contract.customer
+            if not validated_data.get("product_name") and not instance.product_name and amc_contract.product:
+                validated_data["product_name"] = amc_contract.product
+            if not validated_data.get("assigned_technician") and not instance.assigned_technician and amc_contract.assigned_technician:
+                validated_data["assigned_technician"] = amc_contract.assigned_technician
+
+        return super().update(instance, validated_data)

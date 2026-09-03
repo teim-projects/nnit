@@ -89,9 +89,9 @@ export default function FollowupManagement() {
 
   const allLeadsStats = useMemo(() => ({
     total:     totalCount,
-    todayFU:   leads.filter(l => { if (!l.followup_date) return false; const d = new Date(l.followup_date); d.setHours(0,0,0,0); return d.getTime() === today.getTime(); }).length,
-    overdue:   leads.filter(l => { if (!l.followup_date) return false; const d = new Date(l.followup_date); d.setHours(0,0,0,0); return d < today; }).length,
-    completed: leads.filter(l => l.status === "closed").length,
+    todayFU:   leads.filter(l => { if (!l.followup_date) return false; const s = (l.status || "").toLowerCase(); if (s === "close_win" || s === "closed_win" || s === "close_loss" || s === "closed_loss" || s === "closed") return false; const d = new Date(l.followup_date); d.setHours(0,0,0,0); return d.getTime() === today.getTime(); }).length,
+    overdue:   leads.filter(l => { if (!l.followup_date) return false; const s = (l.status || "").toLowerCase(); if (s === "close_win" || s === "closed_win" || s === "close_loss" || s === "closed_loss" || s === "closed") return false; const d = new Date(l.followup_date); d.setHours(0,0,0,0); return d < today; }).length,
+    completed: leads.filter(l => { const s = (l.status || "").toLowerCase(); return s === "close_win" || s === "closed_win" || s === "close_loss" || s === "closed_loss" || s === "closed"; }).length,
   }), [leads, totalCount, today]);
 
   const fmt = (s) => {

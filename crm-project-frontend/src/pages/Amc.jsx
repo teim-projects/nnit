@@ -5,13 +5,15 @@ import AmcList from "../components/amc/AmcList";
 import AmcCalendarView from "../components/amc/AmcCalendarView";
 import ContractDetailModal from "../components/amc/ContractDetailModal";
 import { useModulePermissions } from "../hooks/useAuth";
+import Swal from "sweetalert2";
 import {
   MdAssignmentTurnedIn,
   MdOutlineHourglassTop,
   MdAutorenew,
   MdAttachMoney,
   MdCalendarMonth,
-  MdListAlt
+  MdListAlt,
+  MdNotificationsActive
 } from "react-icons/md";
 
 export default function AmcPage() {
@@ -48,6 +50,45 @@ export default function AmcPage() {
   const handleTabChange = (key) => {
     setActiveTab(key);
     setSearchParams({ tab: key });
+  };
+
+  const handleSendAMCReminders = async () => {
+    const confirm = await Swal.fire({
+      title: "Send 2-Day AMC & Service Reminders?",
+      text: "Sends email reminders to Customer, Technician, and Admin for all AMC visits & expiring AMC contracts scheduled in 2 days.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Yes, Send Emails",
+      confirmButtonColor: "#2563eb"
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const res = await fetch(`${baseApi}/api/services/service-requests/send-2day-reminders/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ days: 2 })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const count = data.summary?.processed || 0;
+        const amcCount = data.summary?.amc_expiry_processed || 0;
+        Swal.fire({
+          icon: "success",
+          title: "AMC Reminders Dispatched",
+          text: `Processed 2-day reminder emails for ${count} AMC service visit(s) and ${amcCount} expiring AMC contract(s).`
+        });
+      } else {
+        throw new Error("Failed to send 2-day AMC reminders");
+      }
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "Error", text: err.message });
+    }
   };
 
   const handleViewContractById = async (contractId) => {
@@ -173,28 +214,39 @@ export default function AmcPage() {
           </div>
         </div>
 
-        {/* Tab Navigation (2 Tabs) */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-          <button
-            onClick={() => handleTabChange("contracts")}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 transition ${
-              activeTab === "contracts"
-                ? "bg-blue-600 text-white shadow-xs"
-                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
-          >
-            <MdListAlt size={16} /> AMC Contracts List
-          </button>
+        {/* Tab Navigation & AMC Reminder Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => handleTabChange("contracts")}
+              className={`px-4 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 transition ${
+                activeTab === "contracts"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+              }`}
+            >
+              <MdListAlt size={16} /> AMC Contracts List
+            </button>
+
+            <button
+              onClick={() => handleTabChange("calendar")}
+              className={`px-4 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 transition ${
+                activeTab === "calendar"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+              }`}
+            >
+              <MdCalendarMonth size={16} /> Service Visits & Expiry Calendar
+            </button>
+          </div>
 
           <button
-            onClick={() => handleTabChange("calendar")}
-            className={`px-4 py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 transition ${
-              activeTab === "calendar"
-                ? "bg-blue-600 text-white shadow-xs"
-                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
+            onClick={handleSendAMCReminders}
+            title="Send 2-Day AMC & Service Reminders to Customer, Technician & Admin"
+            className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl font-semibold border border-slate-200 shadow-xs transition duration-150 text-xs shrink-0"
           >
-            <MdCalendarMonth size={16} /> Service Visits & Expiry Calendar
+            <MdNotificationsActive className="w-4 h-4 text-blue-600" />
+            Send 2-Day AMC Reminders
           </button>
         </div>
 
