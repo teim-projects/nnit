@@ -102,6 +102,31 @@ class ParkingProduct(models.Model):
         validators=[MinValueValidator(0)]
     )
     
+    max_height = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Maximum height required (ft)",
+        validators=[MinValueValidator(0)]
+    )
+    max_width = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Maximum width required (ft)",
+        validators=[MinValueValidator(0)]
+    )
+    max_length = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Maximum length required (ft)",
+        validators=[MinValueValidator(0)]
+    )
+    
     # Capacity
     car_capacity = models.PositiveIntegerField(
         validators=[MinValueValidator(1)],
@@ -187,6 +212,9 @@ class ParkingProduct(models.Model):
             'min_height': float(self.min_height),
             'min_width': float(self.min_width),
             'min_length': float(self.min_length),
+            'max_height': float(self.max_height) if self.max_height is not None else None,
+            'max_width': float(self.max_width) if self.max_width is not None else None,
+            'max_length': float(self.max_length) if self.max_length is not None else None,
             'car_capacity': self.car_capacity,
             'levels': self.levels,
             'total_space': self.total_space_required,

@@ -54,6 +54,7 @@ class ParkingProductSerializer(serializers.ModelSerializer):
             'description', 'levels', 'operation_type', 'automation_type',
             'pit_required', 'load_capacity',
             'min_height', 'min_width', 'min_length',
+            'max_height', 'max_width', 'max_length',
             'car_capacity', 'features', 'advantages', 'specifications',
             'base_price', 'is_active', 'is_featured',
             'image', 'image_url', 'display_image', 'brochure_url',
@@ -99,6 +100,7 @@ class ParkingProductListSerializer(serializers.ModelSerializer):
             'category', 'category_id', 'category_name', 'car_capacity', 'levels',
             'operation_type', 'automation_type', 'pit_required',
             'min_height', 'min_width', 'min_length',
+            'max_height', 'max_width', 'max_length',
             'space_required', 'base_price', 'specifications', 'configurations',
             'image', 'image_url', 'display_image',
             'is_active', 'is_featured'
