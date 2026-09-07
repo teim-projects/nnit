@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { MdArrowBack } from 'react-icons/md';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
@@ -15,6 +14,9 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
     min_height: '',
     min_width: '',
     min_length: '',
+    max_height: '',
+    max_width: '',
+    max_length: '',
     car_capacity: '',
     base_price: '',
     image_url: ''
@@ -35,6 +37,9 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
         min_height: product.min_height || '',
         min_width: product.min_width || '',
         min_length: product.min_length || '',
+        max_height: product.max_height || '',
+        max_width: product.max_width || '',
+        max_length: product.max_length || '',
         car_capacity: product.car_capacity || '',
         base_price: product.base_price || '',
         image_url: product.image_url || product.display_image || product.image || ''
@@ -51,6 +56,9 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
         min_height: '',
         min_width: '',
         min_length: '',
+        max_height: '',
+        max_width: '',
+        max_length: '',
         car_capacity: '',
         base_price: '',
         image_url: ''
@@ -116,6 +124,9 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
         min_height: parseFloat(formData.min_height),
         min_width: parseFloat(formData.min_width),
         min_length: parseFloat(formData.min_length),
+        max_height: formData.max_height ? parseFloat(formData.max_height) : null,
+        max_width: formData.max_width ? parseFloat(formData.max_width) : null,
+        max_length: formData.max_length ? parseFloat(formData.max_length) : null,
         car_capacity: parseInt(formData.car_capacity),
         base_price: formData.base_price ? parseFloat(formData.base_price) : null
       };
@@ -166,7 +177,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
               {product ? 'Edit Parking Product' : 'Add New Parking Product'}
             </h2>
             <p className="text-xs font-semibold text-slate-500 mt-0.5">
-              Fill in product specifications, capacity, pricing, and image details
+              Fill in product specifications, site requirements, pricing, and image details
             </p>
           </div>
           <button
@@ -223,7 +234,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
               </div>
             </div>
 
-            {/* Specifications */}
+            {/* Technical Specifications */}
             <div className="border-t border-gray-200 pt-6">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Technical Specifications</h3>
               
@@ -373,6 +384,58 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
                     onChange={handleChange}
                     className="followup-form-input"
                     placeholder="e.g., 3.5 m"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Maximum Site Requirements */}
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Maximum Site Requirements</h3>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div className="followup-form-field mb-0">
+                  <label className="followup-form-label">
+                    Max. Length
+                  </label>
+                  <input
+                    type="number"
+                    name="max_length"
+                    value={formData.max_length}
+                    onChange={handleChange}
+                    className="followup-form-input"
+                    placeholder="e.g., 6.5 m"
+                    step="0.01"
+                  />
+                </div>
+
+                <div className="followup-form-field mb-0">
+                  <label className="followup-form-label">
+                    Max. Width
+                  </label>
+                  <input
+                    type="number"
+                    name="max_width"
+                    value={formData.max_width}
+                    onChange={handleChange}
+                    className="followup-form-input"
+                    placeholder="e.g., 3.5 m"
+                    step="0.01"
+                  />
+                </div>
+
+                <div className="followup-form-field mb-0">
+                  <label className="followup-form-label">
+                    Max. Height
+                  </label>
+                  <input
+                    type="number"
+                    name="max_height"
+                    value={formData.max_height}
+                    onChange={handleChange}
+                    className="followup-form-input"
+                    placeholder="e.g., 4.5 m"
                     step="0.01"
                   />
                 </div>

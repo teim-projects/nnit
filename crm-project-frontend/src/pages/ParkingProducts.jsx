@@ -302,6 +302,18 @@ export default function ParkingProducts() {
                             : 'N/A'}
                         </span>
                       </div>
+
+                      {/* Max Dimensions if present */}
+                      {(product.max_length || product.max_width || product.max_height) && (
+                        <div>
+                          <span className="block text-[10px] font-black tracking-widest text-gray-400 uppercase">
+                            MAX. DIM (LxWxH)
+                          </span>
+                          <span className="text-sm font-bold text-gray-800">
+                            {`${product.max_length || '—'}x${product.max_width || '—'}x${product.max_height || '—'}m`}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Action Buttons */}
