@@ -305,8 +305,23 @@ export default function AddAmcForm({
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(formatBackendErrors(errorData));
+        let errorMsg = `Server Error (${res.status})`;
+        try {
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            const errorData = await res.json();
+            errorMsg = formatBackendErrors(errorData);
+          } else {
+            const textData = await res.text();
+            const match = textData.match(/<title>(.*?)<\/title>/i) || textData.match(/<h1>(.*?)<\/h1>/i);
+            if (match && match[1]) {
+              errorMsg = match[1].replace(/<[^>]+>/g, "").trim();
+            }
+          }
+        } catch {
+          // fallback
+        }
+        throw new Error(errorMsg);
       }
 
       Swal.fire({

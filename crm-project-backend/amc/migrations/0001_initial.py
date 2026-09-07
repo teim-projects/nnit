@@ -19,7 +19,6 @@ class Migration(migrations.Migration):
             name='AMCContract',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('contract_id', models.CharField(blank=True, max_length=50, null=True, unique=True, verbose_name='Contract ID')),
                 ('product', models.CharField(max_length=255, verbose_name='Product')),
                 ('amc_type', models.CharField(choices=[('comprehensive', 'Comprehensive'), ('non_comprehensive', 'Non-Comprehensive')], default='comprehensive', max_length=50, verbose_name='AMC Type')),
                 ('start_date', models.DateField(blank=True, null=True, verbose_name='Start Date')),
