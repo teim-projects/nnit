@@ -24,10 +24,21 @@ class AMCContractViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        for amc in queryset[:50]:
-            amc.sync_active_cycle_data()
-            if amc.service_requests.count() == 0:
-                amc.generate_schedule()
+        
+        # Only sync data if explicitly requested (to avoid performance issues)
+        if request.query_params.get('sync') == 'true':
+            try:
+                for amc in queryset[:50]:
+                    try:
+                        amc.sync_active_cycle_data()
+                        if amc.service_requests.count() == 0:
+                            amc.generate_schedule()
+                    except Exception as e:
+                        print(f"Error syncing AMC {amc.id}: {str(e)}")
+                        continue
+            except Exception as e:
+                print(f"Error in AMC list sync: {str(e)}")
+        
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -37,10 +48,14 @@ class AMCContractViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        instance.sync_active_cycle_data()
-        if instance.service_requests.count() == 0:
-            instance.generate_schedule()
-            instance.refresh_from_db()
+        try:
+            instance.sync_active_cycle_data()
+            if instance.service_requests.count() == 0:
+                instance.generate_schedule()
+                instance.refresh_from_db()
+        except Exception as e:
+            print(f"Error syncing AMC {instance.id} on retrieve: {str(e)}")
+            # Continue without syncing if there's an error
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
