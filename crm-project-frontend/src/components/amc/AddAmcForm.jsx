@@ -295,7 +295,7 @@ export default function AddAmcForm({
         status: data.status,
       };
 
-      const url = amc ? `${baseApi}/amc/contracts/${amc.id}/` : `${baseApi}/amc/contracts/`;
+      const url = amc ? `${baseApi}/api/amc/contracts/${amc.id}/` : `${baseApi}/api/amc/contracts/`;
       const method = amc ? "PUT" : "POST";
 
       const res = await fetch(url, {

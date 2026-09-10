@@ -77,7 +77,7 @@ export default function ServicePage() {
     const amcContractId = srv.amc_contract || srv.amc_contract_details?.id;
     if (amcContractId) {
       try {
-        const res = await fetch(`${baseApi}/amc/contracts/${amcContractId}/`, {
+        const res = await fetch(`${baseApi}/api/amc/contracts/${amcContractId}/`, {
           headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
         });
         if (res.ok) {
@@ -168,7 +168,7 @@ export default function ServicePage() {
 
       // 4. Fetch Active AMC Contracts
       try {
-        const amcRes = await fetch(`${baseApi}/amc/contracts/`, {
+        const amcRes = await fetch(`${baseApi}/api/amc/contracts/`, {
           headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
         });
         if (amcRes.ok) {

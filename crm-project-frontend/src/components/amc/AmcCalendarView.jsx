@@ -21,7 +21,7 @@ export default function AmcCalendarView({ baseApi, token, onViewContract }) {
   const fetchCalendarEvents = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${baseApi}/amc/calendar-events/`, {
+      const res = await fetch(`${baseApi}/api/amc/calendar-events/`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {})

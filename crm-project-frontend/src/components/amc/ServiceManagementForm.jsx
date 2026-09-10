@@ -107,7 +107,7 @@ export default function ServiceManagementForm({
 
   const loadServiceForEdit = async (recordId) => {
     try {
-      const recordRes = await axios.get(`${baseApi}/amc/service-records/${recordId}/`, { headers: authHeaders });
+      const recordRes = await axios.get(`${baseApi}/api/amc/service-records/${recordId}/`, { headers: authHeaders });
       const data = recordRes.data;
 
       setCustomerSearchInput(data.customer_name || '');
@@ -357,7 +357,7 @@ export default function ServiceManagementForm({
   const addMaterialsToRecord = async (recordId, products) => {
     for (const product of products) {
       await axios.post(
-        `${baseApi}/amc/service-records/${recordId}/add_material/`,
+        `${baseApi}/api/amc/service-records/${recordId}/add_material/`,
         {
           product_data: product.product_data || {
             name: product.product_name,
@@ -375,13 +375,13 @@ export default function ServiceManagementForm({
   };
 
   const syncMaterialsForEdit = async (recordId, products) => {
-    const recordRes = await axios.get(`${baseApi}/amc/service-records/${recordId}/`, {
+    const recordRes = await axios.get(`${baseApi}/api/amc/service-records/${recordId}/`, {
       headers: authHeaders,
     });
     const existing = recordRes.data.materials || [];
 
     for (const material of existing) {
-      await axios.delete(`${baseApi}/amc/service-records/${recordId}/material/${material.id}/`, {
+      await axios.delete(`${baseApi}/api/amc/service-records/${recordId}/material/${material.id}/`, {
         headers: authHeaders,
       });
     }
@@ -477,13 +477,13 @@ export default function ServiceManagementForm({
       const payload = buildRecordPayload(totals);
 
       if (isEdit) {
-        await axios.put(`${baseApi}/amc/service-records/${service.id}/`, payload, {
+        await axios.put(`${baseApi}/api/amc/service-records/${service.id}/`, payload, {
           headers: authHeaders,
         });
         await syncMaterialsForEdit(service.id, formData.products);
         Swal.fire('Success', 'Service record updated successfully', 'success');
       } else {
-        const recordResponse = await axios.post(`${baseApi}/amc/service-records/`, payload, {
+        const recordResponse = await axios.post(`${baseApi}/api/amc/service-records/`, payload, {
           headers: authHeaders,
         });
         await addMaterialsToRecord(recordResponse.data.id, formData.products);

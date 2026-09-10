@@ -94,7 +94,7 @@ export default function AmcPage() {
   const handleViewContractById = async (contractId) => {
     if (!baseApi || !contractId) return;
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${contractId}/`, {
+      const res = await fetch(`${baseApi}/api/amc/contracts/${contractId}/`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -111,8 +111,9 @@ export default function AmcPage() {
 
   useEffect(() => {
     const fetchStats = async () => {
+      if (!baseApi || !token) return;
       try {
-        const res = await fetch(`${baseApi}/amc/contracts/`, {
+        const res = await fetch(`${baseApi}/api/amc/contracts/`, {
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),

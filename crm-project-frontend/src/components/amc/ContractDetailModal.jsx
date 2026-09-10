@@ -227,7 +227,7 @@ export default function ContractDetailModal({
     if (!baseApi || !currentContract?.id) return;
     setGeneratingSchedule(true);
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${currentContract.id}/generate-schedule/`, {
+      const res = await fetch(`${baseApi}/api/amc/contracts/${currentContract.id}/generate-schedule/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
