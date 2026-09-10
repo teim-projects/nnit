@@ -38,7 +38,7 @@ export default function AmcList({ baseApi, token, filters = {} }) {
   const fetchContracts = async () => {
     setLoading(true);
     try {
-      let url = `${baseApi}/amc/contracts/`;
+      let url = `${baseApi}/api/amc/contracts/`;
       const queryParams = [];
 
       if (filterType !== "all") {
@@ -108,7 +108,7 @@ export default function AmcList({ baseApi, token, filters = {} }) {
     if (!result.isConfirmed) return;
 
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${id}/`, {
+      const res = await fetch(`${baseApi}/api/amc/contracts/${id}/`, {
         method: "DELETE",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -139,7 +139,7 @@ export default function AmcList({ baseApi, token, filters = {} }) {
     if (!result.isConfirmed) return;
 
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${id}/toggle-status/`, {
+      const res = await fetch(`${baseApi}/api/amc/contracts/${id}/toggle-status/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -195,7 +195,7 @@ export default function AmcList({ baseApi, token, filters = {} }) {
     if (!assignAmcModal) return;
 
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${assignAmcModal.id}/assign-technician/`, {
+      const res = await fetch(`${baseApi}/api/amc/contracts/${assignAmcModal.id}/assign-technician/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -220,7 +220,7 @@ export default function AmcList({ baseApi, token, filters = {} }) {
 
   const handleGenerateWarrantyServices = async (id) => {
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${id}/generate-warranty-services/`, {
+      const res = await fetch(`${baseApi}/api/amc/contracts/${id}/generate-warranty-services/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

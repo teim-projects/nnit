@@ -31,7 +31,7 @@ export default function AmcAnalyticsView({ baseApi, token, onViewContract }) {
     setLoading(true);
     try {
       // 1. Dashboard stats
-      const statsRes = await fetch(`${baseApi}/amc/dashboard/`, {
+      const statsRes = await fetch(`${baseApi}/api/amc/dashboard/`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -43,7 +43,7 @@ export default function AmcAnalyticsView({ baseApi, token, onViewContract }) {
       }
 
       // 2. Contracts list
-      const contractsRes = await fetch(`${baseApi}/amc/contracts/`, {
+      const contractsRes = await fetch(`${baseApi}/api/amc/contracts/`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {})

@@ -72,7 +72,7 @@ export default function RenewAmcModal({ contract, baseApi, token, onClose, onSuc
 
     setLoading(true);
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${contract.id}/renew/`, {
+      const res = await fetch(`${baseApi}/api/amc/contracts/${contract.id}/renew/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

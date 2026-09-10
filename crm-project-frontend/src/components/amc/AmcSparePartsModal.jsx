@@ -32,7 +32,7 @@ export default function AmcSparePartsModal({ contract, baseApi, token, onClose, 
   const fetchParts = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${contract.id}/spare_parts/`, { headers });
+      const res = await fetch(`${baseApi}/api/amc/contracts/${contract.id}/spare_parts/`, { headers });
       if (res.ok) {
         const data = await res.json();
         setParts(Array.isArray(data) ? data : data.results || []);
@@ -115,7 +115,7 @@ export default function AmcSparePartsModal({ contract, baseApi, token, onClose, 
 
     setSaving(true);
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${contract.id}/add_spare_part/`, {
+      const res = await fetch(`${baseApi}/api/amc/contracts/${contract.id}/add_spare_part/`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -163,7 +163,7 @@ export default function AmcSparePartsModal({ contract, baseApi, token, onClose, 
     if (!result.isConfirmed) return;
 
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${contract.id}/spare_parts/${partId}/`, {
+      const res = await fetch(`${baseApi}/api/amc/contracts/${contract.id}/spare_parts/${partId}/`, {
         method: "DELETE",
         headers,
       });
@@ -181,7 +181,7 @@ export default function AmcSparePartsModal({ contract, baseApi, token, onClose, 
 
   const handleCreateInvoice = async () => {
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${contract.id}/invoice_draft/`, { headers });
+      const res = await fetch(`${baseApi}/api/amc/contracts/${contract.id}/invoice_draft/`, { headers });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail || "No spare parts to invoice");
