@@ -43,7 +43,6 @@ urlpatterns = [
     path('lead/', include('lead_management.urls')),
     path('product/', include('product_management.urls')),
     path('api/quotation/', include('quotation.urls')),
-    path('api/amc/', include('amc.urls')),
     path('amc/', include('amc.urls')),
     path('parking/', include('parking_products.urls')),
     path('api/services/', include('service_management.urls')),
