@@ -25,9 +25,13 @@ class AMCContractViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         for amc in queryset[:50]:
-            amc.sync_active_cycle_data()
-            if amc.service_requests.count() == 0:
-                amc.generate_schedule()
+            try:
+                amc.sync_active_cycle_data()
+                if amc.service_requests.count() == 0:
+                    amc.generate_schedule()
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Error syncing/generating schedule for AMC {amc.id}: {e}")
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -37,10 +41,14 @@ class AMCContractViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        instance.sync_active_cycle_data()
-        if instance.service_requests.count() == 0:
-            instance.generate_schedule()
-            instance.refresh_from_db()
+        try:
+            instance.sync_active_cycle_data()
+            if instance.service_requests.count() == 0:
+                instance.generate_schedule()
+                instance.refresh_from_db()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error syncing/generating schedule for AMC {instance.id}: {e}")
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -562,7 +570,7 @@ class AMCCalendarEventsView(APIView):
 
                     events.append({
                         'title': type_title,
-                        'start': sr.scheduled_date.isoformat(),
+                        'start': sr.scheduled_date.isoformat() if hasattr(sr.scheduled_date, 'isoformat') else str(sr.scheduled_date),
                         'backgroundColor': color,
                         'borderColor': color,
                         'extendedProps': {
@@ -594,7 +602,7 @@ class AMCCalendarEventsView(APIView):
 
                 events.append({
                     'title': f"Service Visit | {cust_name}",
-                    'start': visit.service_date.isoformat(),
+                    'start': visit.service_date.isoformat() if hasattr(visit.service_date, 'isoformat') else str(visit.service_date),
                     'backgroundColor': color,
                     'borderColor': color,
                     'extendedProps': {
@@ -614,7 +622,7 @@ class AMCCalendarEventsView(APIView):
                 cust_name = get_cust_name(amc.customer)
                 events.append({
                     'title': f"Contract Expiry | {cust_name}",
-                    'start': amc.end_date.isoformat(),
+                    'start': amc.end_date.isoformat() if hasattr(amc.end_date, 'isoformat') else str(amc.end_date),
                     'backgroundColor': '#ef4444',
                     'borderColor': '#ef4444',
                     'extendedProps': {
@@ -642,7 +650,7 @@ class AMCCalendarEventsView(APIView):
                     cust_name = get_cust_name(amc.customer)
                     events.append({
                         'title': f"Renewal Due | {cust_name}",
-                        'start': renewal_date.isoformat(),
+                        'start': renewal_date.isoformat() if hasattr(renewal_date, 'isoformat') else str(renewal_date),
                         'backgroundColor': '#f59e0b',  # Amber
                         'borderColor': '#f59e0b',
                         'extendedProps': {
@@ -652,7 +660,7 @@ class AMCCalendarEventsView(APIView):
                             'customer': cust_name,
                             'product': amc.product,
                             'status': 'renewal_due',
-                            'expiry_date': amc.end_date.isoformat(),
+                            'expiry_date': amc.end_date.isoformat() if hasattr(amc.end_date, 'isoformat') else str(amc.end_date),
                         }
                     })
         except Exception as e:

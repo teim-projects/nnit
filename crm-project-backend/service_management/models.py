@@ -160,18 +160,21 @@ class ServiceRequest(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Updated At")
 
     def generate_service_id(self):
+        import re
         prefix = "SRV-AMC" if self.service_type == ServiceType.AMC else "SRV"
-        last_service = ServiceRequest.objects.filter(service_id__startswith=prefix).order_by('-id').first()
-        if last_service and last_service.service_id:
-            try:
-                clean_str = last_service.service_id.replace("SRV-AMC-", "").replace("SRV-", "").replace("SRV", "")
-                num = int(clean_str)
-                new_num = num + 1
-            except ValueError:
-                new_num = 1
-        else:
-            new_num = 1
-        return f"{prefix}-{new_num:04d}"
+        max_num = 0
+        existing_ids = ServiceRequest.objects.filter(service_id__startswith=prefix).values_list('service_id', flat=True)
+        for sid in existing_ids:
+            if sid:
+                matches = re.findall(r'\d+', str(sid))
+                if matches:
+                    try:
+                        num = int(matches[-1])
+                        if num > max_num:
+                            max_num = num
+                    except ValueError:
+                        pass
+        return f"{prefix}-{(max_num + 1):04d}"
 
     def save(self, *args, **kwargs):
         if not self.service_id:
