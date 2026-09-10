@@ -37,7 +37,29 @@ export default function AmcList({ baseApi, token, filters = {} }) {
 
   // Get fresh token from localStorage if prop is missing
   const getToken = () => {
-    return token || localStorage.getItem('access');
+    // Check multiple possible token keys
+    const possibleTokens = [
+      token,
+      localStorage.getItem('access'),
+      localStorage.getItem('access_token'),
+      localStorage.getItem('token'),
+      localStorage.getItem('authToken'),
+    ];
+    
+    const foundToken = possibleTokens.find(t => t && t.length > 0);
+    
+    if (!foundToken) {
+      console.warn('⚠️ No token found in any storage location!');
+      console.log('Checked locations:', {
+        prop: !!token,
+        access: !!localStorage.getItem('access'),
+        access_token: !!localStorage.getItem('access_token'),
+        token: !!localStorage.getItem('token'),
+        authToken: !!localStorage.getItem('authToken'),
+      });
+    }
+    
+    return foundToken;
   };
 
   const fetchContracts = async () => {
@@ -45,7 +67,14 @@ export default function AmcList({ baseApi, token, filters = {} }) {
     try {
       const authToken = getToken();
       if (!authToken) {
-        throw new Error("No authentication token found. Please login again.");
+        Swal.fire({
+          icon: "warning",
+          title: "Not Logged In",
+          text: "Please login to continue",
+        }).then(() => {
+          window.location.href = '/login';
+        });
+        return;
       }
 
       let url = `${baseApi}/api/amc/contracts/`;
@@ -64,20 +93,25 @@ export default function AmcList({ baseApi, token, filters = {} }) {
 
       console.log("Fetching AMC contracts from:", url);
       console.log("Token present:", !!authToken);
+      console.log("Token value (first 20 chars):", authToken?.substring(0, 20) + "...");
 
       const res = await fetch(url, {
+        method: 'GET',
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
+          "Authorization": `Bearer ${authToken}`,
         },
       });
 
       console.log("Response status:", res.status);
+      console.log("Response headers:", res.headers);
 
-      if (res.status === 401) {
-        // Token expired, redirect to login
+      if (res.status === 401 || res.status === 403) {
+        // Token expired or invalid, redirect to login
         localStorage.removeItem('access');
         localStorage.removeItem('refresh');
+        localStorage.removeItem('token');
+        localStorage.removeItem('access_token');
         Swal.fire({
           icon: "warning",
           title: "Session Expired",
