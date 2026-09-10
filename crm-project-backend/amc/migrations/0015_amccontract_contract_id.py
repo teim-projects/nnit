@@ -10,9 +10,15 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='amccontract',
-            name='contract_id',
-            field=models.CharField(blank=True, max_length=50, null=True, unique=True, verbose_name='Contract ID'),
-        ),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='amccontract',
+                    name='contract_id',
+                    field=models.CharField(blank=True, max_length=50, null=True, unique=True, verbose_name='Contract ID'),
+                ),
+            ],
+            database_operations=[]
+        )
     ]
+
