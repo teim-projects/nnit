@@ -17,7 +17,6 @@ import {
   Area,
   LineChart,
   Line,
-  ComposedChart,
   RadialBarChart,
   RadialBar,
   ScatterChart,
@@ -30,7 +29,6 @@ import {
   FiDownload,
   FiCalendar,
   FiTrash2,
-  FiDatabase,
   FiUsers,
   FiFileText,
   FiPackage,
@@ -38,7 +36,6 @@ import {
   FiDollarSign,
   FiTrendingUp,
   FiCheckCircle,
-  FiFilter,
   FiSearch,
   FiPieChart,
   FiBarChart2,
@@ -48,21 +45,23 @@ import {
   FiUserCheck,
   FiShield,
   FiKey,
-  FiLock,
   FiTag,
   FiGlobe,
   FiTarget,
-  FiActivity
+  FiActivity,
+  FiX,
+  FiChevronLeft,
+  FiChevronRight
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import Swal from "sweetalert2";
 
-const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4", "#f97316", "#14b8a6", "#6366f1"];
+const CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4", "#f97316", "#14b8a6", "#3b82f6"];
 
 const CustomTooltip = ({ active, payload, label, unit = "" }) => {
   if (!active || !payload || !payload.length) return null;
   return (
-    <div className="bg-slate-900/95 text-white px-3.5 py-2.5 rounded-xl shadow-xl border border-slate-700/60 text-xs z-50">
+    <div className="bg-slate-900/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-xl shadow-xl border border-slate-700/60 text-xs z-50">
       {label && <p className="font-bold text-slate-200 mb-1 border-b border-slate-700/60 pb-1">{label}</p>}
       {payload.map((entry, index) => (
         <div key={index} className="flex items-center gap-2 py-0.5">
@@ -129,6 +128,10 @@ export default function ReportsAnalytics() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
   // Database State
   const [dbLeads, setDbLeads] = useState([]);
   const [dbCustomers, setDbCustomers] = useState([]);
@@ -151,6 +154,11 @@ export default function ReportsAnalytics() {
     accountStatus: "All",
     dateRange: "All"
   });
+
+  // Reset page when tab or filters or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, filters, searchTerm]);
 
   // 1. Fetch Records from REST APIs
   const loadDatabaseRecords = async () => {
@@ -213,7 +221,7 @@ export default function ReportsAnalytics() {
   // 3. Dynamic Tab-Specific Filter Options
   const filterOptions = useMemo(() => {
     const salespersons = new Set(["All", ...realSalespersonsList]);
-    
+
     const products = new Set(["All"]);
     dbProducts.forEach((p) => {
       const pName = p.product_name || p.name;
@@ -260,6 +268,28 @@ export default function ReportsAnalytics() {
       dates: ["All", "Today", "This Week", "This Month", "Q1 2026", "Year 2026"]
     };
   }, [realSalespersonsList, dbProducts, dbLeads, dbCustomers, dbRoles, dbStaff]);
+
+  // Count active non-All filters
+  const activeFilterCount = useMemo(() => {
+    return Object.values(filters).filter((val) => val !== "All").length;
+  }, [filters]);
+
+  const resetAllFilters = () => {
+    setFilters({
+      salesperson: "All",
+      product: "All",
+      leadSource: "All",
+      leadStatus: "All",
+      category: "All",
+      priceRange: "All",
+      city: "All",
+      customerType: "All",
+      role: "All",
+      accountStatus: "All",
+      dateRange: "All"
+    });
+    setSearchTerm("");
+  };
 
   // 4. Tab-Specific Filtered Datasets
   const filteredDatasets = useMemo(() => {
@@ -324,7 +354,7 @@ export default function ReportsAnalytics() {
     return { leads, customers, quotations, products, staff };
   }, [dbLeads, dbCustomers, dbQuotations, dbProducts, dbStaff, filters]);
 
-  // 5. Calculate Analytics & TAB-EXCLUSIVE SIMPLE CHARTS (No Duplicate Chart Types per Tab)
+  // 5. Analytics Calculation
   const realAnalytics = useMemo(() => {
     const { leads, customers, quotations, products, staff } = filteredDatasets;
 
@@ -372,7 +402,7 @@ export default function ReportsAnalytics() {
       quotes: quotations.length || 1
     }));
 
-    // TAB 1: REVENUE CHARTS (Area Chart, Horizontal Bar, Vertical Column Bar, Scatter Plot)
+    // TAB 1: REVENUE CHARTS
     const monMap = {};
     const monthsList = [];
     for (let i = 5; i >= 0; i--) {
@@ -441,7 +471,7 @@ export default function ReportsAnalytics() {
       }
     }
 
-    // TAB 2: LEAD CHARTS (Donut Ring, Curved Line, Stacked Bar, Step Funnel Bar)
+    // TAB 2: LEAD CHARTS
     const statusMap = { open: 0, closed: 0, close_win: 0, close_loss: 0, in_process: 0 };
     leads.forEach((l) => {
       const st = (l.status || "open").toLowerCase();
@@ -456,7 +486,7 @@ export default function ReportsAnalytics() {
       { name: "Closed Won", value: statusMap.closed || 1, color: "#10b981" },
       { name: "In Process", value: statusMap.in_process || 1, color: "#f59e0b" },
       { name: "Closed Loss", value: statusMap.close_loss || 0, color: "#ef4444" }
-    ].filter(d => d.value > 0);
+    ].filter((d) => d.value > 0);
 
     const monthlyLeadLineChart = monthlyTrendChart.map((m) => ({
       month: m.month,
@@ -491,7 +521,7 @@ export default function ReportsAnalytics() {
       { stage: "4. Closed Won", count: statusMap.closed || 3, fill: "#10b981" }
     ];
 
-    // TAB 3: PRODUCT CHARTS (Treemap Blocks, Solid Pie Chart, Horizontal Bar, Column Bar)
+    // TAB 3: PRODUCT CHARTS
     const prodCategoryMap = {};
     let totalPrice = 0;
     let maxPrice = 0;
@@ -551,7 +581,7 @@ export default function ReportsAnalytics() {
 
     const avgPrice = products.length > 0 ? totalPrice / products.length : 0;
 
-    // TAB 4: CUSTOMER SEGMENT CHARTS (Multi-Series Line, Solid Pie, Horizontal Bar, Donut Ring)
+    // TAB 4: CUSTOMER SEGMENT CHARTS
     const monthlyCustomerMultiLineChart = monthlyTrendChart.map((m) => ({
       month: m.month,
       direct: m.customers || Math.floor(Math.random() * 4) + 1,
@@ -576,7 +606,7 @@ export default function ReportsAnalytics() {
       color: CHART_COLORS[i % CHART_COLORS.length]
     })).slice(0, 6);
 
-    const leadConversionsCount = customers.filter(c => !c.is_lead_only).length || 15;
+    const leadConversionsCount = customers.filter((c) => !c.is_lead_only).length || 15;
     const directAccountsCount = customers.length > leadConversionsCount ? customers.length - leadConversionsCount : 12;
     const customerTypeDonutChart = [
       { name: "Converted Leads", value: leadConversionsCount, color: "#10b981" },
@@ -584,7 +614,7 @@ export default function ReportsAnalytics() {
       { name: "AMC Subscriptions", value: Math.round(customers.length * 0.25) || 5, color: "#f59e0b" }
     ];
 
-    // TAB 5: ROLE & ACCOUNTS CHARTS (Stacked Column Bar, Radial Circular Ring, Horizontal Bar, Donut Ring)
+    // TAB 5: ROLE & ACCOUNTS CHARTS
     const roleDistributionMap = {};
     let activeUsersCount = 0, inactiveUsersCount = 0;
     staff.forEach((s) => {
@@ -614,7 +644,7 @@ export default function ReportsAnalytics() {
       inactive: roleDistributionMap[r].inactive
     }));
 
-    const activeRatioVal = Math.round((activeUsersCount / (activeUsersCount + inactiveUsersCount)) * 100);
+    const activeRatioVal = Math.round((activeUsersCount / (activeUsersCount + inactiveUsersCount || 1)) * 100);
     const accountSecurityRadialGaugeChart = [
       { name: "Active Account Rate", value: activeRatioVal, fill: "#10b981" }
     ];
@@ -632,7 +662,7 @@ export default function ReportsAnalytics() {
     }));
 
     const resetRequests = JSON.parse(localStorage.getItem("nnit_password_reset_requests") || "[]");
-    const pendingResetsCount = resetRequests.filter(r => r.status === "pending").length;
+    const pendingResetsCount = resetRequests.filter((r) => r.status === "pending").length;
 
     const avgQuoteVal = quotations.length > 0 ? totalRevenueSum / quotations.length : totalRevenueSum;
 
@@ -673,8 +703,9 @@ export default function ReportsAnalytics() {
       roleAccessHorizontalChart,
       accessHierarchyDonutChart
     };
-  }, [filteredDatasets, realSalespersonsList, dbRoles, filters]);
+  }, [filteredDatasets, realSalespersonsList, dbRoles]);
 
+  // Deletion Handler
   const handleDeleteItem = async (id, type, name = "Item") => {
     const confirm = await Swal.fire({
       title: `Delete ${name}?`,
@@ -708,7 +739,52 @@ export default function ReportsAnalytics() {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleExport = () => {
+  // CSV Export Handler
+  const handleExportCSV = () => {
+    let csvRows = [];
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    if (activeTab === "revenue") {
+      csvRows.push(["Salesperson Name", "Quotations Count", "Total Revenue (INR)"]);
+      realAnalytics.salespersonsList.forEach((sp) => {
+        csvRows.push([`"${sp.name}"`, sp.quotes, sp.amount]);
+      });
+    } else if (activeTab === "lead") {
+      csvRows.push(["Customer Name", "Lead Source", "Status"]);
+      filteredDatasets.leads.forEach((l) => {
+        csvRows.push([`"${l.contact_person_name || l.customer_name || 'Lead'}"`, `"${l.lead_source || 'Direct'}"`, `"${l.status || 'open'}"`]);
+      });
+    } else if (activeTab === "product") {
+      csvRows.push(["Product Name", "Category", "Price (INR)"]);
+      filteredDatasets.products.forEach((p) => {
+        csvRows.push([`"${p.product_name || p.name}"`, `"${p.category || 'General'}"`, p.price || 0]);
+      });
+    } else if (activeTab === "segment") {
+      csvRows.push(["Customer Name", "Contact Phone", "City / Location"]);
+      filteredDatasets.customers.forEach((c) => {
+        csvRows.push([`"${c.name}"`, `"${c.contact_number || 'N/A'}"`, `"${c.city || c.address || 'N/A'}"`]);
+      });
+    } else if (activeTab === "role_access") {
+      csvRows.push(["Staff Name", "Username / Email", "Role", "Active Status"]);
+      filteredDatasets.staff.forEach((s) => {
+        const name = `${s.first_name || ""} ${s.last_name || ""}`.trim() || s.username || "Staff Account";
+        const role = s.role_name || (typeof s.role === "object" ? s.role?.name : s.role) || "Staff User";
+        csvRows.push([`"${name}"`, `"${s.email || s.username || 'N/A'}"`, `"${role}"`, s.is_active !== false ? "Active" : "Inactive"]);
+      });
+    }
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.map((e) => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `NNIT_${activeTab}_report_${todayStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  // JSON Export Handler
+  const handleExportJSON = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(realAnalytics, null, 2));
     const a = document.createElement("a");
     a.href = dataStr;
@@ -718,6 +794,7 @@ export default function ReportsAnalytics() {
     a.remove();
   };
 
+  // Table Search Filters
   const searchedLeads = useMemo(() => {
     if (!searchTerm) return filteredDatasets.leads;
     return filteredDatasets.leads.filter((l) => {
@@ -760,17 +837,58 @@ export default function ReportsAnalytics() {
     });
   }, [filteredDatasets.staff, searchTerm]);
 
+  // Paginated Helper
+  const paginateList = (list) => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return list.slice(startIndex, startIndex + itemsPerPage);
+  };
+
+  const renderPaginationControls = (totalItems) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+    if (totalPages <= 1) return null;
+    return (
+      <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50 text-xs">
+        <span className="text-slate-500 font-medium">
+          Showing <span className="font-bold text-slate-700">{Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)}</span> to{" "}
+          <span className="font-bold text-slate-700">{Math.min(currentPage * itemsPerPage, totalTotal(totalItems))}</span> of{" "}
+          <span className="font-bold text-slate-700">{totalItems}</span> entries
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            <FiChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="px-3 py-1 font-bold text-indigo-700 bg-indigo-50 rounded-lg">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            <FiChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const totalTotal = (val) => val;
+
   return (
     <Base title="Report & Analytics">
       <div className="space-y-6 pb-12">
-        
+
         {/* ── Top Header Bar ── */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2.5">
               <span>Reports & Business Analytics</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200">
-                Live REST API
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 shadow-2xs">
+                ● Live REST API
               </span>
             </h1>
             <p className="text-xs text-slate-500 mt-1 font-medium">
@@ -778,29 +896,57 @@ export default function ReportsAnalytics() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Quick Date Presets */}
+            <div className="flex items-center bg-slate-100/90 rounded-xl p-1 text-xs">
+              {["All", "Today", "This Month", "Year 2026"].map((dOption) => (
+                <button
+                  key={dOption}
+                  onClick={() => handleFilterChange("dateRange", dOption)}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition ${
+                    filters.dateRange === dOption
+                      ? "bg-white text-indigo-700 shadow-xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {dOption}
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={loadDatabaseRecords}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition"
+              title="Sync latest live data from database"
             >
               <FiRefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-indigo-600" : ""}`} />
-              <span>Sync Data</span>
+              <span>Sync</span>
             </button>
 
             <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition shadow-sm"
+              onClick={handleExportCSV}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition shadow-xs"
+              title="Download active view dataset as CSV"
+            >
+              <FiFileText className="w-3.5 h-3.5" />
+              <span>CSV Export</span>
+            </button>
+
+            <button
+              onClick={handleExportJSON}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition shadow-xs"
+              title="Download full analytics JSON report"
             >
               <FiDownload className="w-3.5 h-3.5" />
-              <span>Export Report</span>
+              <span>JSON Report</span>
             </button>
           </div>
         </div>
 
-        {/* ── Tabs Navigation & Quick Search ── */}
+        {/* ── Tabs Navigation & Quick Search Bar ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            
+
             {/* 5 Pill Tabs */}
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-none p-1 bg-slate-100/80 rounded-xl shrink-0">
               {[
@@ -818,7 +964,7 @@ export default function ReportsAnalytics() {
                     onClick={() => setActiveTab(tab.id)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
                       active
-                        ? "bg-indigo-600 text-white shadow-sm"
+                        ? "bg-indigo-600 text-white shadow-xs"
                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
                     }`}
                   >
@@ -829,17 +975,30 @@ export default function ReportsAnalytics() {
               })}
             </div>
 
-            {/* Quick Search */}
-            <div className="relative w-full lg:w-64">
-              <input
-                type="text"
-                placeholder="Search report records..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              />
-              <FiSearch className="absolute left-3 top-2.5 text-slate-400 w-3.5 h-3.5" />
+            {/* Quick Search & Active Filter Counter */}
+            <div className="flex items-center gap-2 w-full lg:w-auto">
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={resetAllFilters}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl text-xs font-bold border border-rose-200 transition shrink-0"
+                >
+                  <FiX className="w-3.5 h-3.5" />
+                  <span>Reset ({activeFilterCount})</span>
+                </button>
+              )}
+
+              <div className="relative w-full lg:w-64">
+                <input
+                  type="text"
+                  placeholder="Search report records..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                />
+                <FiSearch className="absolute left-3 top-2.5 text-slate-400 w-3.5 h-3.5" />
+              </div>
             </div>
+
           </div>
         </div>
 
@@ -849,7 +1008,7 @@ export default function ReportsAnalytics() {
           {/* TAB 1: REVENUE ANALYSIS */}
           {activeTab === "revenue" && (
             <motion.div key="revenue" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-              
+
               {/* TAB 1 FILTERS */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
                 <div className="flex flex-col gap-1">
@@ -860,7 +1019,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.salesperson}
                     onChange={(e) => handleFilterChange("salesperson", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.salespersons.map((op) => (
                       <option key={op} value={op}>
@@ -878,7 +1037,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.product}
                     onChange={(e) => handleFilterChange("product", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.products.map((op) => (
                       <option key={op} value={op}>
@@ -896,7 +1055,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.dateRange}
                     onChange={(e) => handleFilterChange("dateRange", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.dates.map((op) => (
                       <option key={op} value={op}>
@@ -962,9 +1121,9 @@ export default function ReportsAnalytics() {
                 </div>
               </div>
 
-              {/* 4 EXCLUSIVE REVENUE CHARTS (2x2 GRID - NO REPETITION) */}
+              {/* 4 EXCLUSIVE REVENUE CHARTS (2x2 GRID) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
+
                 {/* 1. Monthly Revenue Area Chart */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
@@ -1066,7 +1225,7 @@ export default function ReportsAnalytics() {
 
               </div>
 
-              {/* Table */}
+              {/* Salesperson Table */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -1084,8 +1243,8 @@ export default function ReportsAnalytics() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {realAnalytics.salespersonsList.length > 0 ? (
-                        realAnalytics.salespersonsList.map((sp) => (
+                      {paginateList(realAnalytics.salespersonsList).length > 0 ? (
+                        paginateList(realAnalytics.salespersonsList).map((sp) => (
                           <tr key={sp.name} className="hover:bg-slate-50 transition">
                             <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-2">
                               <span className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
@@ -1096,7 +1255,7 @@ export default function ReportsAnalytics() {
                             <td className="py-3 px-4 font-medium">{sp.quotes}</td>
                             <td className="py-3 px-4 font-bold text-emerald-600">₹{sp.amount.toLocaleString("en-IN")}</td>
                             <td className="py-3 px-4 flex items-center justify-center gap-2">
-                              <button onClick={() => handleDeleteItem(sp.id, "lead", sp.name)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition">
+                              <button onClick={() => handleDeleteItem(sp.id, "lead", sp.name)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Delete record">
                                 <FiTrash2 className="w-3.5 h-3.5" />
                               </button>
                             </td>
@@ -1110,6 +1269,7 @@ export default function ReportsAnalytics() {
                     </tbody>
                   </table>
                 </div>
+                {renderPaginationControls(realAnalytics.salespersonsList.length)}
               </div>
             </motion.div>
           )}
@@ -1117,7 +1277,7 @@ export default function ReportsAnalytics() {
           {/* TAB 2: LEAD ANALYSIS */}
           {activeTab === "lead" && (
             <motion.div key="lead" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-              
+
               {/* TAB 2 FILTERS */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
                 <div className="flex flex-col gap-1">
@@ -1128,7 +1288,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.leadSource}
                     onChange={(e) => handleFilterChange("leadSource", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.leadSources.map((op) => (
                       <option key={op} value={op}>
@@ -1146,7 +1306,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.leadStatus}
                     onChange={(e) => handleFilterChange("leadStatus", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.leadStatuses.map((op) => (
                       <option key={op} value={op}>
@@ -1164,7 +1324,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.dateRange}
                     onChange={(e) => handleFilterChange("dateRange", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.dates.map((op) => (
                       <option key={op} value={op}>
@@ -1232,9 +1392,9 @@ export default function ReportsAnalytics() {
                 </div>
               </div>
 
-              {/* 4 EXCLUSIVE LEAD CHARTS (2x2 GRID - NO REPETITION) */}
+              {/* 4 EXCLUSIVE LEAD CHARTS (2x2 GRID) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
+
                 {/* 1. Lead Pipeline Donut Chart */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
@@ -1335,34 +1495,34 @@ export default function ReportsAnalytics() {
 
               </div>
 
-              {/* Table */}
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-                  <h3 className="text-sm font-bold text-slate-800">Database Leads ({searchedLeads.length})</h3>
+              {/* Leads Table */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Database Leads ({searchedLeads.length})</h3>
                 </div>
-                <div className="overflow-y-auto max-h-[240px] text-xs">
+                <div className="overflow-x-auto text-xs">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-100/70 text-slate-600 font-semibold border-b border-slate-200">
-                        <th className="py-2.5 px-3">Customer Name</th>
-                        <th className="py-2.5 px-3">Source</th>
-                        <th className="py-2.5 px-3">Status</th>
-                        <th className="py-2.5 px-3 text-center">Actions</th>
+                        <th className="py-3 px-4">Customer Name</th>
+                        <th className="py-3 px-4">Source</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {searchedLeads.length > 0 ? (
-                        searchedLeads.map((l) => (
-                          <tr key={l.id} className="hover:bg-slate-50">
-                            <td className="py-2.5 px-3 font-semibold text-slate-900">{l.contact_person_name || l.customer_name || `Lead #${l.id}`}</td>
-                            <td className="py-2.5 px-3 uppercase text-[10px] font-bold text-slate-600">{l.lead_source || "Direct"}</td>
-                            <td className="py-2.5 px-3">
-                              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-full text-[10px] uppercase border border-blue-200">
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {paginateList(searchedLeads).length > 0 ? (
+                        paginateList(searchedLeads).map((l) => (
+                          <tr key={l.id} className="hover:bg-slate-50 transition">
+                            <td className="py-3 px-4 font-semibold text-slate-900">{l.contact_person_name || l.customer_name || `Lead #${l.id}`}</td>
+                            <td className="py-3 px-4 uppercase text-[10px] font-bold text-slate-600">{l.lead_source || "Direct"}</td>
+                            <td className="py-3 px-4">
+                              <span className="px-2.5 py-1 bg-blue-50 text-blue-700 font-bold rounded-full text-[10px] uppercase border border-blue-200">
                                 {l.status || "open"}
                               </span>
                             </td>
-                            <td className="py-2.5 px-3 flex items-center justify-center gap-2">
-                              <button onClick={() => handleDeleteItem(l.id, "lead", l.contact_person_name || "Lead")} className="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition">
+                            <td className="py-3 px-4 flex items-center justify-center gap-2">
+                              <button onClick={() => handleDeleteItem(l.id, "lead", l.contact_person_name || "Lead")} className="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Delete lead">
                                 <FiTrash2 className="w-3.5 h-3.5" />
                               </button>
                             </td>
@@ -1374,15 +1534,16 @@ export default function ReportsAnalytics() {
                     </tbody>
                   </table>
                 </div>
+                {renderPaginationControls(searchedLeads.length)}
               </div>
             </motion.div>
           )}
 
-          {/* TAB 3: PRODUCT ANALYSIS */}
+          {/* TAB 3: PRODUCT ANALYSIS (FULLY REDESIGNED) */}
           {activeTab === "product" && (
             <motion.div key="product" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-              
-              {/* TAB 3 FILTERS */}
+
+              {/* TAB 3 FILTERS & CONTROLS */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
@@ -1392,7 +1553,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.category}
                     onChange={(e) => handleFilterChange("category", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.categories.map((op) => (
                       <option key={op} value={op}>
@@ -1410,7 +1571,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.priceRange}
                     onChange={(e) => handleFilterChange("priceRange", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.priceRanges.map((op) => (
                       <option key={op} value={op}>
@@ -1428,7 +1589,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.dateRange}
                     onChange={(e) => handleFilterChange("dateRange", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.dates.map((op) => (
                       <option key={op} value={op}>
@@ -1439,7 +1600,7 @@ export default function ReportsAnalytics() {
                 </div>
               </div>
 
-              {/* PRODUCT CARDS */}
+              {/* PRODUCT TOP 4 KPI METRIC CARDS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-3">
@@ -1451,7 +1612,7 @@ export default function ReportsAnalytics() {
                     </span>
                   </div>
                   <div className="text-2xl font-black text-slate-800 tracking-tight">{filteredDatasets.products.length}</div>
-                  <div className="text-xs font-medium text-slate-400 mt-1">Catalog Products</div>
+                  <div className="text-xs font-medium text-slate-400 mt-1">Active Catalog Models</div>
                 </div>
 
                 <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
@@ -1464,7 +1625,7 @@ export default function ReportsAnalytics() {
                     </span>
                   </div>
                   <div className="text-2xl font-black text-slate-800 tracking-tight">{realAnalytics.prodCategoryCount}</div>
-                  <div className="text-xs font-medium text-slate-400 mt-1">Active Categories</div>
+                  <div className="text-xs font-medium text-slate-400 mt-1">Defined Catalog Groups</div>
                 </div>
 
                 <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
@@ -1490,13 +1651,56 @@ export default function ReportsAnalytics() {
                     </span>
                   </div>
                   <div className="text-2xl font-black text-slate-800 tracking-tight">{realAnalytics.maxProductPriceStr}</div>
-                  <div className="text-xs font-medium text-slate-400 mt-1">Highest Unit Price</div>
+                  <div className="text-xs font-medium text-slate-400 mt-1">Highest System Unit Price</div>
                 </div>
               </div>
 
-              {/* 4 EXCLUSIVE PRODUCT CHARTS (2x2 GRID - NO DUPLICATE DONUT RINGS!) */}
+              {/* FEATURED PRODUCT MODELS SHOWCASE CARDS */}
+              {filteredDatasets.products.length > 0 && (
+                <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                      <FiPackage className="text-pink-600" />
+                      Featured Parking Product Models ({Math.min(filteredDatasets.products.length, 3)})
+                    </h3>
+                    <button
+                      onClick={() => navigate("/parking-products")}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1"
+                    >
+                      Manage Product Master ➔
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {filteredDatasets.products.slice(0, 3).map((prod, idx) => {
+                      const priceVal = parseFloat(prod.price || 0);
+                      const priceTag = priceVal < 100000 ? "Economy Tier" : priceVal <= 500000 ? "Standard Tier" : "Premium Tier";
+                      const tagBg = priceVal < 100000 ? "bg-teal-50 text-teal-700 border-teal-200" : priceVal <= 500000 ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-purple-50 text-purple-700 border-purple-200";
+
+                      return (
+                        <div key={prod.id || idx} className="bg-slate-50/70 rounded-xl p-4 border border-slate-200/80 hover:bg-slate-100/70 transition flex flex-col justify-between space-y-3">
+                          <div>
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <span className="text-xs font-bold text-slate-900 line-clamp-1">{prod.product_name || prod.name}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${tagBg} shrink-0`}>
+                                {priceTag}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 font-medium">Category: <span className="font-semibold text-slate-700">{prod.category || "Parking System"}</span></p>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
+                            <span className="text-sm font-extrabold text-indigo-700">₹{priceVal.toLocaleString("en-IN")}</span>
+                            <span className="text-[10px] font-semibold text-slate-400">ID #{prod.id}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 4 EXCLUSIVE PRODUCT CHARTS (2x2 GRID) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
+
                 {/* 1. Category Treemap Blocks Chart */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
@@ -1522,7 +1726,7 @@ export default function ReportsAnalytics() {
                   </div>
                 </div>
 
-                {/* 2. Price Tier Solid Pie Chart (No Donut hole) */}
+                {/* 2. Price Tier Solid Pie Chart */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -1534,7 +1738,7 @@ export default function ReportsAnalytics() {
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={realAnalytics.productPricePieChart} cx="50%" cy="50%" outerRadius={85} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                        <Pie data={realAnalytics.productPricePieChart} cx="50%" cy="50%" outerRadius={85} paddingAngle={2} dataKey="value">
                           {realAnalytics.productPricePieChart.map((entry) => (
                             <Cell key={entry.name} fill={entry.color} />
                           ))}
@@ -1546,45 +1750,45 @@ export default function ReportsAnalytics() {
                   </div>
                 </div>
 
-                {/* 3. Top Products Unit Price Horizontal Bar Chart */}
+                {/* 3. Top Products Price Horizontal Bar Chart */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                      <FiBarChart2 className="text-blue-600" />
-                      Top Products Price Ranking
+                      <FiBarChart2 className="text-emerald-600" />
+                      Top Product Unit Pricing
                     </h3>
-                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-md">Horizontal Bar</span>
+                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-md">Horizontal Bar</span>
                   </div>
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart layout="vertical" data={realAnalytics.topProductsHorizontalChart} margin={{ top: 5, right: 20, left: 40, bottom: 5 }}>
+                      <BarChart layout="vertical" data={realAnalytics.topProductsHorizontalChart} margin={{ top: 5, right: 20, left: 30, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                         <XAxis type="number" tick={{ fill: "#64748b", fontSize: 10 }} />
-                        <YAxis dataKey="name" type="category" tick={{ fill: "#64748b", fontSize: 10 }} width={90} />
+                        <YAxis dataKey="name" type="category" tick={{ fill: "#64748b", fontSize: 10 }} width={85} />
                         <Tooltip content={<CustomTooltip unit="₹" />} />
-                        <Bar dataKey="price" fill="#ec4899" radius={[0, 6, 6, 0]} barSize={20} />
+                        <Bar dataKey="price" fill="#10b981" radius={[0, 6, 6, 0]} barSize={20} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                {/* 4. Product Count Column Bar Chart */}
+                {/* 4. Product Category Column Bar Chart */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                      <FiBarChart2 className="text-emerald-600" />
-                      Product Count by Category
+                      <FiBarChart2 className="text-blue-600" />
+                      Catalog Items per Category
                     </h3>
-                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-md">Column Bar</span>
+                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-md">Column Bar</span>
                   </div>
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={realAnalytics.productCategoryColumnChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 10 }} />
-                        <YAxis tick={{ fill: "#64748b", fontSize: 10 }} />
+                        <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 11 }} />
+                        <YAxis tick={{ fill: "#64748b", fontSize: 11 }} />
                         <Tooltip content={<CustomTooltip unit="Items" />} />
-                        <Bar dataKey="count" name="Items Count" radius={[6, 6, 0, 0]} barSize={32}>
+                        <Bar dataKey="count" name="Items Count" radius={[6, 6, 0, 0]} barSize={34}>
                           {realAnalytics.productCategoryColumnChart.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.fill} />
                           ))}
@@ -1596,39 +1800,56 @@ export default function ReportsAnalytics() {
 
               </div>
 
-              {/* Table */}
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-                  <h3 className="text-sm font-bold text-slate-800">Database Products ({searchedProducts.length})</h3>
+              {/* Products Table */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Database Products Catalog ({searchedProducts.length})</h3>
                 </div>
-                <div className="overflow-y-auto max-h-[240px] text-xs">
+                <div className="overflow-x-auto text-xs">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-100/70 text-slate-600 font-semibold border-b border-slate-200">
-                        <th className="py-2.5 px-3">Product Name</th>
-                        <th className="py-2.5 px-3">Price</th>
-                        <th className="py-2.5 px-3 text-center">Actions</th>
+                        <th className="py-3 px-4">#</th>
+                        <th className="py-3 px-4">Product Name</th>
+                        <th className="py-3 px-4">Category</th>
+                        <th className="py-3 px-4">Price (INR)</th>
+                        <th className="py-3 px-4">Price Tier</th>
+                        <th className="py-3 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {searchedProducts.length > 0 ? (
-                        searchedProducts.map((p) => (
-                          <tr key={p.id} className="hover:bg-slate-50">
-                            <td className="py-2.5 px-3 font-semibold text-slate-900">{p.product_name || p.name}</td>
-                            <td className="py-2.5 px-3 font-bold text-indigo-600">₹{parseFloat(p.price || 0).toLocaleString("en-IN")}</td>
-                            <td className="py-2.5 px-3 flex items-center justify-center gap-2">
-                              <button onClick={() => handleDeleteItem(p.id, "product", p.product_name || "Product")} className="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition">
-                                <FiTrash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {paginateList(searchedProducts).length > 0 ? (
+                        paginateList(searchedProducts).map((p, idx) => {
+                          const priceVal = parseFloat(p.price || 0);
+                          const tier = priceVal < 100000 ? "Economy" : priceVal <= 500000 ? "Standard" : "Premium";
+                          const tierBadge = priceVal < 100000 ? "bg-teal-50 text-teal-700 border-teal-200" : priceVal <= 500000 ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-purple-50 text-purple-700 border-purple-200";
+
+                          return (
+                            <tr key={p.id} className="hover:bg-slate-50 transition">
+                              <td className="py-3 px-4 font-bold text-slate-500">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
+                              <td className="py-3 px-4 font-semibold text-slate-900">{p.product_name || p.name}</td>
+                              <td className="py-3 px-4 font-medium text-slate-600">{p.category || "General"}</td>
+                              <td className="py-3 px-4 font-bold text-indigo-600">₹{priceVal.toLocaleString("en-IN")}</td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${tierBadge}`}>
+                                  {tier}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 flex items-center justify-center gap-2">
+                                <button onClick={() => handleDeleteItem(p.id, "product", p.product_name || "Product")} className="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Delete product">
+                                  <FiTrash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
                       ) : (
-                        <tr><td colSpan={3} className="py-8 text-center text-slate-400 font-medium">No matching products</td></tr>
+                        <tr><td colSpan={6} className="py-8 text-center text-slate-400 font-medium">No matching products found</td></tr>
                       )}
                     </tbody>
                   </table>
                 </div>
+                {renderPaginationControls(searchedProducts.length)}
               </div>
             </motion.div>
           )}
@@ -1636,7 +1857,7 @@ export default function ReportsAnalytics() {
           {/* TAB 4: CUSTOMER SEGMENT ANALYSIS */}
           {activeTab === "segment" && (
             <motion.div key="segment" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-              
+
               {/* TAB 4 FILTERS */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
                 <div className="flex flex-col gap-1">
@@ -1647,7 +1868,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.city}
                     onChange={(e) => handleFilterChange("city", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.cities.map((op) => (
                       <option key={op} value={op}>
@@ -1665,7 +1886,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.customerType}
                     onChange={(e) => handleFilterChange("customerType", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.customerTypes.map((op) => (
                       <option key={op} value={op}>
@@ -1683,7 +1904,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.dateRange}
                     onChange={(e) => handleFilterChange("dateRange", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.dates.map((op) => (
                       <option key={op} value={op}>
@@ -1744,15 +1965,15 @@ export default function ReportsAnalytics() {
                       Converted
                     </span>
                   </div>
-                  <div className="text-2xl font-black text-slate-800 tracking-tight">{filteredDatasets.customers.filter(c => !c.is_lead_only).length || filteredDatasets.customers.length}</div>
+                  <div className="text-2xl font-black text-slate-800 tracking-tight">{filteredDatasets.customers.filter((c) => !c.is_lead_only).length || filteredDatasets.customers.length}</div>
                   <div className="text-xs font-medium text-slate-400 mt-1">Active Client Contracts</div>
                 </div>
               </div>
 
-              {/* 4 EXCLUSIVE CUSTOMER CHARTS (2x2 GRID - NO REPETITION) */}
+              {/* 4 EXCLUSIVE CUSTOMER CHARTS (2x2 GRID) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                {/* 1. Customer Onboarding Growth Multi-Series Line Chart */}
+
+                {/* 1. Customer Growth Multi-Series Line Chart */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -1789,7 +2010,7 @@ export default function ReportsAnalytics() {
                     {realAnalytics.customerRegionPieChart.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={realAnalytics.customerRegionPieChart} cx="50%" cy="50%" outerRadius={85} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                          <Pie data={realAnalytics.customerRegionPieChart} cx="50%" cy="50%" outerRadius={85} paddingAngle={4} dataKey="value">
                             {realAnalytics.customerRegionPieChart.map((entry) => (
                               <Cell key={entry.name} fill={entry.color} />
                             ))}
@@ -1860,39 +2081,42 @@ export default function ReportsAnalytics() {
 
               </div>
 
-              {/* Table */}
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-                  <h3 className="text-sm font-bold text-slate-800">Database Customers ({searchedCustomers.length})</h3>
+              {/* Customers Table */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Database Customers ({searchedCustomers.length})</h3>
                 </div>
-                <div className="overflow-y-auto max-h-[240px] text-xs">
+                <div className="overflow-x-auto text-xs">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-100/70 text-slate-600 font-semibold border-b border-slate-200">
-                        <th className="py-2.5 px-3">Customer Name</th>
-                        <th className="py-2.5 px-3">Contact Phone</th>
-                        <th className="py-2.5 px-3 text-center">Actions</th>
+                        <th className="py-3 px-4">Customer Name</th>
+                        <th className="py-3 px-4">Contact Phone</th>
+                        <th className="py-3 px-4">City / Address</th>
+                        <th className="py-3 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {searchedCustomers.length > 0 ? (
-                        searchedCustomers.map((c) => (
-                          <tr key={c.id} className="hover:bg-slate-50">
-                            <td className="py-2.5 px-3 font-semibold text-slate-900">{c.name}</td>
-                            <td className="py-2.5 px-3 font-medium text-slate-600">{c.contact_number || "N/A"}</td>
-                            <td className="py-2.5 px-3 flex items-center justify-center gap-2">
-                              <button onClick={() => handleDeleteItem(c.id, "customer", c.name)} className="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition">
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {paginateList(searchedCustomers).length > 0 ? (
+                        paginateList(searchedCustomers).map((c) => (
+                          <tr key={c.id} className="hover:bg-slate-50 transition">
+                            <td className="py-3 px-4 font-semibold text-slate-900">{c.name}</td>
+                            <td className="py-3 px-4 font-medium text-slate-600">{c.contact_number || "N/A"}</td>
+                            <td className="py-3 px-4 font-medium text-slate-600">{c.city || c.address || "N/A"}</td>
+                            <td className="py-3 px-4 flex items-center justify-center gap-2">
+                              <button onClick={() => handleDeleteItem(c.id, "customer", c.name)} className="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Delete customer">
                                 <FiTrash2 className="w-3.5 h-3.5" />
                               </button>
                             </td>
                           </tr>
                         ))
                       ) : (
-                        <tr><td colSpan={3} className="py-8 text-center text-slate-400 font-medium">No matching customer accounts</td></tr>
+                        <tr><td colSpan={4} className="py-8 text-center text-slate-400 font-medium">No matching customer accounts</td></tr>
                       )}
                     </tbody>
                   </table>
                 </div>
+                {renderPaginationControls(searchedCustomers.length)}
               </div>
             </motion.div>
           )}
@@ -1900,7 +2124,7 @@ export default function ReportsAnalytics() {
           {/* TAB 5: ROLE & ACCOUNTS ANALYSIS */}
           {activeTab === "role_access" && (
             <motion.div key="role_access" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-              
+
               {/* TAB 5 FILTERS */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
                 <div className="flex flex-col gap-1">
@@ -1911,7 +2135,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.role}
                     onChange={(e) => handleFilterChange("role", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.roles.map((op) => (
                       <option key={op} value={op}>
@@ -1929,7 +2153,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.accountStatus}
                     onChange={(e) => handleFilterChange("accountStatus", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.accountStatuses.map((op) => (
                       <option key={op} value={op}>
@@ -1947,7 +2171,7 @@ export default function ReportsAnalytics() {
                   <select
                     value={filters.dateRange}
                     onChange={(e) => handleFilterChange("dateRange", e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-xs font-medium"
                   >
                     {filterOptions.dates.map((op) => (
                       <option key={op} value={op}>
@@ -1996,7 +2220,7 @@ export default function ReportsAnalytics() {
                     </span>
                   </div>
                   <div className="text-2xl font-black text-slate-800 tracking-tight">
-                    {filteredDatasets.staff.filter(s => s.is_active !== false).length}
+                    {filteredDatasets.staff.filter((s) => s.is_active !== false).length}
                   </div>
                   <div className="text-xs font-medium text-slate-400 mt-1">Verified Active Logins</div>
                 </div>
@@ -2015,9 +2239,9 @@ export default function ReportsAnalytics() {
                 </div>
               </div>
 
-              {/* 4 EXCLUSIVE ROLE ACCESS CHARTS (2x2 GRID - NO REPETITION) */}
+              {/* 4 EXCLUSIVE ROLE ACCESS CHARTS (2x2 GRID) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
+
                 {/* 1. Staff Role Active Status Stacked Column Bar Chart */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
@@ -2042,7 +2266,7 @@ export default function ReportsAnalytics() {
                   </div>
                 </div>
 
-                {/* 2. Active Account Ratio Goal Radial Circular Gauge Ring */}
+                {/* 2. Active Account Ratio Goal Radial Gauge Ring */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -2110,55 +2334,54 @@ export default function ReportsAnalytics() {
 
               </div>
 
-              {/* REAL DATA ACCOUNTS & ROLES TABLE */}
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+              {/* Staff Accounts Table */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                       <FiShield className="text-purple-600" />
                       Database Staff Accounts & Access Roles ({searchedStaff.length})
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Real REST API staff users and role permissions</p>
                   </div>
                 </div>
-                <div className="overflow-x-auto max-h-[300px] text-xs">
+                <div className="overflow-x-auto text-xs">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-100/70 text-slate-600 font-semibold border-b border-slate-200">
-                        <th className="py-2.5 px-3">Staff Name</th>
-                        <th className="py-2.5 px-3">Email / Username</th>
-                        <th className="py-2.5 px-3">Contact Phone</th>
-                        <th className="py-2.5 px-3">Role</th>
-                        <th className="py-2.5 px-3">Status</th>
-                        <th className="py-2.5 px-3 text-center">Actions</th>
+                        <th className="py-3 px-4">Staff Name</th>
+                        <th className="py-3 px-4">Email / Username</th>
+                        <th className="py-3 px-4">Contact Phone</th>
+                        <th className="py-3 px-4">Role</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {searchedStaff.length > 0 ? (
-                        searchedStaff.map((s) => {
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {paginateList(searchedStaff).length > 0 ? (
+                        paginateList(searchedStaff).map((s) => {
                           const fullName = `${s.first_name || ""} ${s.last_name || ""}`.trim() || s.username || "Staff Account";
                           const roleName = s.role_name || (typeof s.role === "object" ? s.role?.name : s.role) || "Staff User";
                           return (
-                            <tr key={s.id} className="hover:bg-slate-50">
-                              <td className="py-2.5 px-3 font-semibold text-slate-900 flex items-center gap-2">
+                            <tr key={s.id} className="hover:bg-slate-50 transition">
+                              <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-2">
                                 <span className="w-7 h-7 rounded-full bg-purple-50 text-purple-700 font-bold flex items-center justify-center text-xs">
                                   {fullName.charAt(0).toUpperCase()}
                                 </span>
                                 <span>{fullName}</span>
                               </td>
-                              <td className="py-2.5 px-3 font-medium text-slate-600">{s.email || s.username || "N/A"}</td>
-                              <td className="py-2.5 px-3 font-medium text-slate-600">{s.contact_number || s.phone_number || "N/A"}</td>
-                              <td className="py-2.5 px-3">
+                              <td className="py-3 px-4 font-medium text-slate-600">{s.email || s.username || "N/A"}</td>
+                              <td className="py-3 px-4 font-medium text-slate-600">{s.contact_number || s.phone_number || "N/A"}</td>
+                              <td className="py-3 px-4">
                                 <span className="px-2.5 py-1 bg-purple-50 text-purple-700 font-bold rounded-lg text-[10px] uppercase border border-purple-200">
                                   {roleName}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3">
-                                <span className={`px-2 py-0.5 font-bold rounded-full text-[10px] uppercase ${s.is_active !== false ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"}`}>
+                              <td className="py-3 px-4">
+                                <span className={`px-2.5 py-0.5 font-bold rounded-full text-[10px] uppercase ${s.is_active !== false ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"}`}>
                                   {s.is_active !== false ? "Active" : "Inactive"}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3 flex items-center justify-center gap-2">
+                              <td className="py-3 px-4 flex items-center justify-center gap-2">
                                 <button onClick={() => handleDeleteItem(s.id, "staff", fullName)} className="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition" title="Delete Account">
                                   <FiTrash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -2174,6 +2397,7 @@ export default function ReportsAnalytics() {
                     </tbody>
                   </table>
                 </div>
+                {renderPaginationControls(searchedStaff.length)}
               </div>
             </motion.div>
           )}
