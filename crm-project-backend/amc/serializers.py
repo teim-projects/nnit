@@ -87,31 +87,43 @@ class AMCContractSerializer(serializers.ModelSerializer):
 
         # Create initial Cycle #1
         if start_date and end_date:
+            from django.utils.dateparse import parse_date
             today = timezone.now().date()
-            if start_date > today:
-                st = AMCStatus.SCHEDULED
-            elif (end_date - today).days <= 30 and end_date >= today:
-                st = AMCStatus.EXPIRING_SOON
-            elif end_date < today:
-                st = AMCStatus.EXPIRED
-            else:
-                st = AMCStatus.ACTIVE
+            start_date_obj = parse_date(start_date) if isinstance(start_date, str) else start_date
+            end_date_obj = parse_date(end_date) if isinstance(end_date, str) else end_date
 
-            AMCCycle.objects.create(
-                amc_contract=amc,
-                cycle_number=1,
-                start_date=start_date,
-                end_date=end_date,
-                annual_value=annual_value,
-                payment_frequency=payment_frequency,
-                status=st,
-                remarks="Initial Contract Cycle",
-                created_by=user
-            )
-            amc.sync_active_cycle_data()
+            if start_date_obj and end_date_obj:
+                if start_date_obj > today:
+                    st = AMCStatus.SCHEDULED
+                elif (end_date_obj - today).days <= 30 and end_date_obj >= today:
+                    st = AMCStatus.EXPIRING_SOON
+                elif end_date_obj < today:
+                    st = AMCStatus.EXPIRED
+                else:
+                    st = AMCStatus.ACTIVE
+
+                AMCCycle.objects.create(
+                    amc_contract=amc,
+                    cycle_number=1,
+                    start_date=start_date_obj,
+                    end_date=end_date_obj,
+                    annual_value=annual_value,
+                    payment_frequency=payment_frequency,
+                    status=st,
+                    remarks="Initial Contract Cycle",
+                    created_by=user
+                )
+                try:
+                    amc.sync_active_cycle_data()
+                except Exception:
+                    pass
 
         # Generate scheduled service visits & calculate per_visit_amount
-        amc.generate_schedule()
+        try:
+            amc.generate_schedule()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error generating schedule on AMC create {amc.id}: {e}")
 
         return amc
 
