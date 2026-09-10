@@ -14,7 +14,6 @@ router.register(r'contracts', AMCContractViewSet, basename='amc-contract')
 router.register(r'schedules', AMCServiceScheduleViewSet, basename='amc-schedule')
 router.register(r'visits', AMCServiceVisitViewSet, basename='amc-visit')
 router.register(r'renewals', AMCRenewalViewSet, basename='amc-renewal')
-router.register(r'', AMCContractViewSet, basename='amc')
 
 urlpatterns = [
     path('dashboard/', AMCDashboardView.as_view(), name='amc-dashboard'),
