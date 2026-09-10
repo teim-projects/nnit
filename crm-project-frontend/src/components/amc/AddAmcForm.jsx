@@ -276,6 +276,12 @@ export default function AddAmcForm({
 
     setLoading(true);
     try {
+      // Debug logging
+      console.log("🔍 Debug Info:");
+      console.log("  baseApi:", baseApi);
+      console.log("  amc:", amc);
+      console.log("  URL will be:", amc ? `${baseApi}/api/amc/contracts/${amc.id}/` : `${baseApi}/api/amc/contracts/`);
+      
       const payload = {
         customer: parseInt(data.customer, 10),
         linked_service: data.linked_service ? parseInt(data.linked_service, 10) : null,
@@ -298,11 +304,15 @@ export default function AddAmcForm({
       const url = amc ? `${baseApi}/api/amc/contracts/${amc.id}/` : `${baseApi}/api/amc/contracts/`;
       const method = amc ? "PUT" : "POST";
 
+      console.log("📤 Sending request:", { url, method, payload });
+
       const res = await fetch(url, {
         method,
         headers,
         body: JSON.stringify(payload),
       });
+
+      console.log("📥 Response status:", res.status);
 
       if (!res.ok) {
         let errorMsg = `Server Error (${res.status})`;
@@ -310,9 +320,11 @@ export default function AddAmcForm({
           const contentType = res.headers.get("content-type") || "";
           if (contentType.includes("application/json")) {
             const errorData = await res.json();
+            console.error("❌ Error response JSON:", errorData);
             errorMsg = formatBackendErrors(errorData);
           } else {
             const textData = await res.text();
+            console.error("❌ Error response text:", textData);
             const match = textData.match(/<title>(.*?)<\/title>/i) || textData.match(/<h1>(.*?)<\/h1>/i);
             if (match && match[1]) {
               errorMsg = match[1].replace(/<[^>]+>/g, "").trim();
