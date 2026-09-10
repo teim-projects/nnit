@@ -11,4 +11,19 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.AddField(
+            model_name='parkingproduct',
+            name='max_height',
+            field=models.DecimalField(blank=True, decimal_places=2, help_text='Maximum height required (ft)', max_digits=10, null=True, validators=[django.core.validators.MinValueValidator(0)]),
+        ),
+        migrations.AddField(
+            model_name='parkingproduct',
+            name='max_length',
+            field=models.DecimalField(blank=True, decimal_places=2, help_text='Maximum length required (ft)', max_digits=10, null=True, validators=[django.core.validators.MinValueValidator(0)]),
+        ),
+        migrations.AddField(
+            model_name='parkingproduct',
+            name='max_width',
+            field=models.DecimalField(blank=True, decimal_places=2, help_text='Maximum width required (ft)', max_digits=10, null=True, validators=[django.core.validators.MinValueValidator(0)]),
+        ),
     ]
