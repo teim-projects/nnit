@@ -129,23 +129,19 @@ class AMCContract(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Updated At")
 
     def generate_contract_id(self):
-        import re
-        max_num = 0
-        for cid in AMCContract.objects.values_list('contract_id', flat=True):
-            if cid:
-                matches = re.findall(r'\d+', str(cid))
-                if matches:
-                    try:
-                        num = int(matches[-1])
-                        if num > max_num:
-                            max_num = num
-                    except ValueError:
-                        pass
-        return f"AMC-{(max_num + 1):03d}"
+        last_amc = AMCContract.objects.order_by('-id').first()
+        if last_amc and last_amc.contract_id:
+            try:
+                num = int(last_amc.contract_id.replace("AMC-", "").replace("AMC", ""))
+                new_num = num + 1
+            except ValueError:
+                new_num = 1
+        else:
+            new_num = 1
+        return f"AMC-{new_num:03d}"
 
     def sync_active_cycle_data(self):
         """Auto-evaluates cycle statuses against today's date and syncs active cycle info to contract header."""
-        from django.utils.dateparse import parse_date
         today = timezone.now().date()
         cycles = list(self.cycles.all().order_by('cycle_number'))
         if not cycles:
@@ -157,11 +153,6 @@ class AMCContract(models.Model):
 
             c_start = cycle.start_date
             c_end = cycle.end_date
-
-            if isinstance(c_start, str):
-                c_start = parse_date(c_start)
-            if isinstance(c_end, str):
-                c_end = parse_date(c_end)
 
             if c_end and c_end < today:
                 if cycle.status != AMCStatus.EXPIRED:
@@ -201,16 +192,10 @@ class AMCContract(models.Model):
         if self.amc_type != AMCType.WARRANTY:
             return []
 
-        if not self.customer:
-            return []
-
         from service_management.models import ServiceRequest, ServiceType, ServiceStatus, ServicePriority
         from datetime import timedelta
-        from django.utils.dateparse import parse_date
 
         base_start = self.start_date or timezone.now().date()
-        if isinstance(base_start, str):
-            base_start = parse_date(base_start) or timezone.now().date()
         created_services = []
 
         for q in range(1, 5):
@@ -249,16 +234,10 @@ class AMCContract(models.Model):
         if self.amc_type == AMCType.WARRANTY:
             return self.generate_warranty_services()
 
-        if not self.customer:
-            return []
-
         from service_management.models import ServiceRequest, ServiceType, ServiceStatus, ServicePriority
         from dateutil.relativedelta import relativedelta
-        from django.utils.dateparse import parse_date
 
         base_start = self.start_date or timezone.now().date()
-        if isinstance(base_start, str):
-            base_start = parse_date(base_start) or timezone.now().date()
 
         freq = (self.payment_frequency or 'quarterly').lower()
         if freq == 'monthly':
