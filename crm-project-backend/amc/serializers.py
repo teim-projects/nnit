@@ -43,28 +43,41 @@ class SimpleServiceRequestSerializer(serializers.ModelSerializer):
 
 
 class AMCContractSerializer(serializers.ModelSerializer):
-    customer_details = CustomerSerializer(source="customer", read_only=True)
+    customer_details = CustomerSerializer(source="customer", read_only=True, allow_null=True)
     support_coordinator_details = CustomUserDetailsSerializer(
         source="support_coordinator",
-        read_only=True
+        read_only=True,
+        allow_null=True
     )
     assigned_technician_details = SimpleTechnicianSerializer(
         source="assigned_technician",
-        read_only=True
+        read_only=True,
+        allow_null=True
     )
     linked_service_details = SimpleServiceRequestSerializer(
         source="linked_service",
-        read_only=True
+        read_only=True,
+        allow_null=True
     )
     created_by_details = CustomUserDetailsSerializer(
         source="created_by",
-        read_only=True
+        read_only=True,
+        allow_null=True
     )
     cycles = AMCCycleSerializer(many=True, read_only=True)
-    service_requests = SimpleServiceRequestSerializer(many=True, read_only=True)
+    service_requests = serializers.SerializerMethodField()
     amc_type_display = serializers.CharField(source="get_amc_type_display", read_only=True)
     payment_frequency_display = serializers.CharField(source="get_payment_frequency_display", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    def get_service_requests(self, obj):
+        """Safely get service requests with error handling"""
+        try:
+            service_reqs = obj.service_requests.all()
+            return SimpleServiceRequestSerializer(service_reqs, many=True).data
+        except Exception as e:
+            print(f"Error serializing service_requests for AMC {obj.id}: {str(e)}")
+            return []
 
     class Meta:
         model = AMCContract
