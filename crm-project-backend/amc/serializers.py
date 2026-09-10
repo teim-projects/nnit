@@ -86,47 +86,59 @@ class AMCContractSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        request = self.context.get("request")
-        user = request.user if request and request.user.is_authenticated else None
-        if user and "created_by" not in validated_data:
-            validated_data["created_by"] = user
+        try:
+            request = self.context.get("request")
+            user = request.user if request and request.user.is_authenticated else None
+            if user and "created_by" not in validated_data:
+                validated_data["created_by"] = user
 
-        start_date = validated_data.get("start_date")
-        end_date = validated_data.get("end_date")
-        annual_value = validated_data.get("annual_value", 0.00)
-        payment_frequency = validated_data.get("payment_frequency", "quarterly")
+            start_date = validated_data.get("start_date")
+            end_date = validated_data.get("end_date")
+            annual_value = validated_data.get("annual_value", 0.00)
+            payment_frequency = validated_data.get("payment_frequency", "quarterly")
 
-        amc = AMCContract.objects.create(**validated_data)
+            amc = AMCContract.objects.create(**validated_data)
 
-        # Create initial Cycle #1
-        if start_date and end_date:
-            today = timezone.now().date()
-            if start_date > today:
-                st = AMCStatus.SCHEDULED
-            elif (end_date - today).days <= 30 and end_date >= today:
-                st = AMCStatus.EXPIRING_SOON
-            elif end_date < today:
-                st = AMCStatus.EXPIRED
-            else:
-                st = AMCStatus.ACTIVE
+            # Create initial Cycle #1
+            if start_date and end_date:
+                today = timezone.now().date()
+                if start_date > today:
+                    st = AMCStatus.SCHEDULED
+                elif (end_date - today).days <= 30 and end_date >= today:
+                    st = AMCStatus.EXPIRING_SOON
+                elif end_date < today:
+                    st = AMCStatus.EXPIRED
+                else:
+                    st = AMCStatus.ACTIVE
 
-            AMCCycle.objects.create(
-                amc_contract=amc,
-                cycle_number=1,
-                start_date=start_date,
-                end_date=end_date,
-                annual_value=annual_value,
-                payment_frequency=payment_frequency,
-                status=st,
-                remarks="Initial Contract Cycle",
-                created_by=user
-            )
-            amc.sync_active_cycle_data()
+                AMCCycle.objects.create(
+                    amc_contract=amc,
+                    cycle_number=1,
+                    start_date=start_date,
+                    end_date=end_date,
+                    annual_value=annual_value,
+                    payment_frequency=payment_frequency,
+                    status=st,
+                    remarks="Initial Contract Cycle",
+                    created_by=user
+                )
+                try:
+                    amc.sync_active_cycle_data()
+                except Exception as sync_err:
+                    print(f"Warning: Failed to sync cycle data: {str(sync_err)}")
 
-        # Generate scheduled service visits & calculate per_visit_amount
-        amc.generate_schedule()
+            # Generate scheduled service visits & calculate per_visit_amount
+            try:
+                amc.generate_schedule()
+            except Exception as gen_err:
+                print(f"Warning: Failed to generate schedule: {str(gen_err)}")
 
-        return amc
+            return amc
+        except Exception as e:
+            print(f"❌ Error creating AMC contract: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     @transaction.atomic
     def update(self, instance, validated_data):
