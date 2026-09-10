@@ -35,9 +35,19 @@ export default function AmcList({ baseApi, token, filters = {} }) {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailModalData, setEmailModalData] = useState({});
 
+  // Get fresh token from localStorage if prop is missing
+  const getToken = () => {
+    return token || localStorage.getItem('access');
+  };
+
   const fetchContracts = async () => {
     setLoading(true);
     try {
+      const authToken = getToken();
+      if (!authToken) {
+        throw new Error("No authentication token found. Please login again.");
+      }
+
       let url = `${baseApi}/api/amc/contracts/`;
       const queryParams = [];
 
@@ -52,22 +62,49 @@ export default function AmcList({ baseApi, token, filters = {} }) {
         url += `?${queryParams.join("&")}`;
       }
 
+      console.log("Fetching AMC contracts from:", url);
+      console.log("Token present:", !!authToken);
+
       const res = await fetch(url, {
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${authToken}`,
         },
       });
 
+      console.log("Response status:", res.status);
+
+      if (res.status === 401) {
+        // Token expired, redirect to login
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
+        Swal.fire({
+          icon: "warning",
+          title: "Session Expired",
+          text: "Please login again to continue",
+        }).then(() => {
+          window.location.href = '/login';
+        });
+        return;
+      }
+
       if (res.ok) {
         const data = await res.json();
+        console.log("Fetched contracts data:", data);
         setContracts(Array.isArray(data) ? data : data.results || []);
       } else {
-        throw new Error("Failed to load AMC contracts");
+        const errorText = await res.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Failed to load AMC contracts: ${res.status} ${res.statusText}`);
       }
     } catch (err) {
-      console.error(err);
-      Swal.fire({ icon: "error", title: "Error", text: "Failed to fetch contracts" });
+      console.error("Fetch error:", err);
+      Swal.fire({ 
+        icon: "error", 
+        title: "Error", 
+        text: err.message || "Failed to fetch contracts",
+        footer: "Please check console for details"
+      });
     } finally {
       setLoading(false);
     }
@@ -75,8 +112,14 @@ export default function AmcList({ baseApi, token, filters = {} }) {
 
   const fetchTechnicians = async () => {
     try {
+      const authToken = getToken();
+      if (!authToken) return;
+
       const res = await fetch(`${baseApi}/api/services/technicians/?status=active`, {
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}` 
+        }
       });
       if (res.ok) {
         const data = await res.json();
@@ -108,10 +151,12 @@ export default function AmcList({ baseApi, token, filters = {} }) {
     if (!result.isConfirmed) return;
 
     try {
+      const authToken = getToken();
       const res = await fetch(`${baseApi}/api/amc/contracts/${id}/`, {
         method: "DELETE",
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
         },
       });
 
@@ -139,11 +184,12 @@ export default function AmcList({ baseApi, token, filters = {} }) {
     if (!result.isConfirmed) return;
 
     try {
+      const authToken = getToken();
       const res = await fetch(`${baseApi}/api/amc/contracts/${id}/toggle-status/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${authToken}`,
         },
       });
 
@@ -195,11 +241,12 @@ export default function AmcList({ baseApi, token, filters = {} }) {
     if (!assignAmcModal) return;
 
     try {
+      const authToken = getToken();
       const res = await fetch(`${baseApi}/api/amc/contracts/${assignAmcModal.id}/assign-technician/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           technician_id: selectedTechId ? parseInt(selectedTechId, 10) : null
@@ -220,11 +267,12 @@ export default function AmcList({ baseApi, token, filters = {} }) {
 
   const handleGenerateWarrantyServices = async (id) => {
     try {
+      const authToken = getToken();
       const res = await fetch(`${baseApi}/api/amc/contracts/${id}/generate-warranty-services/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${authToken}`,
         },
       });
       if (res.ok) {
