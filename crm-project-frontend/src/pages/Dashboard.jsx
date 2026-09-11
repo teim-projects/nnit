@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Navigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import Base from "../components/Base";
 import TechnicianDashboard from "./TechnicianDashboard";
 import { useUserRole } from "../hooks/useAuth";
@@ -19,19 +19,20 @@ const C = { indigo: "#6366f1", emerald: "#10b981", orange: "#f97316", violet: "#
 const PIE_COLORS = [C.indigo, C.emerald, C.orange, C.violet, C.sky, C.pink, C.rose, C.amber];
 
 const KPI_DEFS = [
-  { key: "totalLeads", label: "Total Leads", icon: FiUsers, from: "#6366f1", to: "#818cf8", trend: 12, up: true },
-  { key: "totalCustomers", label: "Active Customers", icon: FiCheckCircle, from: "#10b981", to: "#34d399", trend: 8, up: true },
-  { key: "totalQuotations", label: "Quotations", icon: FiFileText, from: "#f97316", to: "#fb923c", trend: 15, up: true },
-  { key: "totalProducts", label: "Products", icon: FiPackage, from: "#8b5cf6", to: "#c084fc", trend: 5, up: true },
-  { key: "avgResponseDays", label: "Avg Response (days)", icon: FiClock, from: "#0ea5e9", to: "#38bdf8", trend: null, up: false },
+  { key: "totalLeads", label: "Total Leads", icon: FiUsers, from: "#6366f1", to: "#818cf8", trend: 12, up: true, path: "/leads" },
+  { key: "totalCustomers", label: "Active Customers", icon: FiCheckCircle, from: "#10b981", to: "#34d399", trend: 8, up: true, path: "/customer" },
+  { key: "totalQuotations", label: "Quotations", icon: FiFileText, from: "#f97316", to: "#fb923c", trend: 15, up: true, path: "/quotation" },
+  { key: "totalProducts", label: "Products", icon: FiPackage, from: "#8b5cf6", to: "#c084fc", trend: 5, up: true, path: "/parking-products" },
+  { key: "avgResponseDays", label: "Avg Response (days)", icon: FiClock, from: "#0ea5e9", to: "#38bdf8", trend: null, up: false, path: "/followup-management" },
 ];
 
 const MINI_DEFS = [
-  { key: "openLeads", label: "Open Leads", icon: FiPhone, color: C.indigo },
-  { key: "todayFollowups", label: "Today Follow-ups", icon: FiCalendar, color: C.emerald },
-  { key: "overdueFollowups", label: "Overdue", icon: FiAlertCircle, color: C.rose },
-  { key: "inProcessLeads", label: "In Process", icon: FiActivity, color: C.orange },
+  { key: "openLeads", label: "Open Leads", icon: FiPhone, color: C.indigo, path: "/leads" },
+  { key: "todayFollowups", label: "Today Follow-ups", icon: FiCalendar, color: C.emerald, path: "/followup-management" },
+  { key: "overdueFollowups", label: "Overdue", icon: FiAlertCircle, color: C.rose, path: "/followup-management" },
+  { key: "inProcessLeads", label: "In Process", icon: FiActivity, color: C.orange, path: "/leads" },
 ];
+
 
 /* ── Count Up Hook ── */
 function useCountUp(target, duration = 1200) {
@@ -77,20 +78,23 @@ const itemVariant = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } }
 };
 
-function KpiCard({ icon: Icon, label, value, from, to, trend, up }) {
+function KpiCard({ icon: Icon, label, value, from, to, trend, up, onClick }) {
   const animated = useCountUp(value);
   return (
     <motion.div
       variants={itemVariant}
-      whileHover={{ y: -4, boxShadow: `0 15px 25px -5px ${from}44` }}
-      className="relative overflow-hidden rounded-2xl p-5 cursor-default group transition-all"
+      onClick={onClick}
+      whileHover={{ y: -6, scale: 1.02, boxShadow: `0 20px 30px -5px ${from}66` }}
+      whileTap={{ scale: 0.97 }}
+      className="relative overflow-hidden rounded-2xl p-5 cursor-pointer group transition-all select-none"
       style={{ background: `linear-gradient(135deg, ${from}, ${to})`, boxShadow: `0 8px 20px -5px ${from}33` }}
+      title={`Click to view ${label} list`}
     >
       <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/20 group-hover:scale-125 transition-transform duration-700 ease-out" />
       <div className="absolute right-4 -bottom-10 w-20 h-20 rounded-full bg-white/10 group-hover:-translate-y-4 transition-transform duration-700 ease-out" />
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-4">
-          <div className="p-2.5 bg-white/25 backdrop-blur-md rounded-xl">
+          <div className="p-2.5 bg-white/25 backdrop-blur-md rounded-xl group-hover:bg-white/35 transition-colors">
             <Icon className="w-5 h-5 text-white" />
           </div>
           {trend != null && (
@@ -101,30 +105,40 @@ function KpiCard({ icon: Icon, label, value, from, to, trend, up }) {
           )}
         </div>
         <div className="text-3xl font-extrabold text-white tracking-tight drop-shadow-xs">{animated.toLocaleString()}</div>
-        <div className="text-xs font-medium text-white/90 mt-1">{label}</div>
+        <div className="text-xs font-semibold text-white/90 mt-1 flex items-center justify-between">
+          <span>{label}</span>
+          <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity underline">View List →</span>
+        </div>
       </div>
     </motion.div>
   );
 }
 
-function MiniCard({ icon: Icon, label, value, color }) {
+function MiniCard({ icon: Icon, label, value, color, onClick }) {
   const animated = useCountUp(value);
   return (
     <motion.div
       variants={itemVariant}
-      whileHover={{ y: -3, boxShadow: "0 10px 15px -3px rgba(0,0,0,0.05)" }}
-      className="bg-white rounded-xl p-4 border border-slate-100 flex items-center gap-4 transition-all shadow-xs"
+      onClick={onClick}
+      whileHover={{ y: -4, scale: 1.02, boxShadow: "0 12px 20px -3px rgba(0,0,0,0.08)" }}
+      whileTap={{ scale: 0.97 }}
+      className="bg-white rounded-xl p-4 border border-slate-100 flex items-center gap-4 transition-all shadow-xs cursor-pointer hover:border-indigo-200 select-none group"
+      title={`Click to view ${label}`}
     >
-      <div className="p-3 rounded-xl shrink-0" style={{ background: color + "18", color: color }}>
+      <div className="p-3 rounded-xl shrink-0 transition-transform group-hover:scale-110" style={{ background: color + "18", color: color }}>
         <Icon className="w-5 h-5" />
       </div>
-      <div>
-        <div className="text-xl font-bold text-slate-800">{animated}</div>
+      <div className="flex-1">
+        <div className="text-xl font-bold text-slate-800 flex items-center justify-between">
+          <span>{animated}</span>
+          <span className="text-[10px] text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">View →</span>
+        </div>
         <div className="text-[11px] text-slate-500 font-semibold uppercase tracking-wide mt-0.5">{label}</div>
       </div>
     </motion.div>
   );
 }
+
 
 function FunnelBar({ label, value, max, color, pct }) {
   const w = max > 0 ? Math.min(100, Math.max(3, Math.round((value / max) * 100))) : 0;
@@ -157,9 +171,11 @@ function FunnelBar({ label, value, max, color, pct }) {
 
 export default function Dashboard() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  const navigate = useNavigate();
   const token = localStorage.getItem("access") || "";
   const { userRole, isLoading: loadingRole } = useUserRole(BASE_API);
   const roleName = (userRole?.name || localStorage.getItem("user_role") || "").toLowerCase();
+
 
   const [stats, setStats] = useState(null);
   const [monthly, setMonthly] = useState([]);
@@ -401,11 +417,16 @@ export default function Dashboard() {
               <p className="text-sm font-medium text-slate-600 mt-2">Here's your business snapshot for today.</p>
               <div className="flex flex-wrap gap-3 mt-6">
                 {[
-                  { l: "Leads", v: stats.totalLeads, c: "text-indigo-700", bg: "bg-indigo-100" },
-                  { l: "Customers", v: stats.totalCustomers, c: "text-emerald-700", bg: "bg-emerald-100" },
-                  { l: "Quotations", v: stats.totalQuotations, c: "text-orange-700", bg: "bg-orange-100" }
+                  { l: "Leads", v: stats.totalLeads, c: "text-indigo-700", bg: "bg-indigo-100 hover:bg-indigo-200", path: "/leads" },
+                  { l: "Customers", v: stats.totalCustomers, c: "text-emerald-700", bg: "bg-emerald-100 hover:bg-emerald-200", path: "/customer" },
+                  { l: "Quotations", v: stats.totalQuotations, c: "text-orange-700", bg: "bg-orange-100 hover:bg-orange-200", path: "/quotation" }
                 ].map((s) => (
-                  <div key={s.l} className={`flex items-center gap-2 px-4 py-2 rounded-xl shadow-xs ${s.bg}`}>
+                  <div
+                    key={s.l}
+                    onClick={() => navigate(s.path)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl shadow-xs ${s.bg} cursor-pointer transition-all hover:scale-105 select-none`}
+                    title={`Click to view ${s.l} list`}
+                  >
                     <span className={`text-lg font-bold ${s.c}`}>{s.v}</span>
                     <span className={`text-xs font-semibold uppercase tracking-wide ${s.c} opacity-80`}>{s.l}</span>
                   </div>
@@ -422,13 +443,21 @@ export default function Dashboard() {
               <div className="text-xs font-medium text-slate-400 mt-1 uppercase">{new Date().getFullYear()}</div>
               <div className="mt-4 space-y-1.5">
                 {stats.overdueFollowups > 0 && (
-                  <div className="flex items-center justify-center gap-1.5 bg-rose-50 text-rose-600 text-[11px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wide">
+                  <div
+                    onClick={() => navigate("/followup-management")}
+                    className="flex items-center justify-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wide cursor-pointer transition-all hover:scale-105"
+                    title="View Overdue Follow-ups"
+                  >
                     <FiAlertCircle className="w-3.5 h-3.5" />
                     {stats.overdueFollowups} overdue
                   </div>
                 )}
                 {stats.todayFollowups > 0 && (
-                  <div className="flex items-center justify-center gap-1.5 bg-emerald-50 text-emerald-600 text-[11px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wide">
+                  <div
+                    onClick={() => navigate("/followup-management")}
+                    className="flex items-center justify-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[11px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wide cursor-pointer transition-all hover:scale-105"
+                    title="View Today's Follow-ups"
+                  >
                     <FiCalendar className="w-3.5 h-3.5" />
                     {stats.todayFollowups} today
                   </div>
@@ -441,16 +470,34 @@ export default function Dashboard() {
         {/* ── KPI CARDS ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {KPI_DEFS.map((d) => (
-            <KpiCard key={d.key} icon={d.icon} label={d.label} value={stats[d.key]} from={d.from} to={d.to} trend={d.trend} up={d.up} />
+            <KpiCard
+              key={d.key}
+              icon={d.icon}
+              label={d.label}
+              value={stats[d.key]}
+              from={d.from}
+              to={d.to}
+              trend={d.trend}
+              up={d.up}
+              onClick={() => d.path && navigate(d.path)}
+            />
           ))}
         </div>
 
         {/* ── MINI CARDS ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {MINI_DEFS.map((d) => (
-            <MiniCard key={d.key} icon={d.icon} label={d.label} value={stats[d.key]} color={d.color} />
+            <MiniCard
+              key={d.key}
+              icon={d.icon}
+              label={d.label}
+              value={stats[d.key]}
+              color={d.color}
+              onClick={() => d.path && navigate(d.path)}
+            />
           ))}
         </div>
+
 
         {/* ── ROW 1: Area + CRM Portfolio Pie ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -554,15 +601,26 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-2 gap-2 mt-5">
               {portfolioData.map((d) => (
-                <div key={d.name} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 hover:bg-slate-100 transition-colors">
+                <div
+                  key={d.name}
+                  onClick={() => {
+                    if (d.name === "Leads") navigate("/leads");
+                    else if (d.name === "Customers") navigate("/customer");
+                    else if (d.name === "Quotations") navigate("/quotation");
+                    else if (d.name === "Products") navigate("/parking-products");
+                  }}
+                  className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 hover:bg-indigo-50/70 hover:border-indigo-200 transition-all cursor-pointer group select-none"
+                  title={`Click to view ${d.name} list`}
+                >
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className="w-2.5 h-2.5 rounded-full shadow-xs" style={{ background: d.fill }} />
-                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{d.name}</span>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide group-hover:text-indigo-600">{d.name}</span>
                   </div>
                   <div className="text-lg font-bold text-slate-800 pl-4">{d.value}</div>
                 </div>
               ))}
             </div>
+
           </motion.div>
         </div>
 
@@ -592,8 +650,13 @@ export default function Dashboard() {
             </div>
             <div className="space-y-2 mt-5">
               {statusData.map((d) => (
-                <div key={d.name} className="flex items-center justify-between text-xs px-3 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors rounded-lg border border-slate-100">
-                  <span className="flex items-center gap-2 text-slate-700 font-medium">
+                <div
+                  key={d.name}
+                  onClick={() => navigate("/leads")}
+                  className="flex items-center justify-between text-xs px-3 py-2.5 bg-slate-50 hover:bg-indigo-50/70 hover:border-indigo-200 transition-all rounded-lg border border-slate-100 cursor-pointer group select-none"
+                  title={`View ${d.name} leads list`}
+                >
+                  <span className="flex items-center gap-2 text-slate-700 font-medium group-hover:text-indigo-600">
                     <span className="w-3 h-3 rounded-full shadow-xs" style={{ background: d.fill }} />
                     {d.name}
                   </span>
@@ -627,8 +690,13 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-2 gap-2 mt-5">
               {srcData.slice(0, 4).map((d, i) => (
-                <div key={d.name} className="flex flex-col bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-600 truncate text-[11px] uppercase tracking-wide">
+                <div
+                  key={d.name}
+                  onClick={() => navigate("/leads")}
+                  className="flex flex-col bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:bg-amber-50/70 hover:border-amber-200 transition-all cursor-pointer group select-none"
+                  title={`View leads from ${d.name}`}
+                >
+                  <span className="flex items-center gap-1.5 font-medium text-slate-600 truncate text-[11px] uppercase tracking-wide group-hover:text-amber-700">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
                     {d.name}
                   </span>
@@ -644,18 +712,23 @@ export default function Dashboard() {
               Conversion Funnel
             </p>
             <p className="text-[11px] font-medium text-slate-400 mb-8 uppercase tracking-wide">Pipeline velocity</p>
-            <div className="space-y-6">
+            <div className="space-y-6 cursor-pointer" onClick={() => navigate("/leads")}>
               {funnelData.map((f, i) => (
                 <FunnelBar key={f.name} label={f.name} value={f.val} max={stats.totalLeads} color={PIE_COLORS[i]} pct={f.pct} />
               ))}
             </div>
             <div className="grid grid-cols-3 gap-2 mt-8">
               {[
-                { l: "Conv. Rate", v: cRate, c: C.indigo },
-                { l: "Quote Rate", v: qRate, c: C.emerald },
-                { l: "Close Rate", v: clRate, c: C.orange }
+                { l: "Conv. Rate", v: cRate, c: C.indigo, path: "/customer" },
+                { l: "Quote Rate", v: qRate, c: C.emerald, path: "/quotation" },
+                { l: "Close Rate", v: clRate, c: C.orange, path: "/leads" }
               ].map((m) => (
-                <div key={m.l} className="text-center py-4 rounded-xl border border-slate-100 bg-slate-50 transition-colors hover:bg-slate-100 shadow-xs">
+                <div
+                  key={m.l}
+                  onClick={() => navigate(m.path)}
+                  className="text-center py-4 rounded-xl border border-slate-100 bg-slate-50 transition-all hover:bg-slate-100 hover:border-indigo-200 hover:scale-105 shadow-xs cursor-pointer select-none"
+                  title={`View ${m.l}`}
+                >
                   <div className="text-2xl font-bold" style={{ color: m.c }}>
                     {m.v}%
                   </div>
@@ -674,7 +747,11 @@ export default function Dashboard() {
               Performance
             </p>
             <p className="text-[11px] font-medium text-slate-400 mb-6 uppercase tracking-wide">Volume analysis</p>
-            <div className="flex items-center justify-between bg-sky-50 rounded-xl px-5 py-4 border border-sky-100 mb-6 shadow-xs">
+            <div
+              onClick={() => navigate("/followup-management")}
+              className="flex items-center justify-between bg-sky-50 hover:bg-sky-100/80 rounded-xl px-5 py-4 border border-sky-100 mb-6 shadow-xs cursor-pointer transition-all hover:scale-[1.01] select-none"
+              title="Click to view Follow-up Management"
+            >
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-sky-100 rounded-lg shrink-0">
                   <FiClock className="w-5 h-5 text-sky-600" />
@@ -722,9 +799,13 @@ export default function Dashboard() {
                 </p>
                 <p className="text-[11px] font-medium text-slate-400 mt-1 uppercase tracking-wide">Latest leads onboarded</p>
               </div>
-              <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-3 py-1.5 rounded-full uppercase tracking-wide shadow-xs border border-indigo-100">
-                {recent.length} entries
-              </span>
+              <button
+                onClick={() => navigate("/leads")}
+                className="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-3 py-1.5 rounded-full uppercase tracking-wide shadow-xs border border-indigo-100 cursor-pointer transition-all"
+                title="View All Leads"
+              >
+                {recent.length} entries • View All →
+              </button>
             </div>
             <div className="space-y-3">
               {recent.length === 0 ? (
@@ -739,13 +820,15 @@ export default function Dashboard() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.1 + 0.7, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
                     key={a.id || i}
-                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all cursor-pointer"
+                    onClick={() => navigate("/leads")}
+                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-indigo-50/60 border border-transparent hover:border-indigo-100 transition-all cursor-pointer group select-none"
+                    title="Click to view Lead in Leads List"
                   >
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-xs" style={{ background: sCol(a.status) }}>
                       {(a.name || "?").charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-800 truncate">{a.name || "—"}</p>
+                      <p className="text-sm font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">{a.name || "—"}</p>
                       <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-0.5">
                         {a.src || "Lead"} <span className="mx-1.5 text-slate-300">•</span> {a.date ? new Date(a.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "—"}
                       </p>
@@ -757,6 +840,7 @@ export default function Dashboard() {
             </div>
           </motion.div>
         </div>
+
 
       </motion.div>
     </Base>
