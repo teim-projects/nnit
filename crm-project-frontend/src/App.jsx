@@ -35,6 +35,7 @@ import TemplateManagement from './pages/TemplateManagement';
 import TechnicianWorkList from './pages/TechnicianWorkList';
 import CompletedWorkList from './pages/CompletedWorkList';
 import TechnicianDashboard from './pages/TechnicianDashboard';
+import ChatbotWidget from './components/ChatbotWidget';
 
 function AppRoutes() {
   const location  = useLocation();
@@ -107,6 +108,9 @@ function AppRoutes() {
           </div>
         </main>
       </div>
+
+      {/* ── System AI Chatbot Widget (Only when logged in) ── */}
+      {!hideNavbar && <ChatbotWidget />}
 
       {/* ── Mobile sidebar overlay ── */}
       {sidebarOpen && !hideNavbar && (

@@ -7,7 +7,9 @@ import {
   FiAlertCircle, FiUserCheck, FiKey, FiRotateCw, FiX, FiTrash2, 
   FiFileText, FiClock, FiCheckCircle, FiRefreshCw
 } from "react-icons/fi";
+import { Bot, Sparkles } from "lucide-react";
 import Swal from "sweetalert2";
+
 import logoNNIT from "../assets/logo-nnit.svg";
 
 const SEARCH_ROUTES = [
@@ -590,6 +592,20 @@ const Navbar = ({ onMenuClick }) => {
 
           {isAuthenticated ? (
             <>
+              {/* ── CAR PARKING AI ASSISTANT BUTTON (Next to Notification Bell) ── */}
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent("openCarParkingAIChat"))}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 hover:from-indigo-700 hover:to-violet-800 text-white text-xs font-bold shadow-sm hover:shadow-indigo-500/20 transition-all duration-300 transform hover:scale-105 active:scale-95 border border-indigo-500/30"
+                title="Open Car Parking AI Assistant"
+              >
+                <div className="relative flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-indigo-100 animate-pulse" />
+                  <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-400 border border-white rounded-full" />
+                </div>
+                <span className="hidden sm:inline tracking-tight">Car Parking AI</span>
+                <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
+              </button>
+
               {/* ── NOTIFICATION BELL BUTTON (Hyper-attractive glowing & ring) ── */}
               <div className="relative">
                 <button
@@ -610,6 +626,7 @@ const Navbar = ({ onMenuClick }) => {
                   )}
                 </button>
               </div>
+
 
               {/* Profile link */}
               <Link to="/profile"
