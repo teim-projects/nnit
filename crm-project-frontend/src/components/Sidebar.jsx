@@ -134,7 +134,7 @@ function IconCheckCircle(props) {
 }
 
 /* ----------------------
-   Sidebar Component
+   Sidebar Component..
    ---------------------- */
 export default function Sidebar({ onNavigate }) {
   const location = useLocation();
