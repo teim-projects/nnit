@@ -1,3 +1,4 @@
 .env/
 .env/
 crm-project-backend/.env/
+!.env.dev
