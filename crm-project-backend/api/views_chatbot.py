@@ -27,7 +27,10 @@ class ChatbotQueryView(APIView):
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GCP_API_KEY")
         if not api_key:
             return Response(
-                {"error": "Gemini API key is not configured in environment variables."},
+                {
+                    "error": "Gemini API key is not configured in environment variables.",
+                    "answer": "⚠️ Chatbot is not configured yet: GEMINI_API_KEY is missing in backend .env file. Please add GEMINI_API_KEY=your_key in crm-project-backend/.env"
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -92,11 +95,10 @@ Your primary role is to assist staff, admins, sales representatives, designers, 
 
         # Try active models in order of priority with rate-limit fallbacks
         models_to_try = [
-            "gemini-1.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-pro",
-            "gemini-2.0-flash-lite",
-            "gemini-1.5-flash-8b"
+            "gemini-3.6-flash",
+            "gemini-3.1-flash-lite",
+            "gemma-4-26b-a4b-it",
+            "gemini-1.5-flash"
         ]
 
         for model in models_to_try:
