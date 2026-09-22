@@ -5,6 +5,8 @@ User = get_user_model()
 
 class EmailOrMobileBackend(ModelBackend):
     def authenticate(self, request, username=None, password=None, **kwargs):
+        if not username:
+            return None
         user = None
         try:
             if '@' in username:
