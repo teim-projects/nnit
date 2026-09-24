@@ -1,5 +1,6 @@
 // src/utils/axios.js
 import axios from 'axios';
+import { logoutUser } from './auth';
 
 // Create an axios instance with base URL from environment
 const api = axios.create({
@@ -31,12 +32,7 @@ api.interceptors.response.use(
   (error) => {
     // If we get a 401, clear token and redirect to login
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('access');
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('authToken');
-      // Redirect to login page (adjust the route as needed)
-      window.location.href = '/login';
+      logoutUser(true);
     }
     return Promise.reject(error);
   }

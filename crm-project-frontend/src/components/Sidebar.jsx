@@ -1,5 +1,6 @@
 // Sidebar.jsx
 import React, { useMemo, useState, useEffect } from "react";
+import { logoutUser } from "../utils/auth";
 import { Link, useLocation } from "react-router-dom";
 import { useUserRole } from "../hooks/useAuth";
 
@@ -288,11 +289,7 @@ export default function Sidebar({ onNavigate }) {
   const isTechnicianRole = roleName === 'technician';
 
   const handleLogout = () => {
-    localStorage.removeItem("access");
-    localStorage.removeItem("refresh");
-    localStorage.removeItem("user_role");
-    window.dispatchEvent(new Event("authChange"));
-    window.location.href = "/login";
+    logoutUser(true);
   };
 
   if (isTechnicianRole) {

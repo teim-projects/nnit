@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { logoutUser } from "../utils/auth";
 import { useNavigate } from "react-router-dom";
 import { 
   FiUser, FiMail, FiPhone, FiCheck, FiLogOut, 
@@ -100,10 +101,7 @@ const ProfileSection = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("access");
-    localStorage.removeItem("refresh");
-    window.dispatchEvent(new Event("authChange"));
-    navigate("/login", { replace: true });
+    logoutUser(true);
   };
 
   useEffect(() => {

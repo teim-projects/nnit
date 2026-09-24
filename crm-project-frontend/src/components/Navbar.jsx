@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { logoutUser } from "../utils/auth";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBars, faXmark } from "@fortawesome/free-solid-svg-icons";
@@ -335,12 +336,9 @@ const Navbar = ({ onMenuClick }) => {
 
   /* ── Auth Check ── */
   const handleLogout = useCallback(() => {
-    window.dispatchEvent(new Event("authChange"));
     setIsAuthenticated(false);
-    localStorage.removeItem("access");
-    localStorage.removeItem("refresh");
-    navigate("/login", { replace: true });
-  }, [navigate]);
+    logoutUser(true);
+  }, []);
 
   const checkAuth = useCallback(async () => {
     const token = localStorage.getItem("access");
