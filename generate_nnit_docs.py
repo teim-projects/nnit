@@ -739,5 +739,7 @@ def build_docx(filename="NNIT_CRM_API_Integration_Documentation.docx"):
     print(f"[SUCCESS] DOCX generated successfully: {filename}")
 
 if __name__ == "__main__":
-    build_pdf()
-    build_docx()
+    build_pdf("NNIT_CRM_API_Integration_Documentation.pdf")
+    build_docx("NNIT_CRM_API_Integration_Documentation.docx")
+    build_pdf("NNIT_CRM_N8N_API_Documentation.pdf")
+    build_docx("NNIT_CRM_N8N_API_Documentation.docx")

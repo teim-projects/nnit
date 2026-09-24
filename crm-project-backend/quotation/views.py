@@ -576,7 +576,8 @@ def simple_quotation_detail(request, pk):
                 "unit_price": float(h_item.unit_price or 0),
                 "installation_charges": inst_rate,
                 "description": h_item.description or "",
-                "line_total": float(h_item.base_amount or 0)
+                "line_total": float(h_item.base_amount or 0),
+                "cars": h_item.product_data.get("car_capacity") if (h_item.product_data and "car_capacity" in h_item.product_data) else None
             })
 
     data = {
@@ -713,12 +714,18 @@ def simple_quotation_update(request, pk):
         inst_charges = float(item_data.get("installation_charges", 0))
         desc = item_data.get("description") or (f"{product.product_name} ({product.category.display_name})" if product else "Parking System")
 
+        custom_cars = item_data.get("cars") if item_data.get("cars") is not None else item_data.get("car_capacity")
+        if custom_cars is not None and str(custom_cars).isdigit() and int(custom_cars) > 0:
+            car_cap_val = int(custom_cars)
+        else:
+            car_cap_val = (getattr(product, 'car_capacity', 2) or 2) if product else 2
+
         product_data_snapshot = {
             "id": product.id if product else None,
             "name": product.product_name if product else "Parking System",
             "sku": (product.product_code or product.product_name) if product else "PKG",
             "category": product.category.display_name if (product and product.category) else "",
-            "car_capacity": getattr(product, 'car_capacity', 2) or 2,
+            "car_capacity": car_cap_val,
             "load_capacity": float(getattr(product, 'load_capacity', 0) or 0) if product else 0,
         }
 

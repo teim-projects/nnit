@@ -342,6 +342,8 @@ class SimpleQuotationItemSerializer(serializers.Serializer):
     unit_price = serializers.DecimalField(max_digits=12, decimal_places=2)
     description = serializers.CharField(required=False, allow_blank=True, default="")
     installation_charges = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
+    cars = serializers.IntegerField(required=False, allow_null=True)
+    car_capacity = serializers.IntegerField(required=False, allow_null=True)
 
 
 class SimpleQuotationSerializer(serializers.Serializer):
@@ -493,12 +495,18 @@ class SimpleQuotationSerializer(serializers.Serializer):
             inst_charges = float(item_data.get("installation_charges", 0))
             desc = item_data.get("description") or f"{product.product_name} ({product.category.display_name})"
 
+            custom_cars = item_data.get("cars") if item_data.get("cars") is not None else item_data.get("car_capacity")
+            if custom_cars is not None and str(custom_cars).isdigit() and int(custom_cars) > 0:
+                car_cap_val = int(custom_cars)
+            else:
+                car_cap_val = getattr(product, 'car_capacity', 2) or 2
+
             product_data_snapshot = {
                 "id": product.id,
                 "name": product.product_name,
                 "sku": product.product_code or product.product_name,
                 "category": product.category.display_name,
-                "car_capacity": getattr(product, 'car_capacity', 2) or 2,
+                "car_capacity": car_cap_val,
                 "load_capacity": float(getattr(product, 'load_capacity', 0) or 0),
             }
 
