@@ -1445,7 +1445,7 @@ export default function AddLeadForm({
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Follow-up Date <span className="text-red-500">*</span>
+                    Follow-up Date <span className="text-slate-400 font-normal text-xs">(Optional)</span>
                   </label>
                   <input
                     type="date"

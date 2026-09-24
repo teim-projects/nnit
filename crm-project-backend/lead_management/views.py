@@ -207,11 +207,14 @@ class LeadViewSet(viewsets.ModelViewSet):
     filterset_class = LeadFilter
 
     ordering_fields = [
+        "created_at",
+        "id",
         "date",
         "followup_date",
         "customer__name",
         "status",
     ]
+    ordering = ["-created_at", "-id"]
 
     filterset_fields = ['assign_to', 'status', 'followup_date', 'date']
     search_fields = [
@@ -317,23 +320,7 @@ class LeadViewSet(viewsets.ModelViewSet):
         user = self.request.user
         today = timezone.localdate()
 
-        queryset = (
-            lead_management.objects
-            .annotate(
-                followup_priority=Case(
-                    When(followup_date=today, then=Value(3)),
-                    When(followup_date__gt=today, then=Value(2)),
-                    When(followup_date__isnull=True, then=Value(0)),
-                    default=Value(1),
-                    output_field=IntegerField(),
-                )
-            )
-            .order_by(
-                "-followup_priority",
-                "-followup_date",
-                "-date"
-            )
-        )
+        queryset = lead_management.objects.all().order_by("-created_at", "-id")
 
         role_name = getattr(getattr(user, 'role', None), 'name', '').lower()
         if role_name == "sales":
