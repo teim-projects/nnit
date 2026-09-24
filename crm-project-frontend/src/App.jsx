@@ -37,12 +37,33 @@ import CompletedWorkList from './pages/CompletedWorkList';
 import TechnicianDashboard from './pages/TechnicianDashboard';
 import ChatbotWidget from './components/ChatbotWidget';
 
+function ProtectedRoute({ isLoggedIn, children }) {
+  if (!isLoggedIn) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
+
 function AppRoutes() {
   const location  = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem("access"));
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setIsLoggedIn(!!localStorage.getItem("access"));
+    };
+
+    window.addEventListener("authChange", handleAuthChange);
+    window.addEventListener("storage", handleAuthChange);
+
+    return () => {
+      window.removeEventListener("authChange", handleAuthChange);
+      window.removeEventListener("storage", handleAuthChange);
+    };
+  }, []);
 
   const noNavPaths = ["/login", "/register", "/forgot-password"];
-  const isLoggedIn = !!localStorage.getItem("access");
 
   const hideNavbar =
     !isLoggedIn ||
@@ -79,31 +100,36 @@ function AppRoutes() {
               <Route path="/"  element={isLoggedIn ? (localStorage.getItem("user_role") === "technician" ? <Navigate to="/technician-dashboard" replace /> : <Navigate to="/dashboard" replace />) : <Navigate to="/login" replace />} />
               <Route path="/login"    element={isLoggedIn ? (localStorage.getItem("user_role") === "technician" ? <Navigate to="/technician-dashboard" replace /> : <Navigate to="/dashboard" replace />) : <Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
-              <Route path="/technician-work-list" element={<TechnicianWorkList />} />
-              <Route path="/work-list" element={<TechnicianWorkList />} />
-              <Route path="/completed-work-list" element={<CompletedWorkList />} />
-              <Route path="/reports"  element={<ReportsAnalytics />} />
-              <Route path="/reports-analytics" element={<ReportsAnalytics />} />
-              <Route path="/profile"   element={<ProfileSection />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/password-reset-confirm/:uid/:token" element={<ResetPasswordConfirm />} />
-              <Route path="/accounts" element={<Accounts />} />
-              <Route path="/customer" element={<Customer />} />
-              <Route path="/leads"    element={<Lead />} />
-              <Route path="/quotation" element={<Quotation />} />
-              <Route path="/invoice"   element={<Invoice />} />
-              <Route path="/parking-products"  element={<ParkingProducts />} />
-              <Route path="/terms-conditions"  element={<TermsManagement />} />
-              <Route path="/amc"       element={<AmcPage />} />
-              <Route path="/services"  element={<ServicePage />} />
-              <Route path="/technicians" element={<TechnicianPage />} />
-              <Route path="/followup-management" element={<FollowupManagement />} />
-              <Route path="/role-access" element={<RoleAccessManagement />} />
-              <Route path="/design-drawings" element={<DesignManagement />} />
-              <Route path="/designer-queue" element={<DesignerQueue />} />
-              <Route path="/templates" element={<TemplateManagement />} />
+
+              {/* Protected Routes */}
+              <Route path="/dashboard" element={<ProtectedRoute isLoggedIn={isLoggedIn}><Dashboard /></ProtectedRoute>} />
+              <Route path="/technician-dashboard" element={<ProtectedRoute isLoggedIn={isLoggedIn}><TechnicianDashboard /></ProtectedRoute>} />
+              <Route path="/technician-work-list" element={<ProtectedRoute isLoggedIn={isLoggedIn}><TechnicianWorkList /></ProtectedRoute>} />
+              <Route path="/work-list" element={<ProtectedRoute isLoggedIn={isLoggedIn}><TechnicianWorkList /></ProtectedRoute>} />
+              <Route path="/completed-work-list" element={<ProtectedRoute isLoggedIn={isLoggedIn}><CompletedWorkList /></ProtectedRoute>} />
+              <Route path="/reports"  element={<ProtectedRoute isLoggedIn={isLoggedIn}><ReportsAnalytics /></ProtectedRoute>} />
+              <Route path="/reports-analytics" element={<ProtectedRoute isLoggedIn={isLoggedIn}><ReportsAnalytics /></ProtectedRoute>} />
+              <Route path="/profile"   element={<ProtectedRoute isLoggedIn={isLoggedIn}><ProfileSection /></ProtectedRoute>} />
+              <Route path="/accounts" element={<ProtectedRoute isLoggedIn={isLoggedIn}><Accounts /></ProtectedRoute>} />
+              <Route path="/customer" element={<ProtectedRoute isLoggedIn={isLoggedIn}><Customer /></ProtectedRoute>} />
+              <Route path="/leads"    element={<ProtectedRoute isLoggedIn={isLoggedIn}><Lead /></ProtectedRoute>} />
+              <Route path="/quotation" element={<ProtectedRoute isLoggedIn={isLoggedIn}><Quotation /></ProtectedRoute>} />
+              <Route path="/invoice"   element={<ProtectedRoute isLoggedIn={isLoggedIn}><Invoice /></ProtectedRoute>} />
+              <Route path="/parking-products"  element={<ProtectedRoute isLoggedIn={isLoggedIn}><ParkingProducts /></ProtectedRoute>} />
+              <Route path="/terms-conditions"  element={<ProtectedRoute isLoggedIn={isLoggedIn}><TermsManagement /></ProtectedRoute>} />
+              <Route path="/amc"       element={<ProtectedRoute isLoggedIn={isLoggedIn}><AmcPage /></ProtectedRoute>} />
+              <Route path="/services"  element={<ProtectedRoute isLoggedIn={isLoggedIn}><ServicePage /></ProtectedRoute>} />
+              <Route path="/technicians" element={<ProtectedRoute isLoggedIn={isLoggedIn}><TechnicianPage /></ProtectedRoute>} />
+              <Route path="/followup-management" element={<ProtectedRoute isLoggedIn={isLoggedIn}><FollowupManagement /></ProtectedRoute>} />
+              <Route path="/role-access" element={<ProtectedRoute isLoggedIn={isLoggedIn}><RoleAccessManagement /></ProtectedRoute>} />
+              <Route path="/design-drawings" element={<ProtectedRoute isLoggedIn={isLoggedIn}><DesignManagement /></ProtectedRoute>} />
+              <Route path="/designer-queue" element={<ProtectedRoute isLoggedIn={isLoggedIn}><DesignerQueue /></ProtectedRoute>} />
+              <Route path="/templates" element={<ProtectedRoute isLoggedIn={isLoggedIn}><TemplateManagement /></ProtectedRoute>} />
+
+              {/* Fallback route */}
+              <Route path="*" element={<Navigate to={isLoggedIn ? "/dashboard" : "/login"} replace />} />
             </Routes>
           </div>
         </main>

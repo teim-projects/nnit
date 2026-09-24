@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logoutUser } from '../utils/auth';
 
 export function useUserRole(baseApi) {
   const [userRole, setUserRole] = useState(null);
@@ -30,7 +31,12 @@ export function useUserRole(baseApi) {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => {
-        if (!res.ok) throw new Error("Unauthorized");
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            logoutUser(true);
+          }
+          throw new Error("Unauthorized");
+        }
         return res.json();
       })
       .then(data => {
