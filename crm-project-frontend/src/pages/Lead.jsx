@@ -2,6 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Base from "../components/Base";
 import TableView from "../components/TableView";
 import LeadDetails from "../components/lead/LeadDetails";
+import AddLeadFollowUpFormNew from "../components/lead/AddLeadFollowUpFormNew";
+import AddLeadForm from "../components/lead/AddLeadForm";
+import { IoLogoWhatsapp } from "react-icons/io5";
+import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd } from "react-icons/md";
 import AddLeadFollowUpFormNew from "../components/lead/AddLeadFollowUpForm";
 import AddLeadForm from "../components/lead/AddLeadForm";
 import { IoLogoWhatsapp } from "react-icons/io5";
@@ -513,6 +517,14 @@ export default function Lead() {
   const actionsRenderer = useCallback((row) => {
     const handleWhatsApp = (e) => {
       e.stopPropagation();
+      const contact = row.customer_contact;
+      if (!contact) {
+        Swal.fire({ icon: 'warning', title: 'No Contact', text: 'No contact number available' });
+        return;
+      }
+      const cleanNumber = contact.replace(/[^0-9]/g, '');
+      const whatsappNumber = cleanNumber.startsWith('91') ? cleanNumber : `91${cleanNumber}`;
+      window.open(`https://wa.me/${whatsappNumber}`, '_blank');
       setEmailModalData({
         recipientEmail: row.customer_email || "",
         recipientName: row.customer_name || "",
@@ -528,6 +540,12 @@ export default function Lead() {
 
     const handleEmail = (e) => {
       e.stopPropagation();
+      const email = row.customer_email;
+      if (!email) {
+        Swal.fire({ icon: 'warning', title: 'No Email', text: 'No email address available' });
+        return;
+      }
+      window.location.href = `mailto:${email}`;
       setEmailModalData({
         recipientEmail: row.customer_email || "",
         recipientName: row.customer_name || "",
@@ -544,6 +562,8 @@ export default function Lead() {
     return (
       <div className="flex items-center justify-center gap-1">
         <button
+          onClick={handleWhatsApp}
+          className="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             if (row.cad_file) {
@@ -569,6 +589,10 @@ export default function Lead() {
         >
           <IoLogoWhatsapp className="w-3.5 h-3.5" />
         </button>
+        
+        <button
+          onClick={handleEmail}
+          className="inline-flex items-center px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
 
         <button
           onClick={handleEmail}
@@ -577,6 +601,18 @@ export default function Lead() {
         >
           <MdEmail className="w-3.5 h-3.5" />
         </button>
+        
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete(row.id);
+          }}
+          className="inline-flex items-center px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+          title="Delete"
+        >
+          <MdDelete className="w-3.5 h-3.5" />
+        </button>
+        
 
         {canEdit && !isDesignerRole && (
           <button
@@ -746,6 +782,15 @@ export default function Lead() {
             setLeadDetailsId(row.id);
             setShowLeadDetails(true);
           }}
+          className="inline-flex items-center px-2 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs font-medium transition-colors"
+          title="View Details"
+        >
+          <MdRemoveRedEye className="w-3.5 h-3.5" />
+          <span className="ml-1">View</span>
+        </button>
+      </div>
+    );
+  }, []);
           className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-medium transition-colors"
           title="View Details"
         >
@@ -808,6 +853,14 @@ export default function Lead() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+
+            <button
+              onClick={() => { setEditingLead(null); setShowLeadForm(true); }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-orange-600 hover:bg-orange-700 text-white font-medium transition-colors shadow-sm"
+            >
+              <MdAdd className="w-5 h-5" />
+              Add Enquiry
+            </button>
             {canCreate && !isDesignerRole && (
               <>
                 <button

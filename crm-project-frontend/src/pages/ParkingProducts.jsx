@@ -132,6 +132,25 @@ export default function ParkingProducts() {
               <h2 className="text-2xl font-black text-gray-900">Parking Products</h2>
               <p className="text-sm font-semibold text-gray-500 mt-1">Manage parking solution catalog</p>
             </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowCategoryModal(true)}
+                className="btn-secondary flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-bold text-sm transition"
+              >
+                <MdCategory className="w-5 h-5" />
+                Add Category
+              </button>
+              <button
+                onClick={() => {
+                  setEditingProduct(null);
+                  setShowProductForm(true);
+                }}
+                className="btn-primary flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition shadow-sm"
+              >
+                <MdAdd className="w-5 h-5" />
+                Add Product
+              </button>
+            </div>
             {canCreate && (
               <div className="flex items-center gap-3">
                 <button
@@ -214,6 +233,11 @@ export default function ParkingProducts() {
                       <div className="flex items-start gap-4">
                         {/* Enlarged Image / Thumbnail Placeholder */}
                         <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200 shadow-inner">
+                          {product.image ? (
+                            <img
+                              src={product.image}
+                              alt={product.product_name}
+                              className="w-full h-full object-cover"
                           {product.display_image || product.image || product.image_url ? (
                             <img
                               src={product.display_image || product.image || product.image_url}
@@ -226,6 +250,11 @@ export default function ParkingProducts() {
                         </div>
 
                         {/* Title & Code */}
+                        <div className="space-y-1">
+                          <h4 className="font-black text-gray-900 text-lg leading-snug">
+                            {product.product_name}
+                          </h4>
+                          <p className="text-xs font-extrabold text-blue-600 uppercase tracking-wide">
                         <div className="space-y-0.5">
                           <h4 className="font-bold text-gray-900 text-base leading-snug">
                             {product.product_name}
@@ -238,6 +267,11 @@ export default function ParkingProducts() {
 
                       {/* Status & Category Badges */}
                       <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <span className="px-3 py-1 text-[11px] font-black tracking-wider text-emerald-700 bg-emerald-100/80 rounded-full uppercase">
+                          ACTIVE
+                        </span>
+                        {product.category_name && (
+                          <span className="px-3 py-1 text-[11px] font-black tracking-wider text-blue-700 bg-blue-100/80 rounded-full">
                         <span className="px-2.5 py-0.5 text-xs font-semibold tracking-wide text-emerald-700 bg-emerald-100/80 rounded-full uppercase">
                           ACTIVE
                         </span>
@@ -249,6 +283,18 @@ export default function ParkingProducts() {
                       </div>
                     </div>
 
+                    {/* Bold & Detailed Specification Text */}
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      {product.description ? (
+                        <p className="text-sm font-semibold text-gray-700 leading-relaxed line-clamp-3">
+                          {product.description}
+                        </p>
+                      ) : (
+                        <p className="text-sm font-semibold text-gray-700 leading-relaxed">
+                          <span className="font-bold text-gray-900">Capacity:</span> <strong className="text-blue-700">{product.car_capacity} cars</strong> | 
+                          <span className="font-bold text-gray-900"> Levels:</span> <strong className="text-gray-900">{product.levels}</strong> | 
+                          <span className="font-bold text-gray-900"> Operation:</span> <strong className="text-gray-900">{product.operation_type}</strong> | 
+                          <span className="font-bold text-gray-900"> Pit Required:</span> <strong className="text-gray-900">{product.pit_required ? 'Yes' : 'No'}</strong>
                     {/* Specification Text */}
                     <div className="mt-4 pt-3 border-t border-slate-100">
                       {product.description ? (
@@ -267,6 +313,41 @@ export default function ParkingProducts() {
                   </div>
 
                   {/* Bottom Stats & Action Bar */}
+                  <div className="py-4 px-6 border-t border-gray-100 bg-slate-50/80 flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      {/* Base Price */}
+                      <div>
+                        <span className="block text-[10px] font-black tracking-widest text-gray-400 uppercase">
+                          PRICE
+                        </span>
+                        <span className="text-base font-black text-gray-900">
+                          {product.base_price
+                            ? `₹${parseFloat(product.base_price).toFixed(2)}L`
+                            : '—'}
+                        </span>
+                      </div>
+
+                      {/* Capacity */}
+                      <div>
+                        <span className="block text-[10px] font-black tracking-widest text-gray-400 uppercase">
+                          CAPACITY
+                        </span>
+                        <span className="text-sm font-bold text-gray-800">
+                          {product.car_capacity} Cars
+                        </span>
+                      </div>
+
+                      {/* Dimensions */}
+                      <div>
+                        <span className="block text-[10px] font-black tracking-widest text-gray-400 uppercase">
+                          MIN. DIM (LxWxH)
+                        </span>
+                        <span className="text-sm font-bold text-gray-800">
+                          {product.min_length && product.min_width && product.min_height
+                            ? `${product.min_length}x${product.min_width}x${product.min_height}m`
+                            : 'N/A'}
+                        </span>
+                      </div>
                   <div className="py-3.5 px-6 border-t border-gray-100 bg-slate-50/80 flex items-center justify-between">
                     <div className="flex items-center gap-6">
                       {/* Base Price */}
@@ -324,6 +405,20 @@ export default function ParkingProducts() {
                         className="hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
                       >
                         <MdSearch className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleEditProduct(product)}
+                        title="Edit Product"
+                        className="hover:text-slate-900 p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
+                      >
+                        <MdEdit className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product.id)}
+                        title="Delete Product"
+                        className="hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <MdDelete className="w-5 h-5" />
                       </button>
                       {canEdit && (
                         <button
