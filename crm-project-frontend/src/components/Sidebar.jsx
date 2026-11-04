@@ -7,6 +7,103 @@ import { useUserRole } from "../hooks/useAuth";
 /* ----------------------
    Icons
    ---------------------- */
+const allItems = [
+  { key: "home", label: "Home", icon: HomeIcon, path: "/dashboard" },
+  { key: "leads", label: "Leads", icon: TargetIcon, path: "/leads" },
+  { key: "contacts", label: "Contacts", icon: UserIcon, path: "/customer" },
+  { key: "accounts", label: "Accounts", icon: BuildingIcon, path: "/accounts" }, // <-- Item to hide
+ 
+  { key: "quotes", label: "Quotes", icon: QuoteIcon, path: "/quotation" },
+  
+  { key: "parking-products", label: "Parking Products", icon: ParkingIcon, path: "/parking-products" },
+  { key: "terms", label: "Terms & Conditions", icon: DocumentIcon, path: "/terms-conditions" },
+  { key: "amc", label: "AMC", icon: AmcIcon, path: "/amc" },
+];
+
+export default function Sidebar() {
+  const location = useLocation();
+  const currentPath = location.pathname;
+
+  // Get BASE_API from environment
+  const baseApi = import.meta.env.VITE_BASE_API_URL;
+  console.log("Sidebar BASE_API =", baseApi);
+
+  if (!baseApi) {
+    console.error("Sidebar: VITE_BASE_API_URL is not defined!");
+  }
+
+  // 2. ✅ Get the user role
+  // Assuming useUserRole returns { userRole: { name: 'sales' }, ... }
+  const { userRole, isLoading: loadingRole } = useUserRole(baseApi);
+
+  // 3. ✅ Filter the sidebar items based on the user role
+  const filteredItems = React.useMemo(() => {
+    // Wait until role is loaded to ensure correct filtering
+    if (loadingRole) {
+      return [];
+    }
+
+    return allItems.filter(item => {
+      // Check for the role object and the name property safely
+      const roleName = userRole?.name?.toLowerCase();
+
+      // Rule: Hide 'accounts' if the user role is 'sales'
+      if (item.key === 'accounts' && roleName === 'sales') {
+        return false; // Exclude this item
+      }
+
+      // Include all other items
+      return true;
+    });
+  }, [userRole, loadingRole, baseApi]);
+
+
+  return (
+    <aside className="w-55 bg-gradient-to-b from-white via-orange-50 to-blue-50 border-r border-orange-100 min-h-screen px-3 py-4">
+      <nav className="space-y-1">
+        {/* 4. ✅ Render the filtered items */}
+        {filteredItems.map((it) => (
+          <SidebarItem key={it.key} item={it} active={isActive(it.path, currentPath)} />
+        ))}
+      </nav>
+    </aside>
+  );
+}
+
+function isActive(itemPath, currentPath) {
+  if (!itemPath) return false;
+  // exact match or startsWith (for nested routes)
+  return currentPath === itemPath || currentPath.startsWith(itemPath + "/");
+}
+
+function SidebarItem({ item, active }) {
+  const baseClasses = "sidebar-item text-sm flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200";
+  const activeClasses = active 
+    ? "bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-md shadow-orange-200" 
+    : "text-gray-700 hover:bg-orange-50 hover:text-orange-700";
+
+  return (
+    <Link
+      to={item.path || "#"}
+      className={`${baseClasses} ${activeClasses}`}
+      aria-current={active ? "page" : undefined}
+    >
+      <span className={active ? "text-white" : "text-gray-400"}>
+        <item.icon className="w-5 h-5" />
+      </span>
+
+      <span className="flex-1 font-medium">{item.label}</span>
+
+      {active && (
+        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-white bg-opacity-20">
+          <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
+            <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+            <circle cx="19" cy="12" r="1.5" fill="currentColor" />
+          </svg>
+        </span>
+      )}
+    </Link>
 function ChevronDownIcon({ isOpen = false }) {
   return (
     <svg

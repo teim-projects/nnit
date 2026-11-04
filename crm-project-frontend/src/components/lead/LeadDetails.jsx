@@ -424,6 +424,7 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                               </p>
                             )}
 
+                            <p className="text-sm text-gray-700 mb-5 font-medium leading-relaxed">{fu.remarks || fu.discussion_notes || "No discussion notes recorded."}</p>
                             {fu.site_name && (
                               <p className="text-xs font-bold text-indigo-700 mb-2">
                                 📍 Site Name: {fu.site_name}

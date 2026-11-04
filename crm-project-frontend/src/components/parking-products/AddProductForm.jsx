@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { MdArrowBack } from 'react-icons/md';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
@@ -18,6 +19,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
     max_width: '',
     max_length: '',
     car_capacity: '',
+    base_price: ''
     base_price: '',
     image_url: ''
   });
@@ -41,6 +43,7 @@ export default function AddProductForm({ open, onClose, onSuccess, product, cate
         max_width: product.max_width || '',
         max_length: product.max_length || '',
         car_capacity: product.car_capacity || '',
+        base_price: product.base_price || ''
         base_price: product.base_price || '',
         image_url: product.image_url || product.display_image || product.image || ''
       });

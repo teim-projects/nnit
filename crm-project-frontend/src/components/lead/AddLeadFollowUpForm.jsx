@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Swal from "sweetalert2";
 import { MdClose } from "react-icons/md";
+import { FiPhone, FiVideo, FiMapPin } from "react-icons/fi";
 import { FiPhone, FiVideo, FiMapPin, FiCamera, FiTrash2 } from "react-icons/fi";
 import { IoLogoWhatsapp } from "react-icons/io5";
 import { HiOutlineMail, HiOutlineUserGroup, HiOutlineClipboardList } from "react-icons/hi";
@@ -17,6 +18,101 @@ const FollowupHistoryModal = ({ open, onClose, lead }) => {
     const dateB = new Date(b.followup_date);
     return dateB - dateA;
   });
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[10000]">
+      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+        {/* Header - Simple White */}
+        <div className="bg-white px-6 py-4 flex justify-between items-center border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900">Followup History</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <MdClose className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-6 bg-gray-50">
+          {sortedFollowups.length > 0 ? (
+            <div className="space-y-4">
+              {sortedFollowups.map((fu, idx) => {
+                const interactionLabel = 
+                  fu.interaction_type === 'call' ? 'Call' :
+                  fu.interaction_type === 'email' ? 'Email' :
+                  fu.interaction_type === 'whatsapp' ? 'Whatsapp' :
+                  fu.interaction_type === 'video_call' ? 'Video Call' :
+                  fu.interaction_type === 'in_person' ? 'In-Person' :
+                  fu.interaction_type === 'demo' ? 'Demo' :
+                  fu.interaction_type === 'site_visit' ? 'Site Visit' : 'Call';
+
+                const hasQualifying = fu.qualifying_info && (
+                  fu.qualifying_info.site_location || 
+                  fu.qualifying_info.cars_required || 
+                  fu.qualifying_info.car_type || 
+                  fu.qualifying_info.budget_range ||
+                  fu.qualifying_info.installation_timeline ||
+                  fu.qualifying_info.basement_available ||
+                  fu.qualifying_info.pit_possible ||
+                  fu.qualifying_info.site_challenges
+                );
+
+                const hasRequirement = fu.requirement_info && (
+                  fu.requirement_info.site_length || 
+                  fu.requirement_info.site_width || 
+                  fu.requirement_info.site_height ||
+                  fu.requirement_info.preferred_parking_type ||
+                  fu.requirement_info.automation_required
+                );
+
+                return (
+                  <div key={fu.id || idx} className="bg-white border-2 border-gray-300 rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                    {/* Header */}
+                    <div className="px-6 py-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-gray-900 text-xl">{fu.followup_date || '—'}</span>
+                          <span className="text-gray-400">•</span>
+                          <span className="text-gray-600 font-medium">{interactionLabel}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {fu.client_response && (
+                            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
+                              fu.client_response === 'very_positive' ? 'bg-green-100 text-green-700' :
+                              fu.client_response === 'positive' ? 'bg-green-100 text-green-700' :
+                              fu.client_response === 'negative' ? 'bg-red-100 text-red-700' :
+                              fu.client_response === 'call_back_later' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-200 text-gray-700'
+                            }`}>
+                              {fu.client_response === 'very_positive' ? 'Very Positive' :
+                               fu.client_response === 'positive' ? 'Positive' :
+                               fu.client_response === 'negative' ? 'Negative' :
+                               fu.client_response === 'no_response' ? 'No Response' :
+                               fu.client_response === 'call_back_later' ? 'Call Back Later' : 'Neutral'}
+                            </span>
+                          )}
+                          <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-600 text-white">
+                            {fu.followup_status === 'completed' ? 'Completed' :
+                             fu.followup_status === 'pending' ? 'Pending' : 'Completed'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {(fu.created_by_full_name || fu.conducted_by || fu.contacted_person) && (
+                        <p className="text-sm text-gray-500 mb-3">
+                          {(fu.created_by_full_name || fu.conducted_by) && (
+                            <span>By <strong className="text-gray-700">{fu.created_by_full_name || fu.conducted_by}</strong></span>
+                          )}
+                          {(fu.created_by_full_name || fu.conducted_by) && fu.contacted_person && <span> · Contact </span>}
+                          {fu.contacted_person && <strong className="text-gray-700">{fu.contacted_person}</strong>}
+                        </p>
+                      )}
+
+                      {fu.faq_answers && fu.faq_answers.length > 0 && fu.faq_answers[0].answer && (
+                        <p className="text-sm text-blue-600 font-semibold mb-3">F001</p>
+                      )}
+
+                      {/* Discussion */}
+                      {(fu.remarks || fu.discussion_notes || fu.followup_summary) && (
+                        <p className="text-sm text-gray-700 leading-relaxed mb-4">
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[10000]">
@@ -306,6 +402,11 @@ export default function AddLeadFollowUpFormNew({
   // ---------- State (all fields) ----------
   const [followupDate, setFollowupDate] = useState("");
   const [nextFollowupDate, setNextFollowupDate] = useState("");
+  const [status, setStatus] = useState("in_process");
+  const [remarks, setRemarks] = useState("");
+  const [discussionNotes, setDiscussionNotes] = useState("");
+
+  // Follow-up mode & conducted by
   const [status, setStatus] = useState("open");
   const [remarks, setRemarks] = useState("");
   const [discussionNotes, setDiscussionNotes] = useState("");
@@ -512,6 +613,11 @@ export default function AddLeadFollowUpFormNew({
       // Basic fields
       setFollowupDate(followup.followup_date ?? "");
       setNextFollowupDate(followup.next_followup_date ?? "");
+      setStatus(followup.status ?? "in_process");
+      setRemarks(followup.remarks ?? "");
+      setDiscussionNotes(followup.discussion_notes ?? "");
+
+      // Followup mode, conducted by, etc.
       setStatus(followup.status ?? "open");
       setRemarks(followup.remarks ?? "");
       setDiscussionNotes(followup.discussion_notes ?? "");
@@ -561,6 +667,55 @@ export default function AddLeadFollowUpFormNew({
       } else {
         setSuggestedProducts([]);
       }
+
+      // FAQ answers
+      if (followup.faq_answers?.length) {
+        const initial = {};
+        followup.faq_answers.forEach((item) => {
+          initial[item.faq] = item.answer || "";
+        });
+        setFaqAnswers(initial);
+      } else {
+        setFaqAnswers({});
+      }
+    } else {
+      // Reset all fields when not editing (optional)
+      // But we want to keep default values for mode, status, etc.
+      setFollowupDate("");
+      setNextFollowupDate("");
+      setStatus("in_process");
+      setRemarks("");
+      setDiscussionNotes("");
+      setFollowupMode("call");
+      setFollowupStatus("completed");
+      setConductedBy("");
+      setClientResponse("");
+      setFollowupSummary("");
+      setCommitmentByClient("");
+      setCommitmentByUs("");
+      setDecisionMaker("");
+      setBudgetStatus("");
+      setTimeline("");
+      setCompetition("");
+      setSiteLocation("");
+      setCarsRequired("");
+      setCarType("");
+      setBudgetRange("");
+      setBasementAvailable("");
+      setPitPossible("");
+      setInstallationTimeline("");
+      setSiteChallenges("");
+      setShowRequirement(false);
+      setSiteLength("");
+      setSiteWidth("");
+      setSiteHeight("");
+      setPreferredParkingType("");
+      setAutomationRequired("");
+      setSuggestedProducts([]);
+      setFaqAnswers({});
+    }
+  }, [followup]);
+
 
       // FAQ answers
       if (followup.faq_answers?.length) {
@@ -894,6 +1049,208 @@ export default function AddLeadFollowUpFormNew({
                   )}
                 </div>
 
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Conducted By
+                  </label>
+                  <select
+                    value={conductedBy}
+                    onChange={(e) => setConductedBy(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    disabled={usersLoading}
+                  >
+                    <option value="">Select Team Member</option>
+                    {usersList.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name || user.full_name || user.username || user.id}
+                      </option>
+                    ))}
+                  </select>
+                  {usersLoading && <span className="text-xs text-gray-400">Loading users...</span>}
+                </div>
+              </div>
+
+              {/* 2. Dates & Status */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Follow-up Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                      validationErrors.followupDate ? "border-red-500" : "border-gray-300"
+                    }`}
+                    value={followupDate}
+                    onChange={(e) => setFollowupDate(e.target.value)}
+                  />
+                  {validationErrors.followupDate && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.followupDate}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Next Follow-up Date (optional)
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    value={nextFollowupDate}
+                    onChange={(e) => setNextFollowupDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Status <span className="text-red-500">*</span>
+                </label>
+                <select
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                    validationErrors.status ? "border-red-500" : "border-gray-300"
+                  }`}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="open">Open</option>
+                  <option value="in_process">In Process</option>
+                  <option value="closed">Closed</option>
+                </select>
+                {validationErrors.status && (
+                  <p className="text-red-500 text-xs mt-1">{validationErrors.status}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Remarks (Brief)
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  rows={2}
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Brief summary..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Discussion Notes (Detailed)
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  rows={4}
+                  value={discussionNotes}
+                  onChange={(e) => setDiscussionNotes(e.target.value)}
+                  placeholder="Enter detailed conversation notes..."
+                />
+              </div>
+
+              {/* 3. Client Response */}
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-4 uppercase">Response</h3>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Client Response <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: "very_positive", label: "Very Positive", color: "green" },
+                      { value: "positive", label: "Positive", color: "green" },
+                      { value: "neutral", label: "Neutral", color: "gray" },
+                      { value: "negative", label: "Negative", color: "red" },
+                      { value: "no_response", label: "No Response", color: "gray" },
+                      { value: "call_back_later", label: "Call Back Later", color: "blue" },
+                    ].map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setClientResponse(item.value)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                          clientResponse === item.value
+                            ? `bg-${item.color}-600 text-white shadow-md`
+                            : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  {validationErrors.clientResponse && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.clientResponse}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Discussion Notes & Commitments */}
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-4 uppercase">Discussion Notes</h3>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Follow-up Summary / Key Discussion Points
+                  </label>
+                  <textarea
+                    value={followupSummary}
+                    onChange={(e) => setFollowupSummary(e.target.value)}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                    placeholder="What was discussed? Key pain points shared, objections raised, decisions taken..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Commitment by Client
+                    </label>
+                    <textarea
+                      value={commitmentByClient}
+                      onChange={(e) => setCommitmentByClient(e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                      placeholder="e.g., Will share PO by Friday..."
+
+          {/* Form Body */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* 1. Follow-up Mode & Conducted By */}
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Follow-up Mode <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: "call", label: "Call", icon: <FiPhone /> },
+                      { value: "whatsapp", label: "WhatsApp", icon: <IoLogoWhatsapp /> },
+                      { value: "email", label: "Email", icon: <HiOutlineMail /> },
+                      { value: "video_call", label: "Video Call", icon: <FiVideo /> },
+                      { value: "in_person", label: "In-Person", icon: <HiOutlineUserGroup /> },
+                      { value: "demo", label: "Demo", icon: <HiOutlineClipboardList /> },
+                      { value: "site_visit", label: "Site Visit", icon: <FiMapPin /> },
+                    ].map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setFollowupMode(item.value)}
+                        className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                          followupMode === item.value
+                            ? "bg-blue-600 text-white shadow-md"
+                            : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                        } ${item.value === "site_visit" ? "col-span-2" : ""}`}
+                      >
+                        {item.icon}
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  {validationErrors.followupMode && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.followupMode}</p>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -907,7 +1264,132 @@ export default function AddLeadFollowUpFormNew({
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Commitment by Us
+                    </label>
+                    <textarea
+                      value={commitmentByUs}
+                      onChange={(e) => setCommitmentByUs(e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                      placeholder="e.g., Sending revised proposal..."
+                    />
+                  </div>
+                </div>
+              </div>
 
+              
+
+              {/* 6. Qualifying Questions – Site */}
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-4 uppercase">
+                  Qualifying Questions – Site Details
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Site Location
+                    </label>
+                    <input
+                      type="text"
+                      value={siteLocation}
+                      onChange={(e) => setSiteLocation(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                      placeholder="e.g., Andheri West, Mumbai"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Number of Cars Required
+                    </label>
+                    <input
+                      type="text"
+                      value={carsRequired}
+                      onChange={(e) => setCarsRequired(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                      placeholder="e.g., 20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Car Type
+                    </label>
+                    <select
+                      value={carType}
+                      onChange={(e) => setCarType(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                    >
+                      <option value="">Select</option>
+                      <option value="sedan">Sedan</option>
+                      <option value="suv">SUV</option>
+                      <option value="hatchback">Hatchback</option>
+                      <option value="mixed">Mixed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Budget Range
+                    </label>
+                    <input
+                      type="text"
+                      value={budgetRange}
+                      onChange={(e) => setBudgetRange(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                      placeholder="e.g., ₹30-40 Lakhs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Basement Available
+                    </label>
+                    <select
+                      value={basementAvailable}
+                      onChange={(e) => setBasementAvailable(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                    >
+                      <option value="">Select</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Pit Possible
+                    </label>
+                    <select
+                      value={pitPossible}
+                      onChange={(e) => setPitPossible(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                    >
+                      <option value="">Select</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Installation Timeline
+                    </label>
+                    <input
+                      type="text"
+                      value={installationTimeline}
+                      onChange={(e) => setInstallationTimeline(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                      placeholder="e.g., 3 months"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Site Challenges
+                    </label>
+                    <textarea
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                      rows={2}
+                      value={siteChallenges}
+                      onChange={(e) => setSiteChallenges(e.target.value)}
+                      placeholder="Any specific challenges at the site?"
+                    />
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Site Photo (optional)
@@ -959,6 +1441,72 @@ export default function AddLeadFollowUpFormNew({
                   </div>
                 </div>
               </div>
+
+              {/* 7. Suggested Solutions */}
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-md font-semibold text-gray-900">Suggested Solutions</h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Recommend parking products to the customer
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddProduct}
+                    className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-1"
+                  >
+                    <span className="text-lg leading-none">+</span> Add Product
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {suggestedProducts.map((product, index) => (
+                    <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start mb-3">
+                        <h4 className="font-medium text-sm text-gray-900">Product {index + 1}</h4>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProduct(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <MdClose className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Product <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
+                            value={product.product_id}
+                            onChange={(e) =>
+                              handleProductChange(index, "product_id", e.target.value)
+                            }
+                          >
+                            <option value="">Select Product</option>
+                            {productsList.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.product_name || p.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Category
+                          </label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm"
+                            value={product.category || ""}
+                            disabled
+                            placeholder="Auto-filled"
+                          />
+                        </div>
+                      </div>
 
               {/* 2. Dates & Status */}
               <div className="grid grid-cols-2 gap-4">
@@ -1337,6 +1885,27 @@ export default function AddLeadFollowUpFormNew({
                   </div>
                 )}
               </div>
+
+              {/* 8. Requirement (optional) */}
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-md font-semibold text-gray-900">
+                      Add Requirement (Optional)
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Detailed site measurements and preferences
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowRequirement(!showRequirement)}
+                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    {showRequirement ? "🔼 Hide" : "🔽 Show"}
+                  </button>
+                </div>
+
 
               {/* 8. Requirement (optional) */}
               <div className="border-t pt-4">
