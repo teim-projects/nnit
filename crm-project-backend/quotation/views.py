@@ -506,6 +506,15 @@ def fetch_lead_by_mobile(request):
     sp_name = f"{lead.assign_to.first_name or ''} {lead.assign_to.last_name or ''}".strip() if (lead and lead.assign_to) else ""
     sp_phone = getattr(lead.assign_to, 'mobile_no', '') or getattr(lead.assign_to, 'phone', '') if (lead and lead.assign_to) else ""
 
+    proj_name = (lead.project_name if lead and lead.project_name else "") or ""
+    proj_address = (
+        (lead.project_adderess if lead and lead.project_adderess else None) or
+        (lead.site_location if lead and lead.site_location else None) or
+        (customer.site_address if customer and customer.site_address else None) or
+        (customer.address if customer and customer.address else None) or
+        ""
+    )
+
     return Response({
         "found": True,
         "customer_id": cust_id,
@@ -517,10 +526,13 @@ def fetch_lead_by_mobile(request):
         "state": state,
         "city": city,
         "address": address,
+        "site_name": proj_name,
+        "project_name": proj_name,
+        "site_address": proj_address,
+        "project_address": proj_address,
         "sales_person_id": sp_id,
         "sales_person_name": sp_name,
         "sales_person_phone": sp_phone,
-        "project_name": lead.project_name if lead else ""
     }, status=status.HTTP_200_OK)
 
 
@@ -589,6 +601,10 @@ def simple_quotation_detail(request, pk):
         "sales_person_name": quotation.sales_person_name or "",
         "sales_person_phone": quotation.sales_person_phone or "",
         "subject": quotation.subject,
+        "site_name": quotation.site_name or "",
+        "project_name": quotation.site_name or "",
+        "site_address": quotation.site_address or "",
+        "project_address": quotation.site_address or "",
         "quantity": first_item.quantity if first_item else 1,
         "unit_price": float(first_item.unit_price) if first_item else 0,
         "gst_percent": float(first_item.gst_percent) if first_item else 18,
@@ -637,6 +653,11 @@ def simple_quotation_update(request, pk):
         quotation.sales_person_name = data.get("sales_person_name") or ""
     if "sales_person_phone" in data:
         quotation.sales_person_phone = data.get("sales_person_phone") or ""
+
+    if "site_name" in data or "project_name" in data:
+        quotation.site_name = (data.get("site_name") or data.get("project_name") or "").strip()
+    if "site_address" in data or "project_address" in data:
+        quotation.site_address = (data.get("site_address") or data.get("project_address") or "").strip()
 
     trans_chg = float(data.get("transportation_charges") or data.get("transport_charges") or 0)
     pack_chg = float(data.get("packing_forwarding_charges") or data.get("packing_charges") or 0)

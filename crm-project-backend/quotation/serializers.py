@@ -103,15 +103,17 @@ class QuotationSerializer(serializers.ModelSerializer):
         source="branch.email", read_only=True
     )
     
-    site_name_detail = serializers.CharField(
-        source="site.name", read_only=True
-    )
-    site_address = serializers.CharField(
-        source="site.address", read_only=True
-    )
+    site_name_detail = serializers.SerializerMethodField()
+    site_address = serializers.SerializerMethodField()
     site_city = serializers.CharField(
         source="site.city", read_only=True
     )
+
+    def get_site_name_detail(self, obj):
+        return obj.site_name or (obj.site.name if obj.site else "")
+
+    def get_site_address(self, obj):
+        return obj.site_address or (obj.site.address if obj.site else "")
 
     versions = QuotationVersionSerializer(many=True)
     terms = serializers.SerializerMethodField()
@@ -351,6 +353,10 @@ class SimpleQuotationSerializer(serializers.Serializer):
     contact_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     company_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     email = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    site_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    project_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    site_address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    project_address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     items = SimpleQuotationItemSerializer(many=True, required=False)
 
     sales_person = serializers.IntegerField(required=False, allow_null=True)
@@ -433,12 +439,19 @@ class SimpleQuotationSerializer(serializers.Serializer):
         if not sp_phone and sp_obj:
             sp_phone = getattr(sp_obj, 'mobile_no', '') or getattr(sp_obj, 'phone', '')
 
+        # Resolve site / project name and address
+        resolved_site_name = (validated_data.get("site_name") or validated_data.get("project_name") or "").strip()
+        resolved_site_address = (validated_data.get("site_address") or validated_data.get("project_address") or "").strip()
+        if not resolved_site_address and customer:
+            resolved_site_address = (getattr(customer, 'site_address', None) or getattr(customer, 'address', '') or '').strip()
+
         # Create quotation
         quotation = Quotation.objects.create(
             quotation_no="TEMP",
             customer=customer,
             subject=subject,
-            site_name="",
+            site_name=resolved_site_name,
+            site_address=resolved_site_address,
             thank_you_note="Thank you for choosing us. We look forward to serving you.",
             sales_person=sp_obj,
             sales_person_name=sp_name,

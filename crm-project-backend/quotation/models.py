@@ -33,7 +33,8 @@ class Quotation(models.Model):
     )
 
     subject = models.CharField(max_length=255)
-    site_name = models.CharField(max_length=255, blank=True, null=True)
+    site_name = models.CharField(max_length=255, blank=True, null=True, verbose_name="Site / Project Name")
+    site_address = models.TextField(blank=True, null=True, verbose_name="Site Address / Location")
     thank_you_note = models.TextField(max_length=400)
 
     sales_person = models.ForeignKey(

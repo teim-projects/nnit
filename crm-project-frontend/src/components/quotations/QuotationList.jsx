@@ -388,7 +388,14 @@ export default function QuotationList({ onAdd, onEdit, filters = {}, canCreate =
                       <div className="text-xs text-slate-400">{q.customer_contact}</div>
                     </td>
 
-                    <td className="px-4 py-3 text-slate-600">{q.site_name_detail || q.site_name || "—"}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <div className="font-medium text-slate-800">{q.site_name || q.site_name_detail || "—"}</div>
+                      {q.site_address && (
+                        <div className="text-[11px] text-slate-400 truncate max-w-[200px]" title={q.site_address}>
+                          📍 {q.site_address}
+                        </div>
+                      )}
+                    </td>
 
                     <td className="px-4 py-3">
                       {latest ? (

@@ -584,7 +584,7 @@
 
             <!-- PROJECT BOX (Attached to main table top) -->
             <div class="project-box">
-                <strong>Project Name:</strong> “ {{ project_name }} ”{% if site_location_str %}{{ site_location_str }}{% endif %}<br>
+                <strong>Project Name:</strong> <strong>“ {{ project_name }} ”</strong>{% if site_location_bold %}{{ site_location_bold|safe }}{% elif site_location_str %}{{ site_location_str }}{% endif %}<br>
                 <strong>Product Name:</strong> {{ parking_systems_display|default:product_name }}
             </div>
 

@@ -44,6 +44,10 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
   const [gstPercent, setGstPercent] = useState(18);
   const [selectedTerms, setSelectedTerms] = useState([]);
 
+  // Site / Project & Location State (appears in PDF Term 2 & Annexure I)
+  const [siteName, setSiteName] = useState("");
+  const [siteAddress, setSiteAddress] = useState("");
+
   // Additional Charges State (in ₹) & Charge Types
   const [transportChargesType, setTransportChargesType] = useState("custom");
   const [transportCharges, setTransportCharges] = useState("");
@@ -122,6 +126,9 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
       if (c.contact_number) setMobileNumber(c.contact_number);
       if (c.company_name || c.name) setCompanyName(c.company_name || c.name);
       if (c.email) setEmailAddress(c.email);
+      if (c.site_address) setSiteAddress(c.site_address);
+      else if (c.address) setSiteAddress(c.address);
+      if (c.site_name) setSiteName(c.site_name);
     }
   };
 
@@ -138,6 +145,8 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
           if (d.customer_id) setCustomerId(String(d.customer_id));
           if (d.company_name) setCompanyName(d.company_name);
           if (d.email) setEmailAddress(d.email);
+          if (d.site_name || d.project_name) setSiteName(d.site_name || d.project_name);
+          if (d.site_address || d.project_address || d.address) setSiteAddress(d.site_address || d.project_address || d.address);
           if (d.sales_person_id) {
             setSalesPersonId(String(d.sales_person_id));
             if (d.sales_person_name) setSalesPersonName(d.sales_person_name);
@@ -158,9 +167,11 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
     }
   };
 
-  // Pre-fill customer from lead
+  // Pre-fill customer and site details from lead
   useEffect(() => {
     if (leadData?.customer_id) setCustomerId(String(leadData.customer_id));
+    if (leadData?.project_name) setSiteName(leadData.project_name);
+    if (leadData?.project_address || leadData?.site_address) setSiteAddress(leadData.project_address || leadData.site_address);
   }, [leadData]);
 
   // Load existing quotation for edit
@@ -173,6 +184,8 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
         setSalesPersonId(d.sales_person ? String(d.sales_person) : "");
         setSalesPersonName(d.sales_person_name || "");
         setSalesPersonPhone(d.sales_person_phone || "");
+        setSiteName(d.site_name || d.project_name || "");
+        setSiteAddress(d.site_address || d.project_address || "");
         setGstPercent(d.gst_percent ?? 18);
 
         setTransportChargesType(d.transportation_charges_type || "custom");
@@ -385,6 +398,10 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
       contact_number: mobileNumber,
       company_name: companyName,
       email: emailAddress,
+      site_name: siteName.trim(),
+      project_name: siteName.trim(),
+      site_address: siteAddress.trim(),
+      project_address: siteAddress.trim(),
       sales_person: salesPersonId ? parseInt(salesPersonId) : null,
       sales_person_name: salesPersonName,
       sales_person_phone: salesPersonPhone,
@@ -524,6 +541,54 @@ export default function AddQuotation({ id = null, onBack, leadData = null }) {
                         className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SITE / PROJECT & LOCATION DETAILS SECTION (PDF 2 No: Term 2 & Annexure I) */}
+              <div className="p-4 bg-amber-50/70 rounded-xl border border-amber-200/80 space-y-3">
+                <div className="flex items-center justify-between border-b border-amber-200/80 pb-2">
+                  <span className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                    📍 SITE / PROJECT & ADDRESS DETAILS
+                  </span>
+                  <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/90 px-2.5 py-0.5 rounded-full border border-amber-300">
+                    PDF 2 No / Term 2 & Annexure I
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Site Name / Project Name */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Site Name / Project Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Rajarampuri"
+                      value={siteName}
+                      onChange={(e) => setSiteName(e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white shadow-sm"
+                    />
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      In PDF Term 2: <span className="font-semibold text-slate-700">for &quot;{siteName || "Rajarampuri"}&quot;</span>
+                    </span>
+                  </div>
+
+                  {/* Site Address / Location */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Site Address / Location
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 8th Lane, Kolhapur"
+                      value={siteAddress}
+                      onChange={(e) => setSiteAddress(e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white shadow-sm"
+                    />
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      In PDF Term 2: <span className="font-semibold text-slate-700">at {siteAddress || "8th Lane, Kolhapur"}</span>
+                    </span>
                   </div>
                 </div>
               </div>

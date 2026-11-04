@@ -348,9 +348,54 @@ def _build_simple_quotation_context(quotation, version):
     parking_systems_display = f"{category_name} - {product_name}" if category_name != product_name else product_name
 
     # Project and Location details
-    project_name = quotation.site_name or (quotation.site.name if quotation.site else None) or quotation.subject or "—"
-    site_city = (quotation.site.city if quotation.site and quotation.site.city else None) or (quotation.customer.city if quotation.customer else None) or ""
-    site_location_str = f" at {site_city}" if site_city else ""
+    raw_project_name = (
+        quotation.site_name or
+        (quotation.site.name if quotation.site else None) or
+        ""
+    ).strip()
+
+    if raw_project_name:
+        clean_project_name = raw_project_name.strip(' "\'“”')
+    else:
+        clean_project_name = (quotation.subject or "").strip(' "\'“”')
+
+    raw_site_address = (
+        getattr(quotation, 'site_address', None) or
+        (quotation.site.address if quotation.site and quotation.site.address else None) or
+        (quotation.site.city if quotation.site and quotation.site.city else None) or
+        (quotation.customer.site_address if quotation.customer and quotation.customer.site_address else None) or
+        (quotation.customer.address if quotation.customer and quotation.customer.address else None) or
+        (quotation.customer.city if quotation.customer and quotation.customer.city else None) or
+        ""
+    ).strip()
+
+    site_location_str = ""
+    clean_site_address = ""
+    if raw_site_address:
+        clean_site_address = raw_site_address.strip()
+        if clean_site_address.lower().startswith("at "):
+            clean_site_address = clean_site_address[3:].strip()
+        elif clean_site_address.startswith("@"):
+            clean_site_address = clean_site_address.lstrip('@ ').strip()
+
+    if clean_site_address:
+        site_location_str = f" at {clean_site_address}"
+        site_location_bold = f" at <strong>{clean_site_address}</strong>"
+    else:
+        site_location_str = ""
+        site_location_bold = ""
+
+    # Target clause for Term 2: e.g. for "tiger" at 8th Lane, Kolhapur (both site name and address bold)
+    if clean_project_name and site_location_bold:
+        contract_target_str = f'for <strong>"{clean_project_name}"</strong>{site_location_bold}'
+    elif clean_project_name:
+        contract_target_str = f'for <strong>"{clean_project_name}"</strong>'
+    elif site_location_bold:
+        contract_target_str = f'for works{site_location_bold}'
+    else:
+        contract_target_str = ""
+
+    project_name = clean_project_name or "—"
     grand_total_words = _amount_in_words(grand_total)
     grand_total_fmt = _fmt_inr(grand_total)
 
@@ -372,11 +417,15 @@ def _build_simple_quotation_context(quotation, version):
 
         # Dynamic injection for Term 2 (Price & Terms of Payment)
         elif seq == 2 or "price" in title_lower or "payment" in title_lower:
-            payment_schedule = """<p>1) 50% of order value including GST @ 18% as advance along with your order.</p>
-<p>2) 40% of order value including GST @ 18% after readiness of material against Proforma invoice.</p>
-<p>3) 10% of order value including GST @ 18% after successful trial, installation & handover of the System.</p>
+            target_clause = f" {contract_target_str}," if contract_target_str else ""
+
+            gst_rate_label = f"{int(total_gst_pct)}%" if (total_gst_pct and float(total_gst_pct).is_integer()) else f"{total_gst_pct:.0f}%" if total_gst_pct else "18%"
+
+            payment_schedule = f"""<p>1) 50% of order value including GST @ {gst_rate_label} as advance along with your order.</p>
+<p>2) 40% of order value including GST @ {gst_rate_label} after readiness of material against Proforma invoice.</p>
+<p>3) 10% of order value including GST @ {gst_rate_label} after successful trial, installation & handover of the System</p>
 <p>Any delay in payments as per the above schedule shall carry interest @ 24% p.a. Our Rates are based on current prices of steel. If rates of steel escalate more than 2% of current prices of steel at the time of execution of the works contract, then our quoted prices will escalate proportionately.</p>"""
-            content = f"<p>The total consideration for execution of the above works contract <strong>for \"{project_name}\"{site_location_str}</strong>, shall be inclusive GST <strong>Rs. {grand_total_fmt} ({grand_total_words})</strong> which shall be due and payable as under —</p>{payment_schedule}"
+            content = f"<p>The total consideration for execution of the above works contract{target_clause} shall be inclusive GST <strong>Rs. {grand_total_fmt} (Rs. {grand_total_words})</strong><br>which shall be due and payable as under &ndash;</p>{payment_schedule}"
 
         processed_terms.append({
             'sequence': t.sequence,
@@ -463,6 +512,11 @@ def _build_simple_quotation_context(quotation, version):
         'version': version,
         'formatted_offer_no': formatted_offer_no,
         'project_name': project_name,
+        'site_name': clean_project_name,
+        'site_address': clean_site_address or raw_site_address,
+        'site_location_str': site_location_str,
+        'site_location_bold': site_location_bold,
+        'contract_target_str': contract_target_str,
         'product_name': product_name,
         'category_name': category_name,
         'system_full_name': system_full_name,
