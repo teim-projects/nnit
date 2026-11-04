@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status, filters
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from api.permissions import HasModulePermission
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
@@ -154,13 +155,15 @@ class QuotationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='send-email')
     def send_email(self, request, pk=None):
-        """Send quotation via email"""
-        from django.core.mail import send_mail
+        """Send quotation via email with branded HTML template and PDF attachment"""
+        from django.core.mail import EmailMultiAlternatives
         from django.conf import settings
 
         quotation = self.get_object()
-        email = request.data.get('email', '')
-        note = request.data.get('note', '')
+        email = request.data.get('email') or request.data.get('recipient_email', '')
+        note = request.data.get('note') or request.data.get('text_content', '')
+        html_content = request.data.get('html_content', '')
+        subject = request.data.get('subject') or f"Quotation {quotation.quotation_no} - NNIT Car Parking Systems"
         version_id = request.data.get('version_id')
 
         if not email:
@@ -173,25 +176,63 @@ class QuotationViewSet(viewsets.ModelViewSet):
             version = QuotationVersion.objects.filter(quotation=quotation, is_active=True).first()
 
         try:
-            subject = f"Quotation {quotation.quotation_no} from Krishna Air"
-            body = f"Dear {quotation.customer_name},\n\n"
-            if note:
-                body += f"{note}\n\n"
-            body += f"Please find your quotation {quotation.quotation_no}"
-            if version:
-                body += f" ({version.version_no})"
-                body += f"\nTotal Amount: ₹{version.grand_total}"
-            body += "\n\nThank you for your business.\n\nKrishna Air"
+            cust_name = quotation.customer.name if (quotation.customer and quotation.customer.name) else "Valued Customer"
+            ver_name = version.version_no if version else ""
+            tot_amt = f"₹{version.grand_total:,.2f}" if (version and version.grand_total) else ""
 
-            send_mail(
-                subject,
-                body,
-                settings.DEFAULT_FROM_EMAIL,
-                [email],
-                fail_silently=False,
+            # Prepare text body cleanly without duplication
+            text_body = str(note).strip() if note else ""
+            if not text_body:
+                text_body = f"Dear {cust_name},\n\nPlease find attached Quotation {quotation.quotation_no}"
+                if ver_name:
+                    text_body += f" ({ver_name})"
+                if tot_amt:
+                    text_body += f"\nTotal Amount: {tot_amt}"
+                text_body += "\n\nThank you for choosing NNIT Car Parking Systems.\n\nBest Regards,\nNNIT Car Parking Systems Team"
+
+            HEADER_IMAGE_URL = "https://files.catbox.moe/4i67y4.jpg"
+            final_html = html_content
+
+            if not final_html or '<body' not in final_html:
+                final_html = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:'Segoe UI',sans-serif; background-color:#f4f6f9; margin:0; padding:20px; color:#333;">
+  <div style="max-width:600px; margin:0 auto; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.08); border:1px solid #e2e8f0;">
+    <img src="{HEADER_IMAGE_URL}" alt="NNIT Car Parking Systems Header" style="width:100%; display:block; margin:0; padding:0; border:0;" />
+    <div style="padding:25px; line-height:1.6; white-space:pre-wrap;">{text_body}</div>
+  </div>
+</body>
+</html>'''
+
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None) or getattr(settings, 'EMAIL_HOST_USER', 'connectteim@gmail.com')
+
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=text_body,
+                from_email=from_email,
+                to=[email],
             )
-            return Response({"detail": "Email sent successfully"}, status=status.HTTP_200_OK)
+            msg.attach_alternative(final_html, "text/html")
+
+            # Generate and attach Quotation PDF
+            if version:
+                try:
+                    pdf_bytes = build_quotation_pdf(
+                        quotation,
+                        version,
+                        base_url=request.build_absolute_uri('/')
+                    )
+                    clean_no = str(quotation.quotation_no).replace('/', '_').replace('\\', '_')
+                    filename = f"Quotation_{clean_no}_v{ver_name}.pdf"
+                    msg.attach(filename, pdf_bytes, 'application/pdf')
+                except Exception as pdf_err:
+                    logger.error(f"Could not generate PDF attachment for email: {str(pdf_err)}")
+
+            msg.send(fail_silently=False)
+            return Response({"detail": "Email sent successfully with PDF attachment"}, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(f"Error sending quotation email: {str(e)}")
             return Response({"detail": f"Email failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=["get"], url_path="latest-version")
@@ -410,6 +451,79 @@ class QuotationCustomerViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
 
 
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def fetch_lead_by_mobile(request):
+    """
+    GET /api/quotation/fetch-lead-by-mobile/?mobile=<number>
+    Searches Customer and lead_management by mobile number.
+    Returns complete lead & customer details for auto-filling Quotation form.
+    """
+    raw_mobile = request.query_params.get("mobile", "").strip()
+    if not raw_mobile:
+        return Response({"found": False, "detail": "Mobile number is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    import re
+    cleaned_mobile = re.sub(r'[^\d]', '', raw_mobile)
+    if cleaned_mobile.startswith('91') and len(cleaned_mobile) == 12:
+        cleaned_mobile = cleaned_mobile[2:]
+
+    from lead_management.models import Customer, lead_management
+    from django.db.models import Q
+
+    customer = Customer.objects.filter(
+        Q(contact_number__icontains=cleaned_mobile) |
+        Q(secondary_contact_number__icontains=cleaned_mobile)
+    ).first()
+
+    lead = None
+    if customer:
+        lead = customer.leads.order_by('-created_at', '-id').first()
+    else:
+        lead = lead_management.objects.filter(
+            Q(contact_person_number__icontains=cleaned_mobile) |
+            Q(customer__contact_number__icontains=cleaned_mobile)
+        ).select_related('customer', 'assign_to').order_by('-created_at', '-id').first()
+
+        if lead:
+            customer = lead.customer
+
+    if not customer and not lead:
+        return Response({"found": False, "detail": "No lead or customer found for this mobile number"}, status=status.HTTP_200_OK)
+
+    cust_id = customer.id if customer else None
+    cust_name = customer.name if customer else (lead.contact_person_name if lead else "")
+    contact_no = customer.contact_number if customer else (lead.contact_person_number if lead else cleaned_mobile)
+    company_name = (lead.company_name if lead else "") or getattr(customer, 'company_name', '') or cust_name
+    contact_person = (lead.contact_person_name if lead else "") or customer.poc_name or cust_name
+    email = customer.email if customer else ""
+    state = customer.state if customer else ""
+    city = customer.city if customer else ""
+    address = customer.address if customer else (lead.project_adderess if lead else "")
+
+    sp_id = lead.assign_to_id if (lead and lead.assign_to) else None
+    sp_name = f"{lead.assign_to.first_name or ''} {lead.assign_to.last_name or ''}".strip() if (lead and lead.assign_to) else ""
+    sp_phone = getattr(lead.assign_to, 'mobile_no', '') or getattr(lead.assign_to, 'phone', '') if (lead and lead.assign_to) else ""
+
+    return Response({
+        "found": True,
+        "customer_id": cust_id,
+        "customer_name": cust_name,
+        "contact_number": contact_no,
+        "company_name": company_name,
+        "contact_person": contact_person,
+        "email": email,
+        "state": state,
+        "city": city,
+        "address": address,
+        "sales_person_id": sp_id,
+        "sales_person_name": sp_name,
+        "sales_person_phone": sp_phone,
+        "project_name": lead.project_name if lead else ""
+    }, status=status.HTTP_200_OK)
+
+
 # =====================================================
 # SIMPLE QUOTATION VIEW
 # POST /quotation/simple-quotation/
@@ -439,27 +553,61 @@ def simple_quotation_create(request):
 def simple_quotation_detail(request, pk):
     """
     GET /quotation/simple-quotation/<pk>/
-    Returns simple-form-friendly data for editing.
+    Returns simple-form-friendly data for editing (including multiple items).
     """
-    from lead_management.serializers import CustomerSerializer
     quotation = get_object_or_404(Quotation, pk=pk)
     version = quotation.versions.filter(is_active=True).first()
-    item = version.high_side_items.first() if version else None
+    
+    items_list = []
+    first_item = None
+    if version:
+        high_items = list(version.high_side_items.all())
+        first_item = high_items[0] if high_items else None
+        for h_item in high_items:
+            p_id = h_item.product_data.get("id") if h_item.product_data else None
+            p_name = h_item.product_data.get("name") if h_item.product_data else ""
+            qty = h_item.quantity or 1
+            inst_rate = (float(h_item.mathadi_charges) / qty) if (h_item.mathadi_charges and qty > 0) else 0.0
+            items_list.append({
+                "id": h_item.id,
+                "parking_product_id": p_id,
+                "parking_product_name": p_name,
+                "quantity": qty,
+                "unit_price": float(h_item.unit_price or 0),
+                "installation_charges": inst_rate,
+                "description": h_item.description or "",
+                "line_total": float(h_item.base_amount or 0),
+                "cars": h_item.product_data.get("car_capacity") if (h_item.product_data and "car_capacity" in h_item.product_data) else None
+            })
 
     data = {
         "id": quotation.id,
         "quotation_no": quotation.quotation_no,
         "customer": quotation.customer_id,
-        "customer_name": quotation.customer.name,
+        "customer_name": quotation.customer.name if quotation.customer else "",
+        "sales_person": quotation.sales_person_id,
+        "sales_person_name": quotation.sales_person_name or "",
+        "sales_person_phone": quotation.sales_person_phone or "",
         "subject": quotation.subject,
-        "quantity": item.quantity if item else 1,
-        "unit_price": float(item.unit_price) if item else 0,
-        "gst_percent": float(item.gst_percent) if item else 18,
-        "parking_product_id": item.product_data.get("id") if item else None,
-        "parking_product_name": item.product_data.get("name") if item else "",
+        "quantity": first_item.quantity if first_item else 1,
+        "unit_price": float(first_item.unit_price) if first_item else 0,
+        "gst_percent": float(first_item.gst_percent) if first_item else 18,
+        "parking_product_id": first_item.product_data.get("id") if first_item and first_item.product_data else None,
+        "parking_product_name": first_item.product_data.get("name") if first_item and first_item.product_data else "",
         "subtotal": float(version.subtotal) if version else 0,
         "gst_amount": float(version.gst_amount) if version else 0,
+        "transportation_charges": float(getattr(version, "transportation_charges", 0) or 0) if version else 0,
+        "packing_forwarding_charges": float(getattr(version, "packing_forwarding_charges", 0) or 0) if version else 0,
+        "loading_unloading_charges": float(getattr(version, "loading_unloading_charges", 0) or 0) if version else 0,
+        "insurance_charges": float(getattr(version, "insurance_charges", 0) or 0) if version else 0,
+        "miscellaneous_charges": float(getattr(version, "miscellaneous_charges", 0) or 0) if version else 0,
+        "transportation_charges_type": getattr(version, "transportation_charges_type", "custom") if version else "custom",
+        "packing_forwarding_charges_type": getattr(version, "packing_forwarding_charges_type", "custom") if version else "custom",
+        "loading_unloading_charges_type": getattr(version, "loading_unloading_charges_type", "custom") if version else "custom",
+        "insurance_charges_type": getattr(version, "insurance_charges_type", "custom") if version else "custom",
+        "miscellaneous_charges_type": getattr(version, "miscellaneous_charges_type", "custom") if version else "custom",
         "grand_total": float(version.grand_total) if version else 0,
+        "items": items_list
     }
     return Response(data)
 
@@ -470,23 +618,59 @@ def simple_quotation_detail(request, pk):
 def simple_quotation_update(request, pk):
     """
     PUT /quotation/simple-quotation/<pk>/
-    Creates a new version with updated product/price.
+    Creates a new version with updated products/prices list.
     """
     from parking_products.models import ParkingProduct
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
 
     quotation = get_object_or_404(Quotation, pk=pk)
     data = request.data
-
-    quantity = int(data.get("quantity", 1))
-    unit_price = float(data.get("unit_price", 0))
     gst_percent = float(data.get("gst_percent", 18))
-    parking_product_id = data.get("parking_product_id")
 
-    parking_product = get_object_or_404(ParkingProduct, pk=parking_product_id) if parking_product_id else None
+    sp_id = data.get("sales_person")
+    if sp_id:
+        sp_obj = User.objects.filter(pk=sp_id).first()
+        quotation.sales_person = sp_obj
 
-    # Update quotation fields
-    if parking_product:
-        quotation.subject = f"{parking_product.product_name} - {parking_product.category.display_name}"
+    if "sales_person_name" in data:
+        quotation.sales_person_name = data.get("sales_person_name") or ""
+    if "sales_person_phone" in data:
+        quotation.sales_person_phone = data.get("sales_person_phone") or ""
+
+    trans_chg = float(data.get("transportation_charges") or data.get("transport_charges") or 0)
+    pack_chg = float(data.get("packing_forwarding_charges") or data.get("packing_charges") or 0)
+    load_chg = float(data.get("loading_unloading_charges") or data.get("loading_charges") or 0)
+    ins_chg = float(data.get("insurance_charges") or data.get("insurance") or 0)
+    misc_chg = float(data.get("miscellaneous_charges") or data.get("miscellaneous") or 0)
+
+    trans_type = data.get("transportation_charges_type") or "custom"
+    pack_type = data.get("packing_forwarding_charges_type") or "custom"
+    load_type = data.get("loading_unloading_charges_type") or "custom"
+    ins_type = data.get("insurance_charges_type") or "custom"
+    misc_type = data.get("miscellaneous_charges_type") or "custom"
+
+    raw_items = data.get("items")
+    if not raw_items or not isinstance(raw_items, list) or len(raw_items) == 0:
+        p_id = data.get("parking_product_id")
+        if p_id:
+            raw_items = [{
+                "parking_product_id": p_id,
+                "quantity": data.get("quantity", 1),
+                "unit_price": data.get("unit_price", 0),
+                "description": "",
+                "installation_charges": 0
+            }]
+        else:
+            return Response({"detail": "At least one product item is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Fetch first product to build subject if needed
+    first_product_id = raw_items[0].get("parking_product_id")
+    first_product = ParkingProduct.objects.filter(pk=first_product_id).first() if first_product_id else None
+
+    if first_product:
+        quotation.subject = f"{first_product.product_name} - {first_product.category.display_name}"
+    
     quotation.save()
 
     # Deactivate old version
@@ -507,46 +691,77 @@ def simple_quotation_update(request, pk):
         is_active=True,
         gst_type="CGST_SGST",
         created_by=request.user,
+        transportation_charges=trans_chg,
+        packing_forwarding_charges=pack_chg,
+        loading_unloading_charges=load_chg,
+        insurance_charges=ins_chg,
+        miscellaneous_charges=misc_chg,
+        transportation_charges_type=trans_type,
+        packing_forwarding_charges_type=pack_type,
+        loading_unloading_charges_type=load_type,
+        insurance_charges_type=ins_type,
+        miscellaneous_charges_type=misc_type,
     )
 
-    if parking_product:
-        product_data = {
-            "id": parking_product.id,
-            "name": parking_product.product_name,
-            "sku": parking_product.product_code or parking_product.product_name,
-            "category": parking_product.category.display_name,
-            "car_capacity": parking_product.car_capacity,
+    total_subtotal = 0.0
+    total_gst_amount = 0.0
+
+    for item_data in raw_items:
+        p_id = item_data.get("parking_product_id")
+        product = ParkingProduct.objects.filter(pk=p_id).first() if p_id else None
+        qty = int(item_data.get("quantity", 1))
+        u_price = float(item_data.get("unit_price", 0))
+        inst_charges = float(item_data.get("installation_charges", 0))
+        desc = item_data.get("description") or (f"{product.product_name} ({product.category.display_name})" if product else "Parking System")
+
+        custom_cars = item_data.get("cars") if item_data.get("cars") is not None else item_data.get("car_capacity")
+        if custom_cars is not None and str(custom_cars).isdigit() and int(custom_cars) > 0:
+            car_cap_val = int(custom_cars)
+        else:
+            car_cap_val = (getattr(product, 'car_capacity', 2) or 2) if product else 2
+
+        product_data_snapshot = {
+            "id": product.id if product else None,
+            "name": product.product_name if product else "Parking System",
+            "sku": (product.product_code or product.product_name) if product else "PKG",
+            "category": product.category.display_name if (product and product.category) else "",
+            "car_capacity": car_cap_val,
+            "load_capacity": float(getattr(product, 'load_capacity', 0) or 0) if product else 0,
         }
-    else:
-        product_data = {}
 
-    base_amount = quantity * unit_price
-    gst_value = (base_amount * gst_percent) / 100
+        base_amount = qty * u_price
+        line_subtotal = base_amount + (qty * inst_charges)
+        gst_value = (line_subtotal * gst_percent) / 100
+        total_with_gst = line_subtotal + gst_value
 
-    QuotationHighSideItem.objects.create(
-        quotation_version=version,
-        product_data=product_data,
-        quantity=quantity,
-        unit_price=unit_price,
-        unit="NOS",
-        gst_percent=gst_percent,
-        mathadi_charges=0,
-        transportation_charges=0,
-        description="",
-        hsn_sac="",
-        base_amount=base_amount,
-        gst_amount=gst_value,
-        total_with_gst=base_amount + gst_value,
-    )
+        QuotationHighSideItem.objects.create(
+            quotation_version=version,
+            product_data=product_data_snapshot,
+            quantity=qty,
+            unit_price=u_price,
+            unit="NOS",
+            gst_percent=gst_percent,
+            mathadi_charges=inst_charges * qty,
+            transportation_charges=0,
+            description=desc,
+            hsn_sac="",
+            base_amount=line_subtotal,
+            gst_amount=gst_value,
+            total_with_gst=total_with_gst,
+        )
 
-    half_gst = gst_value / 2
-    version.subtotal = base_amount
-    version.gst_amount = gst_value
+        total_subtotal += line_subtotal
+        total_gst_amount += gst_value
+
+    half_gst = total_gst_amount / 2.0
+    version.subtotal = total_subtotal
+    version.gst_amount = total_gst_amount
     version.cgst_amount = half_gst
     version.sgst_amount = half_gst
     version.igst_amount = 0
-    version.total_amount = base_amount + gst_value
-    version.grand_total = base_amount + gst_value
+    version.total_amount = total_subtotal + total_gst_amount
+    add_charges = trans_chg + pack_chg + load_chg + ins_chg + misc_chg
+    version.grand_total = total_subtotal + total_gst_amount + add_charges
     version.save()
 
     return Response({"id": quotation.id, "quotation_no": quotation.quotation_no, "version": new_version_no})
@@ -568,15 +783,17 @@ class TermsMasterViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing master Terms & Conditions templates
     """
+    module_key = 'terms'
     queryset = TermsMaster.objects.all()
     serializer_class = TermsMasterSerializer
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasModulePermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active', 'is_default']
     search_fields = ['title', 'content']
     ordering_fields = ['sequence', 'created_at']
     ordering = ['sequence']
+    pagination_class = None  # Disable pagination to show all terms
 
     @action(detail=False, methods=['post'], url_path='reorder')
     def reorder(self, request):
@@ -602,6 +819,7 @@ class QuotationTermsViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['quotation', 'is_customized']
     ordering = ['sequence']
+    pagination_class = None  # Disable pagination to show all quotation terms
 
     @action(detail=False, methods=['post'], url_path='bulk-create')
     def bulk_create(self, request):

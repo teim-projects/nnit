@@ -28,6 +28,7 @@ export default function AddLeadForm({
   const [formData, setFormData] = useState({
     enquiry_date: "",
     clientName: "",
+    companyName: "",
     contactNumber: "",
     secondaryContactNumber: "",
     email: "",
@@ -58,6 +59,8 @@ export default function AddLeadForm({
     followupDate: "",
     remarks: "",
   });
+
+  const [cadFile, setCadFile] = useState(null);
 
   const cities = useMemo(() => {
     if (!formData.state) return [];
@@ -246,6 +249,7 @@ export default function AddLeadForm({
         city: lead.customer_city || "",
         state: lead.customer_state || "",
         pincode: lead.customer_pincode || "",
+        companyName: lead.company_name || "",
         projectName: lead.project_name || "",
         projectAddress: lead.project_adderess || "",
         requirementDetails: lead.requirements_details || "",
@@ -266,11 +270,12 @@ export default function AddLeadForm({
           address: ""
         },
         status: lead.status || "open",
-        assignTo: lead.assign_to || "",
+        assignTo: String(lead.assign_to || ""),
         creditedBy: lead.creatd_by_details?.full_name || "",
         followupDate: lead.followup_date || "",
         remarks: lead.remarks || "",
       });
+      setCadFile(lead.cad_file || null);
       contactRef.current = lead.customer_contact || "";
       setCustomerId(lead.customer ?? null);
       setAssignId(lead.assign_to ?? null);
@@ -278,6 +283,7 @@ export default function AddLeadForm({
       setIsQualified(lead.is_qualified || false);
       setQualifyingAnswers(lead.qualifying_answers || {});
     } else {
+      setCadFile(null);
       setFormData({
         enquiry_date: "",
         clientName: "",
@@ -364,11 +370,18 @@ export default function AddLeadForm({
       lookupTimerRef.current = null;
     }
     if (lookupAbortRef.current) {
-      try {
-        lookupAbortRef.current.abort();
-      } catch { }
+      try { lookupAbortRef.current.abort(); } catch { }
       lookupAbortRef.current = null;
     }
+
+    // In EDIT mode — just update the contact number, never wipe other fields
+    if (lead) {
+      contactRef.current = phone;
+      setFormData((prev) => ({ ...prev, contactNumber: phone }));
+      return;
+    }
+
+    // ── ADD mode only below ──
 
     if (!phone || phone === "") {
       setCustomerId(null);
@@ -465,12 +478,14 @@ export default function AddLeadForm({
       return false;
     }
 
-    if (!formData.enquiry_date) {
+    // For new leads enquiry_date is required; for edits it's pre-filled
+    if (!lead && !formData.enquiry_date) {
       showError("enquiry_date", "Enquiry Date is required");
       return false;
     }
 
-    if (!formData.leadSource) {
+    // leadSource required only for new leads (edits already have it)
+    if (!lead && !formData.leadSource) {
       showError("leadSource", "Lead source is required");
       return false;
     }
@@ -521,21 +536,18 @@ export default function AddLeadForm({
       }
     }
 
-    if (!formData.serviceEnquiry) {
+    // Only require serviceEnquiry for new leads
+    if (!lead && !formData.serviceEnquiry) {
       showError("serviceEnquiry", "Enquiry Type is required");
       return false;
     }
 
     if (
-      (formData.serviceEnquiry === "service" ||
-        formData.serviceEnquiry === "both") &&
+      formData.serviceEnquiry &&
+      (formData.serviceEnquiry === "service" || formData.serviceEnquiry === "both") &&
       (!formData.serviceCategory || formData.serviceCategory.length === 0)
     ) {
-      Swal.fire({
-        icon: "error",
-        title: "Validation",
-        text: "Please select at least one service",
-      });
+      Swal.fire({ icon: "error", title: "Validation", text: "Please select at least one service" });
       return false;
     }
 
@@ -565,7 +577,9 @@ export default function AddLeadForm({
       const data = await res.json();
       setLatestLead(data);
 
+      // ✅ MUST spread prev — never replace the whole object
       setFormData((prev) => ({
+        ...prev,
         projectName: data.project_name || prev.projectName,
         projectAddress: data.project_adderess || prev.projectAddress,
       }));
@@ -647,6 +661,7 @@ export default function AddLeadForm({
       }
 
       const payload = {
+        company_name: formData.companyName || "",
         project_name: formData.projectName || "",
         project_adderess: formData.projectAddress || "",
         requirements_details: formData.requirementDetails || "",
@@ -672,13 +687,31 @@ export default function AddLeadForm({
       const url = lead ? `${API_URL}${lead.id}/` : API_URL;
       const method = lead ? "PATCH" : "POST";
 
+      let body;
+      let headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+
+      if (cadFile instanceof File) {
+        const formDataObj = new FormData();
+        Object.keys(payload).forEach((k) => {
+          if (payload[k] !== null && payload[k] !== undefined) {
+            if (typeof payload[k] === "object") {
+              formDataObj.append(k, JSON.stringify(payload[k]));
+            } else {
+              formDataObj.append(k, payload[k]);
+            }
+          }
+        });
+        formDataObj.append("cad_file", cadFile);
+        body = formDataObj;
+      } else {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify(payload);
+      }
+
       const res = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify(payload),
+        headers,
+        body,
       });
 
       let data;
@@ -721,6 +754,33 @@ export default function AddLeadForm({
 
     setFormData(prev => ({ ...prev, clientName: name }));
     setShowSuggestions(true);
+
+    // In EDIT mode — only update the name, never wipe other fields
+    // The customer already exists; user is just correcting the display name.
+    if (lead) {
+      if (name.length >= 2) {
+        try {
+          const res = await fetch(
+            `${baseApi.replace(/\/$/, "")}/lead/customer/lookup/?search=${encodeURIComponent(name)}`,
+            {
+              headers: {
+                "Content-Type": "application/json",
+                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+              },
+            }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            setCustomerSuggestions(Array.isArray(data) ? data : data.results ?? []);
+          }
+        } catch { /* silent */ }
+      } else {
+        setCustomerSuggestions([]);
+      }
+      return; // ← stop here in edit mode — never clear fields
+    }
+
+    // ── ADD mode only below ──
 
     if (customerId && name !== prevName) {
       setCustomerId(null);
@@ -819,27 +879,30 @@ export default function AddLeadForm({
       }
     `}
       </style>
-      <div className="fixed inset-0 bg-black/40 flex justify-center items-start sm:items-center p-6 z-50 mt-15">
-        <div className="relative w-full max-w-2xl p-6 bg-white rounded-md shadow-lg max-h-[90vh] overflow-y-auto">
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 text-xl text-gray-500 hover:text-black"
-          >
-            <RxCross2 />
-          </button>
+      <div className="fixed inset-0 bg-black/50 flex justify-center items-center p-4 pt-20 z-[1050]">
+        <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
 
-          <h1 className="text-2xl font-bold text-center mb-4">
-            {lead ? "Edit Enquiry" : "Add Enquiry"}
-          </h1>
+          {/* ── Header ── */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+            <h1 className="text-base font-bold text-slate-800">
+              {lead ? "Edit Lead" : "Add Lead"}
+            </h1>
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+            >
+              <RxCross2 />
+            </button>
+          </div>
+
+          {/* ── Scrollable Body ── */}
+          <div className="flex-1 overflow-y-auto px-6 py-5">
 
           {loadingLatestLead && (
-            <div className="text-xs text-blue-500 mt-1">
-              Fetching latest enquiry...
-            </div>
+            <div className="text-xs text-blue-500 mb-2">Fetching latest enquiry…</div>
           )}
-
           {latestLead && (
-            <div className="text-xs text-green-600 mt-1">
+            <div className="text-xs text-green-600 mb-2">
               Last Project: {latestLead.project_name} | {latestLead.address}
             </div>
           )}
@@ -850,7 +913,7 @@ export default function AddLeadForm({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Contact Number */}
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Contact Number <span className="text-red-500">*</span>
                   </label>
                   <div className="flex items-center gap-2 mt-1">
@@ -872,7 +935,7 @@ export default function AddLeadForm({
                           input.classList.remove("input-error");
                         }
                       }}
-                      className="w-full px-3 py-2 rounded-md border border-slate-300 placeholder-slate-400"
+                      className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     />
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
@@ -882,7 +945,7 @@ export default function AddLeadForm({
 
                 {/* Customer Name */}
                 <div className="relative">
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Customer Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -891,11 +954,11 @@ export default function AddLeadForm({
                     onChange={handleNameChange}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     onFocus={() => setShowSuggestions(true)}
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   />
 
                   {showSuggestions && customerSuggestions.length > 0 && (
-                    <div className="absolute z-50 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-48 overflow-y-auto shadow-lg">
+                    <div className="absolute z-[1050] w-full bg-white border border-gray-300 rounded-md mt-1 max-h-48 overflow-y-auto shadow-lg">
                       {customerSuggestions.map((c) => (
                         <div
                           key={c.id}
@@ -913,7 +976,7 @@ export default function AddLeadForm({
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Secondary Contact Number
                   </label>
                   <input
@@ -931,12 +994,12 @@ export default function AddLeadForm({
                         }));
                       }
                     }}
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Customer Email
                   </label>
                   <input
@@ -948,14 +1011,13 @@ export default function AddLeadForm({
                       clearError(e);
                       handleChange(e);
                     }}
-                    readOnly={!!customerId}
-                    className={`w-full mt-1 px-3 py-2 rounded-md border border-slate-300 placeholder-slate-400 ${customerId ? "bg-gray-100" : ""
-                      }`}
+                    readOnly={!lead && !!customerId}
+                    className={`w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition ${!lead && customerId ? "bg-slate-50 cursor-not-allowed" : ""}`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Customer Secondary Email
                   </label>
                   <input
@@ -967,9 +1029,8 @@ export default function AddLeadForm({
                       clearError(e);
                       handleChange(e);
                     }}
-                    readOnly={!!customerId}
-                    className={`w-full mt-1 px-3 py-2 rounded-md border border-slate-300 placeholder-slate-400 ${customerId ? "bg-gray-100" : ""
-                      }`}
+                    readOnly={!lead && !!customerId}
+                    className={`w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition ${!lead && customerId ? "bg-slate-50 cursor-not-allowed" : ""}`}
                   />
                 </div>
 
@@ -981,12 +1042,12 @@ export default function AddLeadForm({
                       }`}
                   >
                     <div className={formData.enquiryType !== "organization" ? "md:col-span-2" : ""}>
-                      <label className="text-sm font-normal text-gray-600">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
                         Customer Type <span className="text-red-500">*</span>
                       </label>
                       <select
                         name="enquiryType"
-                        className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                        className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                         value={formData.enquiryType}
                         onChange={(e) => {
                           handleChange(e);
@@ -1008,7 +1069,7 @@ export default function AddLeadForm({
                     {formData.enquiryType === "organization" && (
                       <>
                         <div>
-                          <label className="text-sm font-normal text-gray-600">
+                          <label className="block text-sm font-medium text-slate-700 mb-1">
                             Contact Person Name <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -1019,12 +1080,12 @@ export default function AddLeadForm({
                               clearError(e);
                               handleChange(e);
                             }}
-                            className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                            className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                           />
                         </div>
 
                         <div>
-                          <label className="text-sm font-normal text-gray-600">
+                          <label className="block text-sm font-medium text-slate-700 mb-1">
                             Contact Person Number <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -1036,7 +1097,7 @@ export default function AddLeadForm({
                               clearError(e);
                               handleChange(e);
                             }}
-                            className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                            className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                           />
                         </div>
                       </>
@@ -1045,7 +1106,7 @@ export default function AddLeadForm({
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Address <span className="text-red-500">*</span>
                   </label>
                   <textarea
@@ -1056,15 +1117,14 @@ export default function AddLeadForm({
                       clearError(e);
                       handleChange(e);
                     }}
-                    readOnly={!!customerId}
+                    readOnly={!lead && !!customerId}
                     rows={1}
-                    className={`w-full mt-1 px-3 py-2 rounded-md border border-slate-300 placeholder-slate-400 
-                  ${customerId ? "bg-gray-100" : ""}`}
+                    className={`w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition ${!lead && customerId ? "bg-slate-50 cursor-not-allowed" : ""}`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     State <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -1075,7 +1135,7 @@ export default function AddLeadForm({
                       handleChange(e);
                       setFormData(prev => ({ ...prev, city: "" }));
                     }}
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   >
                     <option value="">Select State</option>
                     {states.map((state) => (
@@ -1087,7 +1147,7 @@ export default function AddLeadForm({
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     City <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -1097,7 +1157,7 @@ export default function AddLeadForm({
                       clearError(e);
                       handleChange(e);
                     }}
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     disabled={!formData.state}
                   >
                     <option value="">
@@ -1112,7 +1172,7 @@ export default function AddLeadForm({
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Pincode
                   </label>
                   <input
@@ -1130,17 +1190,17 @@ export default function AddLeadForm({
                         }));
                       }
                     }}
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Enquiry Type <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="serviceEnquiry"
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     value={formData.serviceEnquiry || ""}
                     onChange={(e) => {
                       handleChange(e);
@@ -1162,7 +1222,7 @@ export default function AddLeadForm({
 
                 {(formData.serviceEnquiry === "service" || formData.serviceEnquiry === "both") && (
                   <div>
-                    <label className="text-sm font-normal text-gray-600">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
                       Service Category <span className="text-red-500">*</span>
                     </label>
                     <CreatableSelect
@@ -1188,7 +1248,23 @@ export default function AddLeadForm({
                 )}
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Company Name
+                  </label>
+                  <input
+                    name="companyName"
+                    placeholder="Company Name"
+                    value={formData.companyName || ""}
+                    onChange={(e) => {
+                      clearError(e);
+                      handleChange(e);
+                    }}
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Project Name
                   </label>
                   <input
@@ -1199,12 +1275,12 @@ export default function AddLeadForm({
                       clearError(e);
                       handleChange(e);
                     }}
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300 placeholder-slate-400"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Project Address
                     <span className="ml-1 text-xs text-blue-500 font-normal">(Google Maps)</span>
                   </label>
@@ -1225,7 +1301,7 @@ export default function AddLeadForm({
             {step === 2 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Enquiry Source <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -1248,7 +1324,7 @@ export default function AddLeadForm({
                       }));
                       setShowLeadSourceInput(!!selected?.needsInput);
                     }}
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   >
                     <option value="">Select Enquiry Source</option>
                     {leadSourceOptions.map(opt => (
@@ -1261,21 +1337,21 @@ export default function AddLeadForm({
 
                 {userRole.name !== "sales" && (
                   <div>
-                    <label className="text-sm font-normal text-gray-600">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
                       Assign To <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="assignTo"
-                      value={formData.assignTo}
+                      value={String(formData.assignTo || "")}
                       onChange={(e) => {
                         clearError(e);
                         handleChange(e);
                       }}
-                      className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                      className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     >
                       <option value="">Assign To</option>
                       {assignOptions.map((o) => (
-                        <option key={o.id} value={o.id}>
+                        <option key={o.id} value={String(o.id)}>
                           {o.name} {o.last_name}
                         </option>
                       ))}
@@ -1298,7 +1374,7 @@ export default function AddLeadForm({
                           }
                         }))
                       }
-                      className="px-3 py-2 rounded-md border border-slate-300"
+                      className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     />
 
                     <input
@@ -1315,7 +1391,7 @@ export default function AddLeadForm({
                           }
                         }))
                       }
-                      className="px-3 py-2 rounded-md border border-slate-300"
+                      className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     />
 
                     <input
@@ -1331,7 +1407,7 @@ export default function AddLeadForm({
                           }
                         }))
                       }
-                      className="px-3 py-2 rounded-md border border-slate-300"
+                      className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     />
 
                     <input
@@ -1347,13 +1423,13 @@ export default function AddLeadForm({
                           }
                         }))
                       }
-                      className="px-3 py-2 rounded-md border border-slate-300 md:col-span-3"
+                      className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition md:col-span-3"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">Enquiry Date <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Enquiry Date <span className="text-red-500">*</span></label>
                   <input
                     type="date"
                     name="enquiry_date"
@@ -1363,14 +1439,13 @@ export default function AddLeadForm({
                       handleChange(e);
                     }}
                     readOnly={!!lead}
-                    className={`w-full mt-1 px-3 py-2 rounded-md border border-slate-300 
-                  ${lead ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                    className={`w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition ${lead ? "bg-slate-50 cursor-not-allowed" : ""}`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
-                    Follow-up Date <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Follow-up Date <span className="text-slate-400 font-normal text-xs">(Optional)</span>
                   </label>
                   <input
                     type="date"
@@ -1380,7 +1455,7 @@ export default function AddLeadForm({
                       clearError(e);
                       handleChange(e);
                     }}
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   />
                 </div>
               </div>
@@ -1390,7 +1465,7 @@ export default function AddLeadForm({
             {step === 2 && (
               <>
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Requirement Details
                   </label>
                   <textarea
@@ -1401,12 +1476,12 @@ export default function AddLeadForm({
                       clearError(e);
                       handleChange(e);
                     }}
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-normal text-gray-600">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Remarks
                   </label>
                   <textarea
@@ -1417,8 +1492,32 @@ export default function AddLeadForm({
                       clearError(e);
                       handleChange(e);
                     }}
-                    className="w-full mt-1 px-3 py-2 rounded-md border border-slate-300"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   />
+                </div>
+
+                <div className="md:col-span-2 bg-gradient-to-r from-indigo-50/50 to-blue-50/50 p-4 rounded-xl border border-indigo-100 space-y-2 mt-1">
+                  <label className="block text-xs font-bold text-indigo-900">
+                    📐 CAD Design Drawing File (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept=".dwg,.dxf,.pdf,.png,.jpg,.jpeg,.zip,.rar"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setCadFile(e.target.files[0]);
+                      }
+                    }}
+                    className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs text-slate-800 bg-white focus:ring-2 focus:ring-indigo-400"
+                  />
+                  {cadFile && (
+                    <div className="flex items-center gap-2 text-xs text-emerald-700 font-semibold pt-1">
+                      <span>📁 File Selected: {typeof cadFile === "string" ? cadFile.split("/").pop() : cadFile.name}</span>
+                      {typeof cadFile === "string" && (
+                        <a href={cadFile} target="_blank" rel="noreferrer" className="text-indigo-600 underline text-[11px]">View Current CAD</a>
+                      )}
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -1442,7 +1541,7 @@ export default function AddLeadForm({
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="px-4 py-2 border border-gray-400 rounded-md"
+                  className="px-5 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
                 >
                   Back
                 </button>
@@ -1452,7 +1551,7 @@ export default function AddLeadForm({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 border border-gray-400 rounded-md"
+                  className="px-5 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
                 >
                   Cancel
                 </button>
@@ -1465,7 +1564,7 @@ export default function AddLeadForm({
                         setStep(2);
                       }
                     }}
-                    className="px-5 py-2 bg-blue-600 text-white rounded-md"
+                    className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition"
                   >
                     Next
                   </button>
@@ -1474,7 +1573,7 @@ export default function AddLeadForm({
                 {step === 2 && (
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-blue-600 text-white rounded-md"
+                    className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition"
                     disabled={loading}
                   >
                     {loading ? (lead ? "Updating..." : "Saving...") : lead ? "Update" : "Submit"}
@@ -1483,6 +1582,7 @@ export default function AddLeadForm({
               </div>
             </div>
           </form>
+          </div>{/* end scrollable body */}
         </div>
 
         <AddCustomerForm

@@ -1,4 +1,3 @@
-
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -15,7 +14,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView
 )
-# For swagger documentation
+
 schema_view = get_schema_view(
    openapi.Info(
       title="Snippets API",
@@ -29,33 +28,30 @@ schema_view = get_schema_view(
    permission_classes=(permissions.AllowAny,),
 )
 
-
-
+from api.views_chatbot import ChatbotQueryView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # Documentation urls
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('auth/', include('api.urls')),
+    path('api/chatbot/', ChatbotQueryView.as_view(), name='direct_chatbot'),
 
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
     path("test/", lambda request: HttpResponse("Working")),
 
-
-   
-    # path('invoice/',include('invoice.urls')),  # Invoice module removed
     path('lead/', include('lead_management.urls')),
     path('product/', include('product_management.urls')),
-    path('api/quotation/', include('quotation.urls')),  # Fixed: Added 'api/' prefix
-    # path('inventory/', include("inventory.urls")),  # Inventory module removed
-    path('amc/', include('amc.urls')),
+    path('api/quotation/', include('quotation.urls')),
+    path('api/amc/', include('amc.urls')),  # Keep only this one - with /api/ prefix
     path('parking/', include('parking_products.urls')),
+    path('api/services/', include('service_management.urls')),
+    path('services/', include('service_management.urls')),
 ]
 
 if settings.DEBUG:
-        urlpatterns += static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)
-        urlpatterns += static(settings.STATIC_URL, document_root = settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_ROOT, document_root=settings.STATIC_ROOT)

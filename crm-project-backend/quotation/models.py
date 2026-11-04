@@ -36,6 +36,17 @@ class Quotation(models.Model):
     site_name = models.CharField(max_length=255, blank=True, null=True)
     thank_you_note = models.TextField(max_length=400)
 
+    sales_person = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="quotations_as_sales_person",
+        verbose_name="Sales Person"
+    )
+    sales_person_name = models.CharField(max_length=200, blank=True, null=True, verbose_name="Sales Person Name")
+    sales_person_phone = models.CharField(max_length=50, blank=True, null=True, verbose_name="Sales Person Mobile")
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -68,6 +79,21 @@ class QuotationVersion(models.Model):
     sgst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     igst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    # Additional Charges
+    transportation_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    packing_forwarding_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    loading_unloading_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    insurance_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    miscellaneous_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Additional Charges Types ("custom", "extra_cost", "nil", "included")
+    transportation_charges_type = models.CharField(max_length=50, default="custom", blank=True, null=True)
+    packing_forwarding_charges_type = models.CharField(max_length=50, default="custom", blank=True, null=True)
+    loading_unloading_charges_type = models.CharField(max_length=50, default="custom", blank=True, null=True)
+    insurance_charges_type = models.CharField(max_length=50, default="custom", blank=True, null=True)
+    miscellaneous_charges_type = models.CharField(max_length=50, default="custom", blank=True, null=True)
+
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 

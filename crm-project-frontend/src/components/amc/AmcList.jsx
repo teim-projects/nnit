@@ -1,51 +1,166 @@
-import { useState, useEffect } from "react";
-import { MdEdit, MdDelete, MdAutorenew, MdVisibility, MdBuild } from "react-icons/md";
+import { useState, useEffect, Fragment } from "react";
+import { 
+  MdEdit, 
+  MdDelete, 
+  MdAutorenew, 
+  MdVisibility, 
+  MdToggleOn, 
+  MdToggleOff, 
+  MdAssignmentInd, 
+  MdClose,
+  MdEmail,
+  MdHistory
+} from "react-icons/md";
+import { IoLogoWhatsapp } from "react-icons/io5";
 import Swal from "sweetalert2";
 import AddAmcForm from "./AddAmcForm";
 import ContractDetailModal from "./ContractDetailModal";
-import AmcSparePartsModal from "./AmcSparePartsModal";
+import RenewAmcModal from "./RenewAmcModal";
+import SendEmailModal from "../SendEmailModal";
 
 export default function AmcList({ baseApi, token, filters = {} }) {
   const [contracts, setContracts] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedAmc, setSelectedAmc] = useState(null);
-  const [filterType, setFilterType] = useState("all"); // all, active, expiring_soon
+  const [filterType, setFilterType] = useState("all"); // all, active, expiring_soon, expired, scheduled, renewed
   const [detailContract, setDetailContract] = useState(null);
-  const [sparePartsContract, setSparePartsContract] = useState(null);
+  const [renewContract, setRenewContract] = useState(null);
+  const [expandedCyclesRowId, setExpandedCyclesRowId] = useState(null);
+
+  // Assign Technician Modal State
+  const [assignAmcModal, setAssignAmcModal] = useState(null);
+  const [selectedTechId, setSelectedTechId] = useState("");
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailModalData, setEmailModalData] = useState({});
+
+  // Get fresh token from localStorage if prop is missing
+  const getToken = () => {
+    // Check multiple possible token keys
+    const possibleTokens = [
+      token,
+      localStorage.getItem('access'),
+      localStorage.getItem('access_token'),
+      localStorage.getItem('token'),
+      localStorage.getItem('authToken'),
+    ];
+    
+    const foundToken = possibleTokens.find(t => t && t.length > 0);
+    
+    if (!foundToken) {
+      console.warn('⚠️ No token found in any storage location!');
+      console.log('Checked locations:', {
+        prop: !!token,
+        access: !!localStorage.getItem('access'),
+        access_token: !!localStorage.getItem('access_token'),
+        token: !!localStorage.getItem('token'),
+        authToken: !!localStorage.getItem('authToken'),
+      });
+    }
+    
+    return foundToken;
+  };
 
   const fetchContracts = async () => {
     setLoading(true);
     try {
-      let url = `${baseApi}/amc/contracts/`;
-      if (filterType === "expiring_soon") {
-        url = `${baseApi}/amc/contracts/expiring_soon/`;
-      } else if (filterType === "active") {
-        url = `${baseApi}/amc/contracts/active_contracts/`;
-      }
-      // Append search filter from FiltersPanel
-      if (filters?.search) {
-        const separator = url.includes("?") ? "&" : "?";
-        url += `${separator}search=${encodeURIComponent(filters.search)}`;
+      const authToken = getToken();
+      if (!authToken) {
+        Swal.fire({
+          icon: "warning",
+          title: "Not Logged In",
+          text: "Please login to continue",
+        }).then(() => {
+          window.location.href = '/login';
+        });
+        return;
       }
 
+      let url = `${baseApi}/api/amc/contracts/`;
+      const queryParams = [];
+
+      if (filterType !== "all") {
+        queryParams.push(`status=${encodeURIComponent(filterType)}`);
+      }
+      if (filters?.search) {
+        queryParams.push(`search=${encodeURIComponent(filters.search)}`);
+      }
+
+      if (queryParams.length > 0) {
+        url += `?${queryParams.join("&")}`;
+      }
+
+      console.log("Fetching AMC contracts from:", url);
+      console.log("Token present:", !!authToken);
+      console.log("Token value (first 20 chars):", authToken?.substring(0, 20) + "...");
+
       const res = await fetch(url, {
+        method: 'GET',
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          "Authorization": `Bearer ${authToken}`,
+        },
+      });
+
+      console.log("Response status:", res.status);
+      console.log("Response headers:", res.headers);
+
+      if (res.status === 401 || res.status === 403) {
+        // Token expired or invalid, redirect to login
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
+        localStorage.removeItem('token');
+        localStorage.removeItem('access_token');
+        Swal.fire({
+          icon: "warning",
+          title: "Session Expired",
+          text: "Please login again to continue",
+        }).then(() => {
+          window.location.href = '/login';
+        });
+        return;
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Fetched contracts data:", data);
+        setContracts(Array.isArray(data) ? data : data.results || []);
+      } else {
+        const errorText = await res.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Failed to load AMC contracts: ${res.status} ${res.statusText}`);
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
+      Swal.fire({ 
+        icon: "error", 
+        title: "Error", 
+        text: err.message || "Failed to fetch contracts",
+        footer: "Please check console for details"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTechnicians = async () => {
+    try {
+      const authToken = getToken();
+      if (!authToken) return;
+
+      const res = await fetch(`${baseApi}/api/services/technicians/?status=active`, {
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}` 
         }
       });
       if (res.ok) {
         const data = await res.json();
-        setContracts(data.results || data);
-      } else {
-        throw new Error("Failed to load contracts");
+        setTechnicians(Array.isArray(data) ? data : data.results || []);
       }
     } catch (err) {
-      console.error(err);
-      Swal.fire({ icon: "error", title: "Error", text: "Failed to fetch contracts" });
-    } finally {
-      setLoading(false);
+      console.error("Failed to load active technicians", err);
     }
   };
 
@@ -53,28 +168,34 @@ export default function AmcList({ baseApi, token, filters = {} }) {
     fetchContracts();
   }, [filterType, baseApi, token, filters]);
 
+  useEffect(() => {
+    fetchTechnicians();
+  }, [baseApi, token]);
+
   const handleDelete = async (id) => {
     const result = await Swal.fire({
       title: "Are you sure?",
-      text: "This will permanently delete the contract",
+      text: "This will permanently delete this AMC contract.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Yes, delete it!",
-      confirmButtonColor: "#d33"
+      confirmButtonColor: "#d33",
     });
 
     if (!result.isConfirmed) return;
 
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${id}/`, {
+      const authToken = getToken();
+      const res = await fetch(`${baseApi}/api/amc/contracts/${id}/`, {
         method: "DELETE",
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
       });
 
       if (res.ok) {
-        Swal.fire({ icon: "success", text: "Contract deleted successfully", timer: 1200 });
+        Swal.fire({ icon: "success", text: "Contract deleted successfully", timer: 1200, showConfirmButton: false });
         fetchContracts();
       } else {
         throw new Error("Failed to delete contract");
@@ -84,38 +205,120 @@ export default function AmcList({ baseApi, token, filters = {} }) {
     }
   };
 
-  const handleRenew = async (id) => {
-    const { value: cost } = await Swal.fire({
-      title: "Renew AMC Contract",
-      input: "number",
-      inputLabel: "Enter AMC Cost for renewal",
-      inputPlaceholder: "Cost in INR",
+  const handleToggleStatus = async (id, currentStatus) => {
+    const actionText = currentStatus === "inactive" ? "activate" : "deactivate";
+    const result = await Swal.fire({
+      title: `Toggle Contract Status?`,
+      text: `Do you want to ${actionText} this AMC contract?`,
+      icon: "question",
       showCancelButton: true,
-      inputValidator: (value) => {
-        if (!value || isNaN(parseFloat(value))) {
-          return "Please enter a valid cost";
-        }
-      }
+      confirmButtonText: `Yes, ${actionText}!`,
     });
 
-    if (!cost) return;
+    if (!result.isConfirmed) return;
 
     try {
-      const res = await fetch(`${baseApi}/amc/contracts/${id}/create_renewal/`, {
+      const authToken = getToken();
+      const res = await fetch(`${baseApi}/api/amc/contracts/${id}/toggle-status/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ amc_cost: parseFloat(cost) })
       });
 
       if (res.ok) {
-        Swal.fire({ icon: "success", text: "Contract renewed successfully", timer: 1200 });
+        Swal.fire({ icon: "success", text: `Contract ${actionText}d successfully`, timer: 1200, showConfirmButton: false });
         fetchContracts();
       } else {
-        const errData = await res.json();
-        throw new Error(errData.detail || "Failed to renew contract");
+        throw new Error("Failed to toggle status");
+      }
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "Error", text: err.message });
+    }
+  };
+
+  const handleWhatsApp = (item) => {
+    const cust = item.customer_details || {};
+    setEmailModalData({
+      recipientEmail: cust.email || "",
+      recipientName: cust.name || cust.company_name || "",
+      recipientPhone: cust.contact_number || "",
+      siteName: cust.site_name || cust.city || "Site",
+      requirements: item.product || "AMC Contract",
+      quotationNo: item.contract_id || "AMC-001",
+      amount: item.annual_value ? `₹${parseFloat(item.annual_value).toLocaleString("en-IN")}` : "",
+      type: "amc",
+      initialChannel: "whatsapp"
+    });
+    setShowEmailModal(true);
+  };
+
+  const handleEmail = (item) => {
+    const cust = item.customer_details || {};
+    setEmailModalData({
+      recipientEmail: cust.email || "",
+      recipientName: cust.name || cust.company_name || "",
+      recipientPhone: cust.contact_number || "",
+      siteName: cust.site_name || cust.city || "Site",
+      requirements: item.product || "AMC Contract",
+      quotationNo: item.contract_id || "AMC-001",
+      amount: item.annual_value ? `₹${parseFloat(item.annual_value).toLocaleString("en-IN")}` : "",
+      type: "amc",
+      initialChannel: "email"
+    });
+    setShowEmailModal(true);
+  };
+
+  const handleAssignTechnicianSubmit = async (e) => {
+    e.preventDefault();
+    if (!assignAmcModal) return;
+
+    try {
+      const authToken = getToken();
+      const res = await fetch(`${baseApi}/api/amc/contracts/${assignAmcModal.id}/assign-technician/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          technician_id: selectedTechId ? parseInt(selectedTechId, 10) : null
+        })
+      });
+
+      if (res.ok) {
+        Swal.fire({ icon: "success", text: "Assigned technician updated for AMC", timer: 1200, showConfirmButton: false });
+        setAssignAmcModal(null);
+        fetchContracts();
+      } else {
+        throw new Error("Failed to assign technician to AMC contract");
+      }
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "Error", text: err.message });
+    }
+  };
+
+  const handleGenerateWarrantyServices = async (id) => {
+    try {
+      const authToken = getToken();
+      const res = await fetch(`${baseApi}/api/amc/contracts/${id}/generate-warranty-services/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        Swal.fire({
+          icon: "success",
+          title: "Warranty Services Synced",
+          text: data.message || "4 Quarterly free warranty services synced successfully!",
+        });
+        fetchContracts();
+      } else {
+        throw new Error("Failed to generate warranty services");
       }
     } catch (err) {
       Swal.fire({ icon: "error", title: "Error", text: err.message });
@@ -124,182 +327,344 @@ export default function AmcList({ baseApi, token, filters = {} }) {
 
   const getStatusBadgeClass = (status) => {
     switch (status) {
-      case "ACTIVE":
-        return "bg-green-100 text-green-800";
-      case "INACTIVE":
-        return "bg-slate-100 text-slate-800";
-      case "EXPIRED":
-        return "bg-red-100 text-red-800";
-      case "CANCELLED":
-        return "bg-amber-100 text-amber-800";
+      case "active":
+        return "bg-emerald-100 text-emerald-800 border border-emerald-200";
+      case "expiring_soon":
+        return "bg-amber-100 text-amber-800 border border-amber-200 animate-pulse";
+      case "expired":
+        return "bg-rose-100 text-rose-800 border border-rose-200";
+      case "scheduled":
+        return "bg-blue-100 text-blue-800 border border-blue-200";
+      case "renewed":
+        return "bg-indigo-100 text-indigo-800 border border-indigo-200";
+      case "inactive":
       default:
-        return "bg-slate-100 text-slate-800";
+        return "bg-slate-100 text-slate-600 border border-slate-200";
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header card matching PurchaseOrder */}
-      <div className="bg-white p-4 rounded-md shadow flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">AMC Contracts</h2>
-          <div className="text-sm text-slate-600">
-            {loading ? "Loading..." : `${contracts.length} AMC contract(s) found`}
-          </div>
+    <div className="space-y-4">
+      {/* Top Action Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+        {/* Status Filters */}
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+          {[
+            { id: "all", label: "All Contracts" },
+            { id: "active", label: "Active" },
+            { id: "expiring_soon", label: "Expiring Soon" },
+            { id: "expired", label: "Expired" },
+            { id: "renewed", label: "Renewed" },
+            { id: "scheduled", label: "Scheduled" },
+            { id: "inactive", label: "Inactive" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterType(tab.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                filterType === tab.id
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilterType("all")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md ${
-                filterType === "all" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setFilterType("active")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md ${
-                filterType === "active" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-              }`}
-            >
-              Active
-            </button>
-            <button
-              onClick={() => setFilterType("expiring_soon")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md ${
-                filterType === "expiring_soon" ? "bg-amber-600 text-white" : "bg-amber-100 text-amber-800 hover:bg-amber-200"
-              }`}
-            >
-              Expiring Soon
-            </button>
-          </div>
-          <button
-            onClick={() => {
-              setSelectedAmc(null);
-              setShowAddForm(true);
-            }}
-            className="px-4 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 text-sm font-medium"
-          >
-            + Add AMC
-          </button>
-        </div>
+
+        <button
+          onClick={() => {
+            setSelectedAmc(null);
+            setShowAddForm(true);
+          }}
+          className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors shrink-0"
+        >
+          + Create AMC Contract
+        </button>
       </div>
 
-      {/* Table Card matching PurchaseOrder */}
-      <div className="bg-white rounded-md shadow overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-50 border-b">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Sr.No</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Contract No</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Customer</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">AMC Type</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Visit Freq.</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">AC Variant</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Start Date</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">End Date</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Cost</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading ? (
-              <tr>
-                <td colSpan="11" className="px-4 py-8 text-center text-sm text-slate-500">
-                  Loading contracts...
-                </td>
+      {/* Contracts Table */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <th className="px-4 py-3.5">#</th>
+                <th className="px-4 py-3.5">Contract ID</th>
+                <th className="px-4 py-3.5">Customer</th>
+                <th className="px-4 py-3.5">Product</th>
+                <th className="px-4 py-3.5">AMC Type</th>
+                <th className="px-4 py-3.5">Frequency</th>
+                <th className="px-4 py-3.5">Assigned Tech</th>
+                <th className="px-4 py-3.5">Start Date</th>
+                <th className="px-4 py-3.5">End Date</th>
+                <th className="px-4 py-3.5">Annual Value</th>
+                <th className="px-4 py-3.5">Status</th>
+                <th className="px-4 py-3.5 text-center">Actions</th>
               </tr>
-            ) : contracts.length === 0 ? (
-              <tr>
-                <td colSpan="11" className="px-4 py-8 text-center text-sm text-slate-500">
-                  No contracts found. Click "+ Add AMC" to create one.
-                </td>
-              </tr>
-            ) : (
-              contracts.map((item, index) => (
-                <tr key={item.id} className="border-b hover:bg-slate-50">
-                  <td className="px-4 py-3 text-sm">{index + 1}</td>
-                  <td className="px-4 py-3 text-sm font-semibold text-blue-600">{item.contract_number}</td>
-                  <td className="px-4 py-3 text-sm">{item.customer_name || `Customer ID: ${item.customer}`}</td>
-                  <td className="px-4 py-3 text-sm">
-                    {item.amc_type === "COMPREHENSIVE"
-                      ? "Comprehensive"
-                      : item.amc_type === "NON_COMPREHENSIVE"
-                        ? "Non-Comprehensive"
-                        : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {{
-                      MONTHLY: "Monthly",
-                      QUARTERLY: "Quarterly",
-                      HALF_YEARLY: "Half Yearly",
-                      YEARLY: "Yearly",
-                    }[item.visit_frequency] || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm">{item.product_name || `Variant ID: ${item.product_variant}`}</td>
-                  <td className="px-4 py-3 text-sm">{item.amc_start_date}</td>
-                  <td className="px-4 py-3 text-sm">{item.amc_end_date}</td>
-                  <td className="px-4 py-3 text-sm">₹{item.amc_cost}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusBadgeClass(item.status)}`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => setDetailContract(item)}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                        title="View Details"
-                      >
-                        <MdVisibility />
-                      </button>
-                      {item.amc_type === "NON_COMPREHENSIVE" && (
-                        <button
-                          onClick={() => setSparePartsContract(item)}
-                          className="px-2 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200"
-                          title="Spare Parts & Invoice"
-                        >
-                          <MdBuild />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          setSelectedAmc(item);
-                          setShowAddForm(true);
-                        }}
-                        className="px-2 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
-                        title="Edit"
-                      >
-                        <MdEdit />
-                      </button>
-                      {item.status === "ACTIVE" && (
-                        <button
-                          onClick={() => handleRenew(item.id)}
-                          className="px-2 py-1 bg-purple-200 text-purple-800 rounded hover:bg-purple-300"
-                          title="Renew AMC"
-                        >
-                          <MdAutorenew />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="px-2 py-1 bg-red-200 text-red-800 rounded hover:bg-red-300"
-                        title="Delete"
-                      >
-                        <MdDelete />
-                      </button>
-                    </div>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-xs">
+              {loading ? (
+                <tr>
+                  <td colSpan="12" className="px-4 py-12 text-center text-sm text-slate-400">
+                    Loading contracts...
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : contracts.length === 0 ? (
+                <tr>
+                  <td colSpan="12" className="px-4 py-12 text-center text-sm text-slate-500">
+                    No AMC contracts found matching your filters.
+                  </td>
+                </tr>
+              ) : (
+                contracts.map((item, index) => {
+                  const customerName =
+                    item.customer_details?.company_name ||
+                    item.customer_details?.name ||
+                    `Customer #${item.customer}`;
+                  const assignedTech = item.assigned_technician_details;
+
+                  return (
+                    <Fragment key={item.id}>
+                      <tr className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3 text-slate-500 font-medium">{index + 1}</td>
+                      <td className="px-4 py-3 font-bold text-blue-600">{item.contract_id || "—"}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-800">{customerName}</td>
+                      <td className="px-4 py-3 text-slate-700 font-medium">{item.product || "—"}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {item.amc_type === "warranty" ? (
+                          <span className="inline-block px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            🛡️ 1 Yr Warranty (4 Free Services)
+                          </span>
+                        ) : (
+                          item.amc_type_display || (item.amc_type === "comprehensive" ? "Comprehensive" : "Non-Comprehensive")
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 capitalize">
+                        {item.payment_frequency_display || item.payment_frequency}
+                      </td>
+
+                      {/* Assigned Tech Column */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {assignedTech ? (
+                          <div className="font-semibold text-indigo-700 flex items-center gap-1">
+                            <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">
+                              {assignedTech.name.charAt(0)}
+                            </span>
+                            {assignedTech.name}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setAssignAmcModal(item);
+                              setSelectedTechId("");
+                            }}
+                            className="text-amber-600 font-semibold hover:underline flex items-center gap-1 text-[11px]"
+                          >
+                            <MdAssignmentInd /> Assign Tech
+                          </button>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{item.start_date || "—"}</td>
+                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{item.end_date || "—"}</td>
+                      <td className="px-4 py-3 font-semibold text-emerald-700 whitespace-nowrap">
+                        ₹{parseFloat(item.annual_value || 0).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getStatusBadgeClass(item.status)}`}>
+                          {item.status_display || item.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => setExpandedCyclesRowId(prev => (prev === item.id ? null : item.id))}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              expandedCyclesRowId === item.id
+                                ? "bg-purple-600 text-white shadow-sm"
+                                : "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                            }`}
+                            title="Renewal History & Old AMC Versions"
+                          >
+                            <MdHistory size={16} />
+                          </button>
+                          <button
+                            onClick={() => setDetailContract(item)}
+                            className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                            title="View Contract Details"
+                          >
+                            <MdVisibility size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleWhatsApp(item)}
+                            className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors"
+                            title="Send WhatsApp"
+                          >
+                            <IoLogoWhatsapp size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleEmail(item)}
+                            className="p-1.5 bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100 transition-colors"
+                            title="Send Email"
+                          >
+                            <MdEmail size={16} />
+                          </button>
+                          {item.amc_type === "warranty" && (
+                            <button
+                              onClick={() => handleGenerateWarrantyServices(item.id)}
+                              className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors font-bold text-xs"
+                              title="Sync 4 Free Quarterly Warranty Services"
+                            >
+                              🛡️
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setAssignAmcModal(item);
+                              setSelectedTechId(item.assigned_technician || "");
+                            }}
+                            className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors"
+                            title="Assign Technician"
+                          >
+                            <MdAssignmentInd size={16} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedAmc(item);
+                              setShowAddForm(true);
+                            }}
+                            className="p-1.5 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors"
+                            title="Edit Contract"
+                          >
+                            <MdEdit size={16} />
+                          </button>
+                          <button
+                            onClick={() => setRenewContract(item)}
+                            className="p-1.5 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
+                            title="Renew Contract"
+                          >
+                            <MdAutorenew size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleToggleStatus(item.id, item.status)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              item.status === "inactive"
+                                ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                            }`}
+                            title={item.status === "inactive" ? "Activate Contract" : "Deactivate Contract"}
+                          >
+                            {item.status === "inactive" ? <MdToggleOff size={18} /> : <MdToggleOn size={18} />}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"
+                            title="Delete Contract"
+                          >
+                            <MdDelete size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedCyclesRowId === item.id && (
+                      <tr key={`cycles-${item.id}`} className="bg-slate-50/90 border-b border-purple-100">
+                        <td colSpan="12" className="px-6 py-4">
+                          <div className="bg-white p-4 rounded-xl border border-purple-200 shadow-sm space-y-3">
+                            {/* Header bar */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-purple-900 font-bold text-sm">
+                                <MdHistory className="w-5 h-5 text-purple-600" />
+                                <span>AMC Contract Cycles ({(item.cycles && item.cycles.length > 0) ? item.cycles.length : 1} cycles)</span>
+                              </div>
+
+                              <button
+                                onClick={() => setRenewContract(item)}
+                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+                              >
+                                <MdAutorenew className="w-4 h-4" /> Renew Contract Now
+                              </button>
+                            </div>
+
+                            {/* Cycles Table */}
+                            <div className="overflow-x-auto rounded-lg border border-slate-200">
+                              <table className="w-full text-xs text-left">
+                                <thead className="bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
+                                  <tr>
+                                    <th className="px-3 py-2">CYCLE</th>
+                                    <th className="px-3 py-2">STATUS</th>
+                                    <th className="px-3 py-2">PERIOD (START - END)</th>
+                                    <th className="px-3 py-2 text-right">ANNUAL VALUE (₹)</th>
+                                    <th className="px-3 py-2">PAYMENT FREQUENCY</th>
+                                    <th className="px-3 py-2">CREATED ON</th>
+                                    <th className="px-3 py-2">CREATED / RENEWED BY</th>
+                                    <th className="px-3 py-2">NOTES / REMARKS</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 bg-white">
+                                  {(item.cycles && item.cycles.length > 0
+                                    ? item.cycles
+                                    : [
+                                        {
+                                          cycle_number: 1,
+                                          status: item.status,
+                                          status_display: item.status_display || item.status,
+                                          start_date: item.start_date,
+                                          end_date: item.end_date,
+                                          annual_value: item.annual_value,
+                                          payment_frequency_display: item.payment_frequency_display || item.payment_frequency,
+                                          created_at: item.created_at,
+                                          created_by_details: item.created_by_details,
+                                          remarks: "Initial Contract Cycle",
+                                        },
+                                      ]
+                                  ).map((cyc, cIdx, arr) => (
+                                    <tr key={cyc.id || cIdx} className="hover:bg-slate-50 transition-colors">
+                                      <td className="px-3 py-2.5 font-bold text-purple-700">
+                                        Cycle #{cyc.cycle_number || (arr.length - cIdx)}
+                                      </td>
+                                      <td className="px-3 py-2.5 whitespace-nowrap">
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${getStatusBadgeClass(cyc.status)}`}>
+                                          {cyc.status_display || cyc.status}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2.5 whitespace-nowrap text-slate-700 font-medium">
+                                        {cyc.start_date || "—"} to {cyc.end_date || "—"}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-right font-bold text-emerald-700 whitespace-nowrap">
+                                        ₹{parseFloat(cyc.annual_value || 0).toLocaleString("en-IN")}
+                                      </td>
+                                      <td className="px-3 py-2.5 capitalize text-slate-600 whitespace-nowrap">
+                                        {cyc.payment_frequency_display || cyc.payment_frequency || "—"}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
+                                        {cyc.created_at ? cyc.created_at.split("T")[0] : "—"}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-slate-700 font-medium whitespace-nowrap">
+                                        {cyc.created_by_details?.first_name || cyc.created_by_details?.username || "System"}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-slate-500 max-w-xs truncate">
+                                        {cyc.remarks || (cIdx === arr.length - 1 ? "Initial Contract Cycle" : "—")}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
+      {/* Add / Edit Form Modal */}
       {showAddForm && (
         <AddAmcForm
           open={showAddForm}
@@ -316,22 +681,119 @@ export default function AmcList({ baseApi, token, filters = {} }) {
         />
       )}
 
+      {/* View Contract Details Modal */}
       {detailContract && (
         <ContractDetailModal
           contract={detailContract}
+          baseApi={baseApi}
+          token={token}
           onClose={() => setDetailContract(null)}
+          onEdit={(item) => {
+            setDetailContract(null);
+            setSelectedAmc(item);
+            setShowAddForm(true);
+          }}
+          onAssignTech={(item) => {
+            setDetailContract(null);
+            setAssignAmcModal(item);
+            setSelectedTechId(item.assigned_technician || "");
+          }}
+          onToggleStatus={(id, st) => {
+            setDetailContract(null);
+            handleToggleStatus(id, st);
+          }}
+          onRefresh={() => fetchContracts()}
         />
       )}
 
-      {sparePartsContract && (
-        <AmcSparePartsModal
-          contract={sparePartsContract}
+      {/* Renew AMC Contract Modal */}
+      {renewContract && (
+        <RenewAmcModal
+          contract={renewContract}
           baseApi={baseApi}
           token={token}
-          onClose={() => setSparePartsContract(null)}
-          onUpdated={fetchContracts}
+          onClose={() => setRenewContract(null)}
+          onSuccess={() => fetchContracts()}
         />
       )}
+
+      {/* Assign Technician Modal */}
+      {assignAmcModal && (
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fadeIn">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <MdAssignmentInd className="text-indigo-600" />
+                Assign Technician to AMC
+              </h3>
+              <button
+                onClick={() => setAssignAmcModal(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
+              >
+                <MdClose className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignTechnicianSubmit} className="p-6 space-y-4">
+              <div>
+                <p className="text-xs text-slate-500 mb-1">AMC Contract:</p>
+                <p className="text-sm font-bold text-slate-800">{assignAmcModal.contract_id} - {assignAmcModal.product}</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Select Technician *
+                </label>
+                <select
+                  value={selectedTechId}
+                  onChange={(e) => setSelectedTechId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white"
+                >
+                  <option value="">-- Unassign Technician --</option>
+                  {technicians.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.specialization}) - {t.phone}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setAssignAmcModal(null)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-sm transition"
+                >
+                  Assign to AMC
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Send Email / WhatsApp Modal */}
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        recipientPhone={emailModalData.recipientPhone}
+        siteName={emailModalData.siteName}
+        requirements={emailModalData.requirements}
+        quotationNo={emailModalData.quotationNo}
+        amount={emailModalData.amount}
+        type="amc"
+        initialChannel={emailModalData.initialChannel || "email"}
+        baseApi={baseApi}
+        token={token}
+      />
     </div>
   );
 }

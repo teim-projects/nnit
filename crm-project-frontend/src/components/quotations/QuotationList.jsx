@@ -6,9 +6,10 @@ import Swal from "sweetalert2";
 import {
   MdRemoveRedEye, MdDownload, MdEdit, MdDelete,
   MdEmail, MdExpandMore, MdExpandLess, MdPrint,
-  MdSend, MdClose, MdHistory,
+  MdClose, MdHistory, MdOutlineNavigateBefore, MdOutlineNavigateNext
 } from "react-icons/md";
-import { FaWhatsapp } from "react-icons/fa";
+import { IoLogoWhatsapp } from "react-icons/io5";
+import SendEmailModal from "../SendEmailModal";
 
 const BASE_API = import.meta.env.VITE_BASE_API_URL;
 console.log("QuotationList BASE_API =", BASE_API);
@@ -49,81 +50,13 @@ function VersionBadge({ versionNo, isLatest }) {
   );
 }
 
-// ── Send Quotation Modal ──────────────────────────────────────────────────────
-function SendModal({ quotation, version, onClose }) {
-  const [email, setEmail] = useState(quotation?.customer_contact || "");
-  const [note, setNote] = useState("");
-  const [sending, setSending] = useState(false);
-
-  const handleWhatsApp = () => {
-    const phone = quotation?.customer_contact?.replace(/\D/g, "") || "";
-    const text = encodeURIComponent(
-      `Dear ${quotation?.customer_name},\n\nPlease find your quotation ${quotation?.quotation_no} (${version?.version_no}).\n\n${note}`
-    );
-    window.open(`https://wa.me/91${phone}?text=${text}`, "_blank");
-    onClose();
-  };
-
-  const handleEmail = async () => {
-    setSending(true);
-    try {
-      await api.post(`api/quotation/quotation/${quotation.id}/send-email/`, {
-        email,
-        note,
-        version_id: version?.id,
-      });
-      Swal.fire({ icon: "success", text: "Email sent!", timer: 1500, showConfirmButton: false });
-      onClose();
-    } catch {
-      Swal.fire({ icon: "error", text: "Email failed. Check backend config." });
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute right-3 top-3 text-slate-500 hover:text-slate-900"><MdClose size={20} /></button>
-        <h3 className="text-lg font-bold mb-4">Send Quotation</h3>
-        <p className="text-sm text-slate-500 mb-4">
-          <span className="font-semibold text-slate-700">{quotation?.quotation_no}</span> — <VersionBadge versionNo={version?.version_no} isLatest={version?.is_active} />
-        </p>
-
-        <div className="space-y-3">
-          <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1">Email / Phone</label>
-            <input className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm"
-              value={email} onChange={e => setEmail(e.target.value)} placeholder="customer@email.com" />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1">Note (optional)</label>
-            <textarea className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm" rows={3}
-              value={note} onChange={e => setNote(e.target.value)} placeholder="Add a personal note..." />
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-5">
-          <button onClick={handleWhatsApp}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md text-sm font-medium">
-            <FaWhatsapp size={16} /> WhatsApp
-          </button>
-          <button onClick={handleEmail} disabled={sending}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium disabled:opacity-50">
-            <MdEmail size={16} /> {sending ? "Sending…" : "Email"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main QuotationList ────────────────────────────────────────────────────────
-export default function QuotationList({ onAdd, onEdit, filters = {} }) {
+export default function QuotationList({ onAdd, onEdit, filters = {}, canCreate = true, canEdit = true, canDelete = true }) {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expandedRows, setExpandedRows] = useState({});   // { [quotation.id]: bool }
-  const [sendModal, setSendModal] = useState(null);        // { quotation, version }
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailModalData, setEmailModalData] = useState({});
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const PAGE_SIZE = 15;
@@ -135,6 +68,7 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
     if (f.date?.from) params.set("date_from", f.date.from);
     if (f.date?.to) params.set("date_to", f.date.to);
     params.set("page", String(pg));
+    params.set("page_size", String(PAGE_SIZE));
     return params.toString();
   }, []);
 
@@ -160,6 +94,49 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
   const getLatestVersion = (q) => q.versions?.find((v) => v.is_active);
   const getOldVersions = (q) => (q.versions || []).filter((v) => !v.is_active).sort((a, b) => b.id - a.id);
   const toggleRow = (id) => setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  // ── WhatsApp & Email Modals (Matches Lead.jsx) ──────────────────────────────
+  const handleWhatsApp = (q, v) => {
+    const latest = getLatestVersion(q);
+    const ver = v || latest;
+    const custEmail = q.customer_email || (q.customer_contact && q.customer_contact.includes("@") ? q.customer_contact : "");
+    const custPhone = (q.customer_contact && !q.customer_contact.includes("@") ? q.customer_contact : "") || q.customer_phone || "";
+    setEmailModalData({
+      recipientEmail: custEmail,
+      recipientName: q.customer_name || q.customer?.name || "",
+      recipientPhone: custPhone,
+      siteName: q.site_name_detail || q.site_name || "",
+      requirements: q.subject || "Car Parking Systems & Automation",
+      quotationNo: q.quotation_no || "",
+      amount: ver?.grand_total ? `₹${fmt(ver.grand_total)}` : "",
+      quotationId: q.id,
+      versionId: ver?.id,
+      type: "quotation",
+      initialChannel: "whatsapp"
+    });
+    setShowEmailModal(true);
+  };
+
+  const handleEmail = (q, v) => {
+    const latest = getLatestVersion(q);
+    const ver = v || latest;
+    const custEmail = q.customer_email || (q.customer_contact && q.customer_contact.includes("@") ? q.customer_contact : "");
+    const custPhone = (q.customer_contact && !q.customer_contact.includes("@") ? q.customer_contact : "") || q.customer_phone || "";
+    setEmailModalData({
+      recipientEmail: custEmail,
+      recipientName: q.customer_name || q.customer?.name || "",
+      recipientPhone: custPhone,
+      siteName: q.site_name_detail || q.site_name || "",
+      requirements: q.subject || "Car Parking Systems & Automation",
+      quotationNo: q.quotation_no || "",
+      amount: ver?.grand_total ? `₹${fmt(ver.grand_total)}` : "",
+      quotationId: q.id,
+      versionId: ver?.id,
+      type: "quotation",
+      initialChannel: "email"
+    });
+    setShowEmailModal(true);
+  };
 
   // ── PDF actions ─────────────────────────────────────────────────────────────
   const openPDF = async (quotationId, versionId, download = false) => {
@@ -201,6 +178,7 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
 
   // ── Delete version ──────────────────────────────────────────────────────────
   const deleteVersion = async (quotationId, versionId) => {
+    if (!canDelete) return;
     const res = await Swal.fire({
       title: "Delete this version?",
       text: "This action cannot be undone.",
@@ -219,10 +197,66 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
     }
   };
 
-  // ── Action buttons (reused for main row and version rows) ──────────────────
+  const handleViewQuotationDrawing = (q) => {
+    const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
+    const custName = (q.customer_name || q.customer || "").trim().toLowerCase();
+    
+    // Flexible matching by customer name
+    const foundReq = existingReqs.find(r => {
+      const rName = (r.customerName || "").trim().toLowerCase();
+      if (!rName) return false;
+      return rName === custName || rName.includes(custName) || custName.includes(rName);
+    });
+
+    const drawingTitle = foundReq?.drawingTitle || `${q.customer_name || "Customer"} Gate & Parking Layout Plan`;
+    const fileName = foundReq?.fileName || `${q.quotation_no ? q.quotation_no.replace(/\//g, "_") : "Quotation"}_CAD_Drawing.dwg`;
+    const drawingSpecs = foundReq?.drawingSpecs || "AutoCAD CAD Drawing & General Arrangement Site Layout";
+    const designerNotes = foundReq?.designerNotes || "AutoCAD site entrance and pit parking design layout completed.";
+    const drawingUrl = foundReq?.drawingUrl || "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=60";
+    const fileType = foundReq?.fileType || "autocad";
+
+    Swal.fire({
+      title: `🎨 Attached Design Drawing`,
+      html: `
+        <div style="text-align: left; font-size: 13px; line-height: 1.6;">
+          <p><strong>Quotation No:</strong> ${q.quotation_no || "N/A"}</p>
+          <p><strong>Customer:</strong> ${q.customer_name || "N/A"}</p>
+          <p><strong>Drawing Title:</strong> ${drawingTitle}</p>
+          <p><strong>File Name:</strong> ${fileName}</p>
+          <p><strong>Format:</strong> ${fileType.toUpperCase()}</p>
+          <p><strong>Technical Specs:</strong> ${drawingSpecs}</p>
+          <p><strong>Designer Remarks:</strong> ${designerNotes}</p>
+        </div>
+      `,
+      icon: "info",
+      showCancelButton: true,
+      confirmButtonText: "📥 Download CAD/PDF Drawing",
+      cancelButtonText: "Close",
+      confirmButtonColor: "#10b981"
+    }).then((res) => {
+      if (res.isConfirmed) {
+        const a = document.createElement("a");
+        a.href = drawingUrl;
+        a.download = fileName;
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    });
+  };
+
+  // ── Action buttons (reused for main row and version rows — matches Lead.jsx) ──
   function ActionButtons({ q, v, isLatest = false }) {
     return (
-      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+      <div className="flex items-center justify-center gap-1 flex-wrap">
+        {/* View CAD / PDF Drawing */}
+        <button onClick={() => handleViewQuotationDrawing(q)}
+          title="View Attached Design Drawing"
+          className="p-1.5 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 flex items-center gap-1 font-bold text-xs">
+          <span>🎨 Drawing</span>
+        </button>
+
         {/* View PDF */}
         <button onClick={() => openPDF(q.id, v?.id)}
           title="View PDF"
@@ -244,15 +278,26 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
           <MdDownload size={16} />
         </button>
 
-        {/* Send (WhatsApp / Email) */}
-        <button onClick={() => setSendModal({ quotation: q, version: v })}
-          title="Send"
-          className="p-1.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200">
-          <MdSend size={16} />
+        {/* Send WhatsApp (Matches Lead.jsx style) */}
+        <button
+          onClick={() => handleWhatsApp(q, v)}
+          className="inline-flex items-center px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium transition-colors"
+          title="Send WhatsApp"
+        >
+          <IoLogoWhatsapp className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Send Email with PDF Attachment (Matches Lead.jsx style) */}
+        <button
+          onClick={() => handleEmail(q, v)}
+          className="inline-flex items-center px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-medium transition-colors"
+          title="Send Email (PDF Attached)"
+        >
+          <MdEmail className="w-3.5 h-3.5" />
         </button>
 
         {/* Edit — only on latest version */}
-        {isLatest && (
+        {isLatest && canEdit && (
           <button onClick={() => onEdit(q.id)}
             title="Edit / New Version"
             className="p-1.5 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200">
@@ -261,11 +306,13 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
         )}
 
         {/* Delete */}
-        <button onClick={() => deleteVersion(q.id, v?.id)}
-          title="Delete version"
-          className="p-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200">
-          <MdDelete size={16} />
-        </button>
+        {canDelete && (
+          <button onClick={() => deleteVersion(q.id, v?.id)}
+            title="Delete version"
+            className="p-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200">
+            <MdDelete size={16} />
+          </button>
+        )}
       </div>
     );
   }
@@ -275,35 +322,40 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
   return (
     <div className="space-y-4">
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="bg-white p-4 rounded-md shadow flex items-center justify-between">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Quotation Management</h2>
-          <p className="text-sm text-slate-500">
-            {loading ? "Loading…" : `${totalCount} quotation(s) found`}
-          </p>
+          <h2 className="text-lg font-semibold">Quotations</h2>
+          <div className="text-xs text-slate-500 font-medium">
+            {loading ? "Loading…" : `${totalCount} total • ${list.length} shown`}
+          </div>
         </div>
-        <button onClick={onAdd}
-          className="px-4 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700 text-sm font-medium">
-          + Add Quotation
-        </button>
+        {canCreate && (
+          <button
+            onClick={onAdd}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm transition flex items-center gap-1.5"
+          >
+            + Add Quotation
+          </button>
+        )}
       </div>
 
       {/* ── Table ────────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-md shadow overflow-x-auto">
-        <table className="w-full text-sm min-w-[900px]">
-          <thead className="bg-slate-50 border-b">
-            <tr>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 w-10">#</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Quotation No</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Customer</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Site</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Latest Version</th>
-              <th className="px-4 py-3 text-right font-semibold text-slate-700">Total (₹)</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700">Date</th>
-              <th className="px-4 py-3 text-center font-semibold text-slate-700">Versions</th>
-              <th className="px-4 py-3 text-center font-semibold text-slate-700">Actions</th>
-            </tr>
-          </thead>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap w-10">SR.NO</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">QUOTATION NO</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">CUSTOMER</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">SITE</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">LATEST VERSION</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">TOTAL (₹)</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">DATE</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">VERSIONS</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">ACTIONS</th>
+              </tr>
+            </thead>
 
           <tbody>
             {loading && (
@@ -429,39 +481,57 @@ export default function QuotationList({ onAdd, onEdit, filters = {} }) {
             })}
           </tbody>
         </table>
+      </div>
 
-        {/* ── Pagination ───────────────────────────────────────────────────── */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t bg-slate-50">
-            <span className="text-sm text-slate-500">
-              Page {page} of {totalPages} · {totalCount} total
-            </span>
-            <div className="flex gap-2">
+        {/* ── Pagination ── */}
+        {!loading && list.length > 0 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+            <p className="text-xs text-slate-500 font-medium">
+              Page <span className="font-bold text-slate-700">{page}</span> of{" "}
+              <span className="font-bold text-slate-700">{totalPages}</span>
+            </p>
+
+            <div className="flex items-center gap-1.5">
               <button
+                onClick={() => fetchQuotations(Math.max(1, page - 1))}
                 disabled={page === 1}
-                onClick={() => fetchQuotations(page - 1)}
-                className="px-3 py-1 rounded border bg-white text-sm disabled:opacity-40 hover:bg-slate-100">
-                ← Prev
+                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                aria-label="Previous page"
+              >
+                <MdOutlineNavigateBefore className="w-4 h-4" />
               </button>
+
               <button
+                onClick={() => fetchQuotations(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
-                onClick={() => fetchQuotations(page + 1)}
-                className="px-3 py-1 rounded border bg-white text-sm disabled:opacity-40 hover:bg-slate-100">
-                Next →
+                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                aria-label="Next page"
+              >
+                <MdOutlineNavigateNext className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── Send Modal ───────────────────────────────────────────────────────── */}
-      {sendModal && (
-        <SendModal
-          quotation={sendModal.quotation}
-          version={sendModal.version}
-          onClose={() => setSendModal(null)}
-        />
-      )}
+      {/* ── Send Email / WhatsApp Modal (Matches Lead.jsx) ────────────────────── */}
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        recipientPhone={emailModalData.recipientPhone}
+        siteName={emailModalData.siteName}
+        requirements={emailModalData.requirements}
+        quotationNo={emailModalData.quotationNo}
+        amount={emailModalData.amount}
+        quotationId={emailModalData.quotationId}
+        versionId={emailModalData.versionId}
+        type="quotation"
+        initialChannel={emailModalData.initialChannel || "email"}
+        baseApi={BASE_API}
+        token={localStorage.getItem("access")}
+      />
     </div>
   );
 }

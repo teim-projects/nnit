@@ -21,7 +21,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         return obj.leads.count()
     
     def get_active_leads(self, obj):
-        return obj.leads.exclude(status='closed').count()
+        return obj.leads.exclude(status__in=['closed', 'close_win', 'close_loss']).count()
 
     def validate_contact_number(self, value):
         value = value.strip()
@@ -79,6 +79,9 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
             "remarks",
             "discussion_notes",
             # Interaction details
+            "site_name",
+            "site_photo",
+            "followup_question",
             "interaction_type",
             "client_response",
             "followup_status",
@@ -146,7 +149,7 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
 class LeadSerializer(serializers.ModelSerializer):
     FIXED_SOURCES = [
         'google_ads', 'indiamart', 'bni', 'justdial', 'reference',
-        'architect/interior_designe', 'builder', 'existing_customer',
+        'architect/interior_designer', 'builder', 'existing_customer',
         'scgt', 'ka_staff', 'other',
     ]
 
@@ -175,6 +178,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "status",
             "lead_type",
             "is_service_lead",
+            "company_name",
             "project_name",
             "project_adderess",
             "date",
@@ -203,6 +207,15 @@ class LeadSerializer(serializers.ModelSerializer):
             "qualifying_answers",
             "is_converted",
             "converted_at",
+            "cad_file",
+            "cad_file_name",
+            "site_location",
+            "site_requirement",
+            "customer_layout",
+            "customer_layout_name",
+            "customer_layout_url",
+            "is_sent",
+            "is_received",
             "followups",
             "total_followups",
             "latest_followup",
@@ -232,9 +245,23 @@ class LeadSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        changed_fields = []
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        instance.save()
+            changed_fields.append(attr)
+
+        # Always include updated_at
+        changed_fields.append('updated_at')
+
+        try:
+            instance.save(update_fields=changed_fields)
+        except DjangoValidationError as exc:
+            raise DRFValidationError(
+                detail=exc.message_dict if hasattr(exc, 'message_dict') else exc.messages
+            )
         return instance
 
     def validate_lead_source(self, value):

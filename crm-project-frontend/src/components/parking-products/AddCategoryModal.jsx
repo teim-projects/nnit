@@ -17,6 +17,8 @@ export default function AddCategoryModal({ open, onClose, onSuccess, baseApi, to
     { value: 'puzzle_parking', label: 'Puzzle Parking', icon: '🧩' },
     { value: 'tower_parking', label: 'Tower Parking', icon: '🏢' },
     { value: 'pit_parking', label: 'Pit Parking', icon: '⬇️' },
+    { value: 'pit_stack_parking', label: 'Pit Stack Parking', icon: '⬇️🏗️' },
+    { value: 'pit_puzzle_parking', label: 'Pit Puzzle Parking', icon: '⬇️🧩' },
     { value: 'cantilever', label: 'Cantilever Parking', icon: '🔧' },
   ];
 
@@ -77,7 +79,7 @@ export default function AddCategoryModal({ open, onClose, onSuccess, baseApi, to
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1050] p-4 animate-fade-in">
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full animate-slide-in">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">

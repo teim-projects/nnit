@@ -43,7 +43,9 @@ class ParkingProductSerializer(serializers.ModelSerializer):
     configurations = ProductConfigurationSerializer(many=True, read_only=True)
     configuration_summary = serializers.SerializerMethodField()
     space_required = serializers.SerializerMethodField()
-    
+    display_image = serializers.ReadOnlyField()
+    image_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = ParkingProduct
         fields = [
@@ -54,7 +56,7 @@ class ParkingProductSerializer(serializers.ModelSerializer):
             'min_height', 'min_width', 'min_length',
             'car_capacity', 'features', 'advantages', 'specifications',
             'base_price', 'is_active', 'is_featured',
-            'image_url', 'brochure_url',
+            'image', 'image_url', 'display_image', 'brochure_url',
             'configurations', 'configuration_summary', 'space_required',
             'created_at', 'updated_at'
         ]
@@ -83,16 +85,22 @@ class ParkingProductSerializer(serializers.ModelSerializer):
 class ParkingProductListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for list view"""
     category_name = serializers.CharField(source='category.display_name', read_only=True)
+    category_id = serializers.IntegerField(source='category.id', read_only=True)
     space_required = serializers.SerializerMethodField()
-    
+    display_image = serializers.ReadOnlyField()
+    image_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    configurations = ProductConfigurationSerializer(many=True, read_only=True)
+
     class Meta:
         model = ParkingProduct
         fields = [
             'id', 'product_name', 'product_code',
-            'category_name', 'car_capacity', 'levels',
+            'category', 'category_id', 'category_name', 'car_capacity', 'levels',
             'operation_type', 'automation_type', 'pit_required',
             'min_height', 'min_width', 'min_length',
-            'space_required', 'base_price',
+            'space_required', 'base_price', 'specifications', 'configurations',
+            'image', 'image_url', 'display_image',
             'is_active', 'is_featured'
         ]
     

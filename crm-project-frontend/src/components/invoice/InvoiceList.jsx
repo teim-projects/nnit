@@ -1,7 +1,8 @@
 import { useEffect, useState, forwardRef, useImperativeHandle, useCallback } from "react";
 import axios from "axios";
-import { FaWhatsapp } from "react-icons/fa";
+import { IoLogoWhatsapp } from "react-icons/io5";
 import { MdRemoveRedEye, MdDownload, MdEdit, MdDelete, MdEmail, MdHistory } from "react-icons/md";
+import SendEmailModal from "../SendEmailModal";
 
 const BASE_API = import.meta.env.VITE_BASE_API_URL;
 console.log("InvoiceList BASE_API =", BASE_API);
@@ -30,7 +31,7 @@ api.interceptors.request.use((config) => {
  * Exposed ref methods:
  *   refreshList() – force re-fetch (called from parent after add/edit)
  */
-const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
+const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {}, canCreate = true, canEdit = true, canDelete = true }, ref) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -51,29 +52,34 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
     return params.toString();
   }, []);
 
-  // ─── Fetch invoices whenever filters change ─────────────────────────────────
-  const fetchInvoices = useCallback(() => {
+  // ─── Fetch Invoices ────────────────────────────────────────────────────────
+  const fetchInvoices = useCallback(async () => {
     setLoading(true);
-    const qs = buildParams(filters);
-    api
-      .get(`invoice/invoice/${qs ? `?${qs}` : ""}`)
-      .then((res) => {
-        setData(res.data.results || res.data);
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
+    try {
+      const qs = buildParams(filters);
+      const res = await api.get(`invoice/invoice/${qs ? `?${qs}` : ""}`);
+      const raw = res.data;
+      const list = Array.isArray(raw) ? raw : raw?.results || [];
+      setData(list);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [filters, buildParams]);
 
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
 
-  // Expose refresh method to parent component
+  // Expose refresh method to parent ref
   useImperativeHandle(ref, () => ({
-    refreshList: fetchInvoices
+    refreshList() {
+      fetchInvoices();
+    },
   }));
 
-  /* ================= PDF VIEW ================= */
+  /* ================= VIEW PDF ================= */
 
   const handleViewPDF = async (invoiceId) => {
     try {
@@ -131,9 +137,40 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
     }
   };
 
+  const handleWhatsApp = (inv) => {
+    setEmailModalData({
+      recipientEmail: inv.buyer_email || "",
+      recipientName: inv.buyer_name || "",
+      recipientPhone: inv.buyer_mobile || inv.buyer_contact || "",
+      siteName: inv.consignee_name || "Site",
+      requirements: "Tax Invoice Delivery",
+      quotationNo: inv.invoice_no || "",
+      amount: inv.grand_total ? `₹${parseFloat(inv.grand_total).toLocaleString("en-IN")}` : "",
+      type: "invoice",
+      initialChannel: "whatsapp"
+    });
+    setShowEmailModal(true);
+  };
+
+  const handleEmail = (inv) => {
+    setEmailModalData({
+      recipientEmail: inv.buyer_email || "",
+      recipientName: inv.buyer_name || "",
+      recipientPhone: inv.buyer_mobile || inv.buyer_contact || "",
+      siteName: inv.consignee_name || "Site",
+      requirements: "Tax Invoice Delivery",
+      quotationNo: inv.invoice_no || "",
+      amount: inv.grand_total ? `₹${parseFloat(inv.grand_total).toLocaleString("en-IN")}` : "",
+      type: "invoice",
+      initialChannel: "email"
+    });
+    setShowEmailModal(true);
+  };
+
   /* ================= DELETE ================= */
 
   const handleDeleteInvoice = async (invoiceId) => {
+    if (!canDelete) return;
     const ok = window.confirm("Delete this invoice?");
     if (!ok) return;
 
@@ -156,14 +193,16 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
             {loading ? "Loading..." : `${data.length} invoice(s) found`}
           </div>
         </div>
-        <div>
-          <button
-            onClick={onAdd}
-            className="px-4 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700"
-          >
-            + Create Invoice
-          </button>
-        </div>
+        {canCreate && onAdd && (
+          <div>
+            <button
+              onClick={onAdd}
+              className="px-4 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700"
+            >
+              + Create Invoice
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table — matches PurchaseOrder.jsx */}
@@ -216,25 +255,29 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
                       <MdRemoveRedEye />
                     </button>
 
-                    <button onClick={() => onEdit(inv.id)} className="px-2 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300" title="Edit">
-                      <MdEdit />
-                    </button>
+                    {canEdit && onEdit && (
+                      <button onClick={() => onEdit(inv.id)} className="px-2 py-1 bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300" title="Edit">
+                        <MdEdit />
+                      </button>
+                    )}
 
                     <button onClick={() => handleDownloadPDF(inv.id)} className="px-2 py-1 bg-green-200 text-green-800 rounded hover:bg-green-300" title="Download">
                       <MdDownload />
                     </button>
 
-                    <button className="px-2 py-1 bg-green-200 text-green-800 rounded hover:bg-green-300" title="WhatsApp">
-                      <FaWhatsapp />
+                    <button onClick={() => handleWhatsApp(inv)} className="px-2 py-1 bg-green-200 text-green-800 rounded hover:bg-green-300 transition-colors" title="Send WhatsApp">
+                      <IoLogoWhatsapp />
                     </button>
 
-                    <button className="px-2 py-1 bg-sky-200 text-sky-800 rounded hover:bg-sky-300" title="Email">
+                    <button onClick={() => handleEmail(inv)} className="px-2 py-1 bg-sky-200 text-sky-800 rounded hover:bg-sky-300 transition-colors" title="Send Email">
                       <MdEmail />
                     </button>
 
-                    <button onClick={() => handleDeleteInvoice(inv.id)} className="px-2 py-1 bg-red-200 text-red-800 rounded hover:bg-red-300" title="Delete">
-                      <MdDelete />
-                    </button>
+                    {canDelete && (
+                      <button onClick={() => handleDeleteInvoice(inv.id)} className="px-2 py-1 bg-red-200 text-red-800 rounded hover:bg-red-300" title="Delete">
+                        <MdDelete />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -250,6 +293,23 @@ const InvoiceList = forwardRef(({ onAdd, onEdit, filters = {} }, ref) => {
           </tbody>
         </table>
       </div>
+
+      {/* Send Email / WhatsApp Modal */}
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        recipientPhone={emailModalData.recipientPhone}
+        siteName={emailModalData.siteName}
+        requirements={emailModalData.requirements}
+        quotationNo={emailModalData.quotationNo}
+        amount={emailModalData.amount}
+        type="invoice"
+        initialChannel={emailModalData.initialChannel || "email"}
+        baseApi={BASE_API}
+        token={localStorage.getItem("access")}
+      />
     </div>
   );
 });

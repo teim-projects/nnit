@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate AMC Calendar Events</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #2196F3;
+        }
+        .btn-secondary:hover {
+            background: #0b7dda;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗓️ AMC Calendar Events Generator</h1>
+        <p>Yeh tool AMC contracts ke liye service visits generate karega, jisse calendar mein events dikhenge.</p>
+
+        <div class="input-group">
+            <label for="apiUrl">Backend API URL:</label>
+            <input type="text" id="apiUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
+        </div>
+
+        <div class="input-group">
+            <label for="token">Login Token (JWT):</label>
+            <input type="password" id="token" placeholder="Bearer token paste karo yahan">
+            <small style="color: #666;">Frontend se login karke browser console mein 'localStorage.getItem("token")' run karo</small>
+        </div>
+
+        <div class="input-group">
+            <label for="contractCount">Kitne AMC contracts hain?</label>
+            <select id="contractCount">
+                <option value="6" selected>6 contracts</option>
+                <option value="10">10 contracts</option>
+                <option value="20">20 contracts</option>
+                <option value="custom">Custom...</option>
+            </select>
+        </div>
+
+        <button onclick="generateAll()" id="generateBtn">
+            ⚙️ Generate Services for All AMCs
+        </button>
+
+        <button onclick="testCalendar()" class="btn-secondary">
+            🔍 Test Calendar API
+        </button>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            output.className = type;
+            output.innerHTML += message + '<br>';
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+        }
+
+        async function generateAll() {
+            clearOutput();
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const count = parseInt(document.getElementById('contractCount').value) || 6;
+
+            if (!token) {
+                log('❌ Token required hai! Pehle login karo aur token paste karo.', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>Generating...';
+
+            log('🚀 Starting generation for ' + count + ' AMC contracts...', 'info');
+            log('━'.repeat(70), 'info');
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (let i = 1; i <= count; i++) {
+                try {
+                    const url = `${apiUrl}/amc/contracts/${i}/generate-schedule/`;
+                    log(`\n📝 AMC Contract #${i}...`);
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        log(`✅ Success! Generated ${data.services?.length || 0} services`, 'success');
+                        log(`   Per visit amount: ₹${data.per_visit_amount || 0}`, 'success');
+                        successCount++;
+                    } else if (response.status === 404) {
+                        log(`⚠️ AMC Contract #${i} not found (probably doesn't exist)`, 'error');
+                    } else {
+                        const error = await response.json();
+                        log(`❌ Error: ${JSON.stringify(error)}`, 'error');
+                        errorCount++;
+                    }
+                } catch (error) {
+                    log(`❌ Network error: ${error.message}`, 'error');
+                    errorCount++;
+                }
+
+                // Small delay between requests
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            log('\n' + '━'.repeat(70), 'success');
+            log(`\n🎉 DONE!`, 'success');
+            log(`   ✅ Success: ${successCount}`, 'success');
+            if (errorCount > 0) {
+                log(`   ❌ Errors: ${errorCount}`, 'error');
+            }
+            log(`\n📅 Ab frontend ko hard refresh karo (Ctrl+Shift+R)`, 'success');
+            log(`   Calendar mein events dikhengi!`, 'success');
+
+            btn.disabled = false;
+            btn.innerHTML = '⚙️ Generate Services for All AMCs';
+        }
+
+        async function testCalendar() {
+            clearOutput();
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const token = document.getElementById('token').value.trim();
+
+            if (!token) {
+                log('❌ Token required hai!', 'error');
+                return;
+            }
+
+            log('🔍 Testing calendar API...', 'info');
+
+            try {
+                const response = await fetch(`${apiUrl}/amc/calendar-events/`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const events = await response.json();
+                    log(`✅ Calendar API working!`, 'success');
+                    log(`   Total events: ${events.length}`, 'success');
+
+                    if (events.length === 0) {
+                        log('\n⚠️ Koi events nahi mili!', 'error');
+                        log('   Services generate karne ke liye upar ka button dabao.', 'error');
+                    } else {
+                        log('\n📋 Sample events:', 'info');
+                        events.slice(0, 5).forEach(evt => {
+                            log(`   ${evt.start} - ${evt.title}`, 'info');
+                        });
+                    }
+                } else {
+                    log(`❌ Error: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Network error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

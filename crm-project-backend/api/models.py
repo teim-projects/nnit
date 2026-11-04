@@ -79,12 +79,36 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(email=email, mobile_no=mobile_no, password=password, role=role, **extra_fields)
 
 
-# Custome Roles 
+# Custom Roles 
+DEFAULT_MODULES = [
+    "dashboard", "leads", "followups", "quotations", "products", 
+    "customers", "amc", "accounts", "invoice", "terms", "role_management"
+]
+
+def get_default_permissions():
+    return {
+        mod: {"can_view": True, "can_create": True, "can_edit": True, "can_delete": True}
+        for mod in DEFAULT_MODULES
+    }
+
 class Role(models.Model):
     name = models.CharField(max_length=200, unique=True)
+    permissions = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
-        return self.name 
+        return self.name
+
+    def get_permissions(self):
+        if not self.permissions:
+            return get_default_permissions()
+        perms = get_default_permissions()
+        if isinstance(self.permissions, dict):
+            for k, v in self.permissions.items():
+                if k in perms and isinstance(v, dict):
+                    perms[k].update(v)
+                else:
+                    perms[k] = v
+        return perms
     
 
 # Custom user model 

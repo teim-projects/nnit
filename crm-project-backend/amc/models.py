@@ -1,348 +1,637 @@
 from django.db import models
+from django.contrib.auth import get_user_model
 from django.utils import timezone
-from datetime import timedelta
-from django.core.exceptions import ValidationError
-from django.db import transaction
-from django.db.models import F
 from lead_management.models import Customer
-from api.models import CustomUser, BranchManagement
-# from inventory.models import InventoryItem  # Inventory module removed
 
-class ServiceManagementRecord(models.Model):
-    """Service Management Record for tracking AC maintenance and services"""
-    
-    SEGMENT_CHOICES = [
-        ('residential', 'Residential'),
-        ('commercial', 'Commercial'),
-        ('industrial', 'Industrial'),
-    ]
-    
-    CONTRACT_TYPE_CHOICES = [
-        ('one_time', 'One Time'),
-        ('amc', 'AMC'),
-        ('warranty', 'Warranty'),
-    ]
-    
-    CONTRACT_STATUS_CHOICES = [
-        ('active', 'Active'),
-        ('inactive', 'Inactive'),
-    ]
-
-    AMC_SERVICE_TYPE_CHOICES = [
-        ('COMPREHENSIVE', 'Comprehensive'),
-        ('NON_COMPREHENSIVE', 'Non-Comprehensive'),
-    ]
-    
-    # Customer Info
-    customer = models.ForeignKey(
-        Customer,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name='service_management_records'
-    )
-    customer_contact = models.CharField(max_length=15)
-    customer_name = models.CharField(max_length=255)
-    customer_email = models.EmailField(null=True, blank=True)
-    subject = models.CharField(max_length=500)
-    
-    # Contract Details
-    contract_type = models.CharField(
-        max_length=20,
-        choices=CONTRACT_TYPE_CHOICES,
-        default='one_time'
-    )
-    contract_status = models.CharField(
-        max_length=20,
-        choices=CONTRACT_STATUS_CHOICES,
-        default='active'
-    )
-    amc_service_type = models.CharField(
-        max_length=20,
-        choices=AMC_SERVICE_TYPE_CHOICES,
-        blank=True,
-        default=''
-    )
-    segment = models.CharField(
-        max_length=20,
-        choices=SEGMENT_CHOICES,
-        default='residential'
-    )
-    service_start_date = models.DateField(null=True, blank=True)
-    service_end_date = models.DateField(null=True, blank=True)
-    
-    # Location
-    state = models.CharField(max_length=100)
-    city = models.CharField(max_length=100)
-    pincode = models.CharField(max_length=10)
-    address = models.TextField()
-    
-    # Pricing
-    apply_gst = models.BooleanField(default=True)
-    gst_percentage = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=18.00
-    )
-    total_price_without_gst = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0
-    )
-    gst_amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0
-    )
-    total_price_with_gst = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0
-    )
-    
-    # Meta
-    created_by = models.ForeignKey(
-        CustomUser,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True
-    )
-    branch = models.ForeignKey(
-        BranchManagement,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        ordering = ['-created_at']
-    
-    def __str__(self):
-        return f"{self.customer_name} - {self.contract_type}"
-    
-    def calculate_totals(self):
-        """Calculate GST and totals"""
-        if self.apply_gst:
-            self.gst_amount = (self.total_price_without_gst * self.gst_percentage) / 100
-            self.total_price_with_gst = self.total_price_without_gst + self.gst_amount
-        else:
-            self.gst_amount = 0
-            self.total_price_with_gst = self.total_price_without_gst
+User = get_user_model()
 
 
-class ServiceManagementMaterial(models.Model):
-    """Materials/AC Types selected for a Service Management Record"""
-    
-    service_record = models.ForeignKey(
-        ServiceManagementRecord,
-        on_delete=models.CASCADE,
-        related_name='materials'
-    )
-    
-    # Store product data as JSON snapshot - NO FOREIGN KEY
-    product_data = models.JSONField(default=dict, blank=True)  # Stores: {id, name, sku, category, hsn, etc.}
-    
-    # Material/Service Details
-    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
-    unit = models.CharField(max_length=50, default='Nos')
-    rate = models.DecimalField(max_digits=10, decimal_places=2)
-    amount = models.DecimalField(max_digits=12, decimal_places=2, editable=False, default=0)
-    description = models.TextField(blank=True, null=True)
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        ordering = ['created_at']
-    
-    def save(self, *args, **kwargs):
-        self.amount = (self.quantity or 0) * (self.rate or 0)
-        super().save(*args, **kwargs)
-        
-        # Update parent record totals
-        self.service_record.total_price_without_gst = sum(
-            m.amount for m in self.service_record.materials.all()
-        )
-        self.service_record.calculate_totals()
-        self.service_record.save()
-    
-    def __str__(self):
-        return f"{self.service_record.customer_name} - {self.product_data.get('name', 'Unknown')}"
+class AMCType(models.TextChoices):
+    COMPREHENSIVE = 'comprehensive', 'Comprehensive'
+    NON_COMPREHENSIVE = 'non_comprehensive', 'Non-Comprehensive'
+    WARRANTY = 'warranty', '1 Year Warranty (4 Quarterly Free Services)'
+
+
+class PaymentFrequency(models.TextChoices):
+    ANNUAL = 'annual', 'Annual'
+    QUARTERLY = 'quarterly', 'Quarterly'
+    MONTHLY = 'monthly', 'Monthly'
+    HALF_YEARLY = 'half_yearly', 'Half-Yearly'
+
+
+class AMCStatus(models.TextChoices):
+    ACTIVE = 'active', 'Active'
+    INACTIVE = 'inactive', 'Inactive'
+    EXPIRING_SOON = 'expiring_soon', 'Expiring Soon'
+    EXPIRED = 'expired', 'Expired'
+    SCHEDULED = 'scheduled', 'Scheduled'
+    RENEWED = 'renewed', 'Renewed'
 
 
 class AMCContract(models.Model):
-    """Customer's AMC Agreement"""
-    STATUS_CHOICES = [
-        ('ACTIVE', 'Active'),
-        ('INACTIVE', 'Inactive'),
-        ('EXPIRED', 'Expired'),
-        ('CANCELLED', 'Cancelled'),
-    ]
-
-    AMC_TYPE_CHOICES = [
-        ('COMPREHENSIVE', 'Comprehensive'),
-        ('NON_COMPREHENSIVE', 'Non-Comprehensive'),
-    ]
-
-    VISIT_FREQUENCY_CHOICES = [
-        ('MONTHLY', 'Monthly'),
-        ('QUARTERLY', 'Quarterly'),
-        ('HALF_YEARLY', 'Half Yearly'),
-        ('YEARLY', 'Yearly'),
-    ]
-    
-    # Links
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='amc_contracts')
-    amc_type = models.CharField(max_length=20, choices=AMC_TYPE_CHOICES, default='COMPREHENSIVE')
-    visit_frequency = models.CharField(
-        max_length=20,
-        choices=VISIT_FREQUENCY_CHOICES,
-        default='QUARTERLY'
+    contract_id = models.CharField(max_length=50, unique=True, blank=True, null=True, verbose_name="Contract ID")
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.CASCADE,
+        related_name='amc_contracts',
+        verbose_name="Customer"
     )
-    # Store product data as JSON snapshot - NO FOREIGN KEY
-    product_data = models.JSONField(default=dict, blank=True)  # Stores product details
-    
-    # Contract details
-    contract_number = models.CharField(max_length=50, unique=True)
-    
-    # Dates
-    sale_date = models.DateField()
-    warranty_end_date = models.DateField()
-    amc_start_date = models.DateField()
-    amc_end_date = models.DateField()
-    
-    # Type logic
-    amc_included_in_sale = models.BooleanField(default=False)
-    
-    # Status
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
-    
-    # Cost tracking
-    amc_cost = models.DecimalField(max_digits=10, decimal_places=2)
-    
-    # Renewal
-    is_renewal = models.BooleanField(default=False)
-    previous_contract = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
+    project_name = models.CharField(max_length=255, blank=True, null=True, verbose_name="Project Name")
+    product = models.CharField(max_length=255, verbose_name="Product")
+    amc_type = models.CharField(
+        max_length=50,
+        choices=AMCType.choices,
+        default=AMCType.COMPREHENSIVE,
+        verbose_name="AMC Type"
+    )
+    # Synced header fields from current active cycle
+    start_date = models.DateField(blank=True, null=True, verbose_name="Start Date")
+    end_date = models.DateField(blank=True, null=True, verbose_name="End Date")
+    annual_value = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0.00,
+        verbose_name="Annual Value (₹)"
+    )
+    payment_frequency = models.CharField(
+        max_length=50,
+        choices=PaymentFrequency.choices,
+        default=PaymentFrequency.QUARTERLY,
+        verbose_name="Payment Frequency"
+    )
+    support_coordinator = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='coordinated_amcs',
+        verbose_name="Support Coordinator"
+    )
+    assigned_technician = models.ForeignKey(
+        'service_management.Technician',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='assigned_amcs',
+        verbose_name="Assigned Technician"
+    )
+    linked_service = models.ForeignKey(
+        'service_management.ServiceRequest',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='linked_amc_contracts',
+        verbose_name="Linked Service Call"
+    )
+    scope_of_support = models.TextField(blank=True, null=True, verbose_name="Scope of Support")
+    per_visit_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0.00,
+        verbose_name="Per Visit Amount (₹)"
+    )
+    default_customer_contact = models.CharField(max_length=50, blank=True, null=True, verbose_name="Default Customer Contact")
+    default_customer_address = models.TextField(blank=True, null=True, verbose_name="Default Customer Address")
+    default_gps_location = models.URLField(blank=True, null=True, verbose_name="Default GPS Location")
+    default_work_description = models.TextField(blank=True, null=True, verbose_name="Default Work Description")
+
+    RENEWAL_CHOICES = [
+        ("PENDING", "Pending"),
+        ("REQUESTED", "Requested"),
+        ("APPROVED", "Approved"),
+        ("REJECTED", "Rejected"),
+        ("NOT_RENEWED", "Not Renewed"),
+    ]
+    renewal_status = models.CharField(
+        max_length=20,
+        choices=RENEWAL_CHOICES,
+        default="PENDING",
+        verbose_name="Renewal Status"
+    )
+    renewal_requested_at = models.DateTimeField(null=True, blank=True, verbose_name="Renewal Requested At")
+    expiry_reminder_2days_sent = models.BooleanField(default=False, verbose_name="2-Day Expiry Reminder Email Sent")
+
+    status = models.CharField(
+        max_length=50,
+        choices=AMCStatus.choices,
+        default=AMCStatus.ACTIVE,
+        verbose_name="Status"
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='amc_contracts_created',
+        verbose_name="Created By"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Created At")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Updated At")
+
+    def generate_contract_id(self):
+        last_amc = AMCContract.objects.order_by('-id').first()
+        if last_amc and last_amc.contract_id:
+            try:
+                num = int(last_amc.contract_id.replace("AMC-", "").replace("AMC", ""))
+                new_num = num + 1
+            except ValueError:
+                new_num = 1
+        else:
+            new_num = 1
+        return f"AMC-{new_num:03d}"
+
+    def sync_active_cycle_data(self):
+        """Auto-evaluates cycle statuses against today's date and syncs active cycle info to contract header."""
+        today = timezone.now().date()
+        cycles = list(self.cycles.all().order_by('cycle_number'))
+        if not cycles:
+            return
+
+        for cycle in cycles:
+            if cycle.status == AMCStatus.INACTIVE:
+                continue
+
+            c_start = cycle.start_date
+            c_end = cycle.end_date
+
+            if c_end and c_end < today:
+                if cycle.status != AMCStatus.EXPIRED:
+                    cycle.status = AMCStatus.EXPIRED
+                    cycle.save(update_fields=['status'])
+            elif c_start and c_end and c_start <= today <= c_end:
+                new_st = AMCStatus.EXPIRING_SOON if (c_end - today).days <= 30 else AMCStatus.ACTIVE
+                if cycle.status != new_st:
+                    cycle.status = new_st
+                    cycle.save(update_fields=['status'])
+            elif c_start and c_start > today:
+                if cycle.status != AMCStatus.SCHEDULED:
+                    cycle.status = AMCStatus.SCHEDULED
+                    cycle.save(update_fields=['status'])
+
+        # Pick active/running cycle or fallback to scheduled / latest
+        active_cycle = self.cycles.filter(status__in=[AMCStatus.ACTIVE, AMCStatus.EXPIRING_SOON]).order_by('-cycle_number').first()
+        if not active_cycle:
+            active_cycle = self.cycles.filter(status=AMCStatus.SCHEDULED).order_by('cycle_number').first() or cycles[-1]
+
+        if active_cycle:
+            self.start_date = active_cycle.start_date
+            self.end_date = active_cycle.end_date
+            self.annual_value = active_cycle.annual_value
+            self.payment_frequency = active_cycle.payment_frequency
+            
+            # If contract has been renewed with 2 or more cycles, mark status as RENEWED
+            if len(cycles) > 1 and active_cycle.status != AMCStatus.INACTIVE:
+                self.status = AMCStatus.RENEWED
+            else:
+                self.status = active_cycle.status
+
+            super().save(update_fields=['start_date', 'end_date', 'annual_value', 'payment_frequency', 'status', 'updated_at'])
+
+    def generate_warranty_services(self):
+        """Generates 4 quarterly free ServiceRequest records for 1-Year Warranty contract."""
+        if self.amc_type != AMCType.WARRANTY:
+            return []
+
+        from service_management.models import ServiceRequest, ServiceType, ServiceStatus, ServicePriority
+        from datetime import timedelta
+
+        base_start = self.start_date or timezone.now().date()
+        created_services = []
+
+        for q in range(1, 5):
+            # Quarterly interval (~91 days per quarter)
+            scheduled_d = base_start + timedelta(days=91 * q)
+            title_str = f"Quarterly Free Warranty Service #{q} (Q{q})"
+
+            existing = ServiceRequest.objects.filter(
+                amc_contract=self,
+                title__icontains=f"Warranty Service #{q}"
+            ).first()
+
+            if not existing:
+                srv = ServiceRequest.objects.create(
+                    service_type=ServiceType.WARRANTY,
+                    amc_contract=self,
+                    customer=self.customer,
+                    product_name=self.product,
+                    title=title_str,
+                    description=f"Automated quarterly free warranty service visit Q{q} under 1-Year Warranty contract {self.contract_id or ''}.",
+                    priority=ServicePriority.MEDIUM,
+                    status=ServiceStatus.UNASSIGNED,
+                    scheduled_date=scheduled_d,
+                    service_cost=0.00,
+                    created_by=self.created_by
+                )
+                created_services.append(srv)
+
+        return created_services
+
+    def generate_schedule(self):
+        """
+        Generates/syncs scheduled ServiceRequest visits based on payment frequency & contract dates.
+        Calculates per_visit_amount = annual_value / total_visits.
+        """
+        if self.amc_type == AMCType.WARRANTY:
+            return self.generate_warranty_services()
+
+        from service_management.models import ServiceRequest, ServiceType, ServiceStatus, ServicePriority
+        from dateutil.relativedelta import relativedelta
+
+        base_start = self.start_date or timezone.now().date()
+
+        freq = (self.payment_frequency or 'quarterly').lower()
+        if freq == 'monthly':
+            total_visits = 12
+            month_step = 1
+        elif freq == 'half_yearly':
+            total_visits = 2
+            month_step = 6
+        elif freq == 'annual':
+            total_visits = 1
+            month_step = 12
+        else:  # quarterly
+            total_visits = 4
+            month_step = 3
+
+        ann_val = float(self.annual_value or 0)
+        calc_per_visit = ann_val / total_visits if total_visits > 0 else 0
+        self.per_visit_amount = calc_per_visit
+
+        if self.pk:
+            AMCContract.objects.filter(pk=self.pk).update(per_visit_amount=calc_per_visit)
+
+        created_services = []
+
+        for visit_num in range(1, total_visits + 1):
+            scheduled_d = base_start + relativedelta(months=month_step * (visit_num - 1))
+            title_str = f"Scheduled AMC Visit #{visit_num} ({self.get_payment_frequency_display() or freq.title()})"
+
+            existing = ServiceRequest.objects.filter(
+                amc_contract=self,
+                title__icontains=f"AMC Visit #{visit_num}"
+            ).first()
+
+            if not existing:
+                srv = ServiceRequest.objects.create(
+                    service_type=ServiceType.AMC,
+                    amc_contract=self,
+                    customer=self.customer,
+                    product_name=self.product,
+                    title=title_str,
+                    description=self.default_work_description or f"Scheduled AMC service visit #{visit_num} under contract {self.contract_id or ''}.",
+                    priority=ServicePriority.MEDIUM,
+                    status=ServiceStatus.UNASSIGNED,
+                    is_allocated=False,
+                    assigned_technician=self.assigned_technician,
+                    scheduled_date=scheduled_d,
+                    service_cost=ann_val,
+                    created_by=self.created_by
+                )
+                created_services.append(srv)
+            else:
+                if existing.service_cost != ann_val and ann_val > 0:
+                    existing.service_cost = ann_val
+                    existing.save(update_fields=['service_cost'])
+                created_services.append(existing)
+
+        return created_services
+
     def save(self, *args, **kwargs):
-        if not self.contract_number:
-            prefix = f"AMC-{self.customer.id}"
-            count = AMCContract.objects.filter(contract_number__startswith=prefix).count() + 1
-            self.contract_number = f"{prefix}-{count:03d}"
-        
-        if self.amc_start_date < self.warranty_end_date and not self.amc_included_in_sale:
-            self.amc_start_date = self.warranty_end_date + timedelta(days=1)
-        
+        if not self.contract_id:
+            self.contract_id = self.generate_contract_id()
+        if self.start_date and not self.end_date:
+            from dateutil.relativedelta import relativedelta
+            from datetime import timedelta
+            self.end_date = self.start_date + relativedelta(years=1) - timedelta(days=1)
         super().save(*args, **kwargs)
-    
+
     def __str__(self):
-        return f"{self.contract_number} - {self.customer.name}"
+        cust_name = getattr(self.customer, 'name', None) or getattr(self.customer, 'company_name', None) or 'No Customer' if self.customer else 'No Customer'
+        return f"{self.contract_id or ''} - {cust_name} ({self.product})"
+
+    class Meta:
+        ordering = ['-updated_at', '-created_at']
+        verbose_name = "AMC Contract"
+        verbose_name_plural = "AMC Contracts"
+
+
+class AMCCycle(models.Model):
+    amc_contract = models.ForeignKey(
+        AMCContract,
+        on_delete=models.CASCADE,
+        related_name='cycles',
+        verbose_name="AMC Contract"
+    )
+    cycle_number = models.PositiveIntegerField(default=1, verbose_name="Cycle #")
+    start_date = models.DateField(verbose_name="Start Date")
+    end_date = models.DateField(verbose_name="End Date")
+    annual_value = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0.00,
+        verbose_name="Annual Value (₹)"
+    )
+    payment_frequency = models.CharField(
+        max_length=50,
+        choices=PaymentFrequency.choices,
+        default=PaymentFrequency.QUARTERLY,
+        verbose_name="Payment Frequency"
+    )
+    status = models.CharField(
+        max_length=50,
+        choices=AMCStatus.choices,
+        default=AMCStatus.ACTIVE,
+        verbose_name="Status"
+    )
+    remarks = models.TextField(blank=True, null=True, verbose_name="Notes / Remarks")
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='amc_cycles_created',
+        verbose_name="Created By"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Created At")
+
+    class Meta:
+        ordering = ['-cycle_number']
+        verbose_name = "AMC Cycle"
+        verbose_name_plural = "AMC Cycles"
+
+    def __str__(self):
+        return f"{self.amc_contract.contract_id or 'AMC'} - Cycle #{self.cycle_number} ({self.status})"
+
+
+
+
+
+# ============================================================================
+# AMC SERVICE SCHEDULE - Planned service dates
+# ============================================================================
+class AMCServiceSchedule(models.Model):
+    """
+    Planned/Scheduled AMC service dates.
+    Created automatically when AMC contract is generated.
+    """
+    amc_contract = models.ForeignKey(
+        'AMCContract',
+        on_delete=models.CASCADE,
+        related_name='service_schedules',
+        verbose_name="AMC Contract"
+    )
+    service_date = models.DateField(verbose_name="Scheduled Service Date")
+    
+    # Reminder tracking
+    reminder_sent = models.BooleanField(default=False, verbose_name="Reminder Email Sent")
+    reminder_sent_at = models.DateTimeField(null=True, blank=True, verbose_name="Reminder Sent At")
+    
+    # Status tracking
+    is_completed = models.BooleanField(default=False, verbose_name="Completed")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Completed At")
+    
+    is_approved = models.BooleanField(default=False, verbose_name="Approved by Admin")
+    approved_at = models.DateTimeField(null=True, blank=True, verbose_name="Approved At")
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_schedules',
+        verbose_name="Approved By"
+    )
+    
+    notes = models.TextField(blank=True, null=True, verbose_name="Notes")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Created At")
     
     class Meta:
-        ordering = ['-created_at']
-
-
-# TEMPORARILY DISABLED - Inventory module removed
-# class AMCSparePart(models.Model):
-#     """Spare parts used on non-comprehensive AMC contracts — deducts inventory stock."""
-#     amc_contract = models.ForeignKey(
-#         AMCContract,
-#         on_delete=models.CASCADE,
-#         related_name='spare_parts'
-#     )
-#     inventory_item = models.ForeignKey(
-#         InventoryItem,
-#         on_delete=models.PROTECT,
-#         related_name='amc_spare_parts'
-#     )
-#     quantity_used = models.DecimalField(max_digits=10, decimal_places=2)
-#     unit = models.CharField(max_length=20, default='Nos')
-#     rate_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
-#     gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=18)
-#     hsn_sac = models.CharField(max_length=50, blank=True, null=True)
-#     description = models.TextField(blank=True, null=True)
-#     total_cost = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
-#     invoice = models.ForeignKey(
-#         'invoice.Invoice',
-#         on_delete=models.SET_NULL,
-#         null=True,
-#         blank=True,
-#         related_name='amc_spare_parts'
-#     )
-#     created_at = models.DateTimeField(auto_now_add=True)
-#
-#     class Meta:
-#         ordering = ['-created_at']
-#
-#     def __str__(self):
-#         return f"Spare part - {self.amc_contract.contract_number}"
-#
-#     def _validate_low_side(self):
-#         if not self.inventory_item_id:
-#             return
-#         if self.inventory_item.product_variant_id is not None:
-#             raise ValidationError('Only low-side materials can be used as AMC spare parts.')
-#         if not self.inventory_item.item_id:
-#             raise ValidationError('Inventory item must be a low-side material.')
-#
-#     def save(self, *args, **kwargs):
-#         self._validate_low_side()
-#         self.total_cost = (self.quantity_used or 0) * (self.rate_per_unit or 0)
-#         is_new = self.pk is None
-#
-#         if is_new:
-#             with transaction.atomic():
-#                 inv = InventoryItem.objects.select_for_update().get(id=self.inventory_item_id)
-#                 if inv.quantity < self.quantity_used:
-#                     raise ValidationError(
-#                         f'Insufficient stock. Available: {inv.quantity}, Requested: {self.quantity_used}'
-#                     )
-#                 InventoryItem.objects.filter(id=inv.id).update(
-#                     quantity=F('quantity') - self.quantity_used,
-#                     total_out_quantity=F('total_out_quantity') + self.quantity_used
-#                 )
-#                 super().save(*args, **kwargs)
-#         else:
-#             super().save(*args, **kwargs)
-#
-#     def delete(self, *args, **kwargs):
-#         with transaction.atomic():
-#             try:
-#                 inv = InventoryItem.objects.select_for_update().get(id=self.inventory_item_id)
-#                 InventoryItem.objects.filter(id=inv.id).update(
-#                     quantity=F('quantity') + self.quantity_used,
-#                     total_out_quantity=F('total_out_quantity') - self.quantity_used
-#                 )
-#             except InventoryItem.DoesNotExist:
-#                 pass
-#             super().delete(*args, **kwargs)
-
-
-class AMCRenewal(models.Model):
-    """Track renewals and manage expiry"""
-    previous_contract = models.OneToOneField(AMCContract, on_delete=models.CASCADE, related_name='renewal')
-    new_contract = models.OneToOneField(
-        AMCContract, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        related_name='renewed_from'
-    )
-    
-    renewal_date = models.DateField()
-    renewal_cost = models.DecimalField(max_digits=10, decimal_places=2)
-    
-    status = models.CharField(max_length=20, choices=[
-        ('PENDING', 'Pending'),
-        ('RENEWED', 'Renewed'),
-        ('EXPIRED', 'Expired'),
-    ], default='PENDING')
-    
-    created_at = models.DateTimeField(auto_now_add=True)
+        db_table = 'amc_service_schedules'
+        ordering = ['service_date']
+        verbose_name = "AMC Service Schedule"
+        verbose_name_plural = "AMC Service Schedules"
+        unique_together = ['amc_contract', 'service_date']
     
     def __str__(self):
-        return f"Renewal - {self.previous_contract.contract_number}"
+        contract_id = self.amc_contract.contract_id if self.amc_contract else "No Contract"
+        return f"{contract_id} - {self.service_date}"
+
+
+# ============================================================================
+# AMC SERVICE VISIT - Actual service records with technician allocation
+# ============================================================================
+class AMCServiceVisit(models.Model):
+    """
+    Actual service visit records.
+    Created when service is allocated to technician.
+    """
+    ALLOCATION_STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('ALLOCATED', 'Allocated'),
+        ('IN_PROGRESS', 'In Progress'),
+        ('COMPLETED', 'Completed'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+    
+    amc_contract = models.ForeignKey(
+        'AMCContract',
+        on_delete=models.CASCADE,
+        related_name='visits',
+        verbose_name="AMC Contract"
+    )
+    service_date = models.DateField(verbose_name="Service Date")
+    
+    # Link to product if multi-product AMC
+    product = models.ForeignKey(
+        'product_management.Product',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='amc_visits',
+        verbose_name="Product"
+    )
+    
+    # Technician assignment (can be multiple)
+    technicians = models.ManyToManyField(
+        'service_management.Technician',
+        blank=True,
+        related_name='amc_service_visits',
+        verbose_name="Assigned Technicians"
+    )
+    
+    # Link to CRM service request (when work is allocated)
+    crm_service = models.ForeignKey(
+        'service_management.ServiceRequest',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='amc_visit_records',
+        verbose_name="Linked Service Request"
+    )
+    crm_service_created_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Service Request Created At"
+    )
+    
+    # Visit details
+    allocation_status = models.CharField(
+        max_length=20,
+        choices=ALLOCATION_STATUS_CHOICES,
+        default='PENDING',
+        verbose_name="Allocation Status"
+    )
+    auto_allocation_done = models.BooleanField(
+        default=False,
+        verbose_name="Auto Allocated by System"
+    )
+    
+    remarks = models.TextField(blank=True, null=True, verbose_name="Visit Remarks")
+    allocation_cancelled_reason = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Cancellation Reason"
+    )
+    
+    # Rescheduling tracking
+    rescheduled_from = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Original Date (if rescheduled)"
+    )
+    reschedule_reason = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Reschedule Reason"
+    )
+    
+    # Reminder tracking
+    reminder_sent = models.BooleanField(default=False, verbose_name="Reminder Email Sent")
+    reminder_sent_at = models.DateTimeField(null=True, blank=True, verbose_name="Reminder Sent At")
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Created At")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Updated At")
+    
+    class Meta:
+        db_table = 'amc_service_visits'
+        ordering = ['-service_date']
+        verbose_name = "AMC Service Visit"
+        verbose_name_plural = "AMC Service Visits"
+    
+    def stop_future_visits_for_product(self):
+        """
+        If product service is marked complete, cancel all future pending visits for same product.
+        """
+        if not self.product:
+            return
+        
+        # Cancel future pending visits for this product
+        AMCServiceVisit.objects.filter(
+            amc_contract=self.amc_contract,
+            product=self.product,
+            service_date__gt=self.service_date,
+            allocation_status='PENDING'
+        ).update(
+            allocation_status='CANCELLED',
+            allocation_cancelled_reason='Auto-stopped: Product service completed'
+        )
+        
+        # Check if all visits are done - if yes, mark contract as completed
+        pending_visits = AMCServiceVisit.objects.filter(
+            amc_contract=self.amc_contract,
+            allocation_status='PENDING'
+        ).exists()
+        
+        if not pending_visits:
+            self.amc_contract.status = AMCStatus.EXPIRED
+            self.amc_contract.save(update_fields=['status'])
+    
+    def __str__(self):
+        contract_id = self.amc_contract.contract_id if self.amc_contract else "No Contract"
+        product_name = self.product.name if self.product else "General"
+        return f"{contract_id} - {self.service_date} - {product_name}"
+
+
+# ============================================================================
+# AMC RENEWAL - Track renewal requests
+# ============================================================================
+class AMCRenewal(models.Model):
+    """
+    Track AMC renewal requests from customers.
+    """
+    RENEWAL_STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('REQUESTED', 'Customer Requested Renewal'),
+        ('APPROVED', 'Approved by Admin'),
+        ('REJECTED', 'Rejected'),
+        ('NOT_RENEWED', 'Customer Declined Renewal'),
+        ('COMPLETED', 'Renewal Completed (New Cycle Created)'),
+    ]
+    
+    amc_contract = models.ForeignKey(
+        'AMCContract',
+        on_delete=models.CASCADE,
+        related_name='renewal_requests',
+        verbose_name="AMC Contract"
+    )
+    
+    status = models.CharField(
+        max_length=20,
+        choices=RENEWAL_STATUS_CHOICES,
+        default='PENDING',
+        verbose_name="Renewal Status"
+    )
+    
+    # Customer response
+    customer_requested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Customer Requested At"
+    )
+    customer_response = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Customer Response/Notes"
+    )
+    
+    # Admin action
+    admin_action_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='amc_renewals_processed',
+        verbose_name="Processed By"
+    )
+    admin_action_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Processed At"
+    )
+    admin_notes = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Admin Notes"
+    )
+    
+    # New cycle details (if approved)
+    new_cycle = models.ForeignKey(
+        'AMCCycle',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='renewal_record',
+        verbose_name="New Cycle Created"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Created At")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Updated At")
+    
+    class Meta:
+        db_table = 'amc_renewals'
+        ordering = ['-created_at']
+        verbose_name = "AMC Renewal Request"
+        verbose_name_plural = "AMC Renewal Requests"
+    
+    def __str__(self):
+        contract_id = self.amc_contract.contract_id if self.amc_contract else "No Contract"
+        return f"{contract_id} - Renewal ({self.get_status_display()})"

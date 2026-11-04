@@ -1,7 +1,8 @@
 
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
-from .views import GoogleLogin ,PasswordResetRequestView, PasswordResetConfirmView, StaffViewSet,RoleViewSet,MeView, BranchManagementViewSet , SiteManagementViewSet
+from .views import GoogleLogin ,PasswordResetRequestView, PasswordResetConfirmView, AdminResetPasswordView, StaffViewSet,RoleViewSet,MeView, BranchManagementViewSet , SiteManagementViewSet
+from .views_chatbot import ChatbotQueryView
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -16,7 +17,10 @@ urlpatterns = [
     path('auth/google/', GoogleLogin.as_view(), name='google_login'),
     path("password-reset/", PasswordResetRequestView.as_view(), name="password-reset"),
     path("password-reset-confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
-     path("me/", MeView.as_view(), name="me"),
+    path("admin-reset-password/", AdminResetPasswordView.as_view(), name="admin-reset-password"),
+    path("me/", MeView.as_view(), name="me"),
+    path("chatbot/", ChatbotQueryView.as_view(), name="chatbot"),
 ]
+
 
 urlpatterns += router.urls

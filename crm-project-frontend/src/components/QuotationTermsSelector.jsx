@@ -31,7 +31,7 @@ const QuotationTermsSelector = ({ quotationId, onTermsChange }) => {
   const fetchMasterTerms = async () => {
     try {
       const token = localStorage.getItem('access');
-      const response = await axios.get(`${API_BASE_URL}/terms/?is_active=true`, {
+      const response = await axios.get(`${API_BASE_URL}/terms/?is_active=true&page_size=100`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       // Handle both array and paginated response
@@ -74,10 +74,21 @@ const QuotationTermsSelector = ({ quotationId, onTermsChange }) => {
     );
   };
 
-  const handleApplyDefaults = async () => {
+  const handleApplyDefaults = async (e) => {
+    // Prevent any default behavior
+    e?.preventDefault();
+    e?.stopPropagation();
+    
     if (!quotationId) {
+      // For new quotations, just select default terms
       const defaults = masterTerms.filter(t => t.is_default).map(t => t.id);
       setSelectedTerms(defaults);
+      // Don't expand automatically - let user review
+      return;
+    }
+
+    // For existing quotations, confirm before applying
+    if (!window.confirm('Apply default terms to this quotation? This will replace existing terms.')) {
       return;
     }
 
@@ -189,14 +200,25 @@ const QuotationTermsSelector = ({ quotationId, onTermsChange }) => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={handleApplyDefaults}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleApplyDefaults(e);
+            }}
+            type="button"
             className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition"
           >
             Apply Defaults
           </button>
           <button
-            onClick={() => setExpanded(!expanded)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            type="button"
             className="p-1 hover:bg-gray-100 rounded transition"
+            aria-label="Toggle terms selection"
           >
             {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
           </button>

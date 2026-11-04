@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Base from "../components/Base";
 import TableView from "../components/TableView";
 import LeadDetails from "../components/lead/LeadDetails";
@@ -6,9 +6,15 @@ import AddLeadFollowUpFormNew from "../components/lead/AddLeadFollowUpFormNew";
 import AddLeadForm from "../components/lead/AddLeadForm";
 import { IoLogoWhatsapp } from "react-icons/io5";
 import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd } from "react-icons/md";
+import AddLeadFollowUpFormNew from "../components/lead/AddLeadFollowUpForm";
+import AddLeadForm from "../components/lead/AddLeadForm";
+import { IoLogoWhatsapp } from "react-icons/io5";
+import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd, MdEdit, MdFileUpload } from "react-icons/md";
 import Swal from "sweetalert2";
-import { useUserRole } from '../hooks/useAuth';
+import { useModulePermissions } from '../hooks/useAuth';
 import AddQuotation from "../components/quotations/AddQuotation";
+import BulkImportModal from "../components/BulkImportModal";
+import SendEmailModal from "../components/SendEmailModal";
 
 
 export default function Lead() {
@@ -22,11 +28,13 @@ export default function Lead() {
   
   const API_URL = `${BASE_API}/lead/lead/`;
 
-  // ✅ Called hook to get user role
-  const { userRole, isLoading: loadingUser } = useUserRole(BASE_API);
+  // ✅ Called hook to get module permissions
+  const { canView, canCreate, canEdit, canDelete, userRole, isLoading: loadingUser } = useModulePermissions("leads");
 
-  // Initialize assign_to filter as empty string as well
-  // const initialFilters = useMemo(() => ({ search: "", status: "", assign_to: "", lead_source: "", }), []);
+  const activeUserRole = (localStorage.getItem("user_role") || userRole?.name || "").toLowerCase();
+  const isSuper = userRole?.name === 'admin' || userRole?.is_superuser || activeUserRole === 'admin';
+  const isDesignerRole = activeUserRole === 'designer' && !isSuper;
+
   const initialFilters = useMemo(() => ({
     search: "",
     status: "",
@@ -38,16 +46,34 @@ export default function Lead() {
     sort_by: "",
   }), []);
 
-
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
-
-  //forn connect enquiry to quotattion
   const [showQuotationForm, setShowQuotationForm] = useState(false);
   const [quotationLeadData, setQuotationLeadData] = useState(null);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const displayedRows = useMemo(() => {
+    if (isSuper || !isDesignerRole) return rows;
+    const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
+    const activeSentReqs = existingReqs.filter(r => 
+      r.status === "pending_drawing" || r.status === "drawing_completed" || r.status === "attached_to_quotation"
+    );
+    const reqLeadIds = new Set(activeSentReqs.map(r => String(r.leadId)));
+    const reqCustomerNames = new Set(activeSentReqs.map(r => (r.customerName || "").trim().toLowerCase()));
+
+    return rows.filter(r => {
+      const leadIdStr = String(r.id);
+      const name = (r.contact_person_name || r.customer_name || r.customer?.name || "").trim().toLowerCase();
+      return (
+        reqLeadIds.has(leadIdStr) ||
+        (name && reqCustomerNames.has(name)) ||
+        r.sent_to_designer === true ||
+        (r.designer_status && r.designer_status !== "none")
+      );
+    });
+  }, [rows, isDesignerRole, isSuper]);
 
   // pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,6 +84,9 @@ export default function Lead() {
   // modal / edit state
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailModalData, setEmailModalData] = useState({});
 
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [leadDetailsId, setLeadDetailsId] = useState(null);
@@ -78,8 +107,8 @@ export default function Lead() {
 
   const status_choice = useMemo(() => [
     { value: "open", label: "Open" },
-    { value: "in_process", label: "In Process" },
-    { value: "closed", label: "Closed" },
+    { value: "close_win", label: "Close Win" },
+    { value: "close_loss", label: "Close Loss" },
   ], []);
 
   const leadSourceOptions = useMemo(() => [
@@ -194,10 +223,11 @@ export default function Lead() {
       key: "sort_by",
       type: "select",
       label: "Sort By",
-      placeholder: "Default (Priority)",
+      placeholder: "Default (Newest First)",
       options: [
-        { value: "-date",           label: "Newest First" },
-        { value: "date",            label: "Oldest First" },
+        { value: "-created_at",     label: "Newest Created First" },
+        { value: "-date",           label: "Enquiry Date Newest" },
+        { value: "date",            label: "Enquiry Date Oldest" },
         { value: "customer__name",  label: "Customer Name A to Z" },
         { value: "-customer__name", label: "Customer Name Z to A" },
         { value: "followup_date",   label: "Follow-up Date Ascending" },
@@ -306,14 +336,38 @@ export default function Lead() {
         throw new Error("Unexpected staff response shape");
       }
     } catch (err) {
-      setError(err.message || String(err));
-      setRows([]);
-      setTotalCount(0);
-      setTotalPages(1);
+      console.warn("Lead.jsx fetchData error, checking designer fallback:", err);
+      if (isDesignerRole) {
+        const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
+        const activeSentReqs = existingReqs.filter(r => 
+          r.status === "pending_drawing" || r.status === "drawing_completed" || r.status === "attached_to_quotation"
+        );
+        const fallbackRows = activeSentReqs.map(req => ({
+          id: req.leadId || req.id,
+          date: req.sentDate || new Date().toISOString().split("T")[0],
+          followup_date: req.sentDate || new Date().toISOString().split("T")[0],
+          contact_person_name: req.customerName,
+          customer_name: req.customerName,
+          contact_person_number: req.contact || "N/A",
+          customer_contact: req.contact || "N/A",
+          lead_source: "Sales Dispatch",
+          status: req.status === "drawing_completed" ? "COMPLETED" : "OPEN",
+          assign_to_details: { full_name: req.salesPersonName || "Pravin Dare" }
+        }));
+        setRows(fallbackRows);
+        setTotalCount(fallbackRows.length);
+        setTotalPages(1);
+        setError(null);
+      } else {
+        setError(err.message || String(err));
+        setRows([]);
+        setTotalCount(0);
+        setTotalPages(1);
+      }
     } finally {
       setLoading(false);
     }
-  }, [token, appliedFilters, API_URL, userRole]); // Added userRole to deps
+  }, [token, appliedFilters, API_URL, userRole, isDesignerRole]);
 
   useEffect(() => { fetchData(currentPage); }, [fetchData, currentPage]);
 
@@ -362,7 +416,12 @@ export default function Lead() {
   };
 
   const getRowClassName = (lead) => {
-    if (!lead.followup_date) return "";
+    if (!lead || !lead.followup_date) return "";
+
+    const s = (lead.status || "").toLowerCase();
+    if (s === "close_win" || s === "closed_win" || s === "close_loss" || s === "closed_loss" || s === "closed") {
+      return "";
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -384,21 +443,72 @@ export default function Lead() {
   };
 
   const columns = [
-    { key: "sr", label: "Sr.No", render: (_, idx) => (currentPage - 1) * PAGE_SIZE + (idx + 1) },
-    { key: "date", label: "Date", render: (r) => formatDate(r.date) },
-    { key: "followup_date", label: "Followup Date", render: (r) => formatDate(r.followup_date) },
-    { key: "name", label: "Name", render: (r) => r.customer_name },
+    { key: "id", label: "Lead ID", render: (r) => `#${r.id}` },
+    { key: "date", label: "Date", render: (r) => r.date || (r.created_at ? r.created_at.slice(0, 10) : "") },
+    { key: "customer_name", label: "Customer", render: (r) => r.customer_name },
+    { key: "project_name", label: "Project", render: (r) => r.project_name || "-" },
     { key: "contact", label: "Contact", render: (r) => r.customer_contact },
-    // { key: "email", label: "Email", render: (r) => r.customer_email },
-    // { key: "hvac_application", label: "HVAC Application", render: (r) => r.hvac_application },
     { key: "lead_source", label: "Source", render: (r) => r.lead_source },
-    { key: "status", label: "Status", render: (r) => r.status },
+    { key: "status", label: "Status", render: (r) => {
+        const s = (r.status || "open").toLowerCase();
+        if (s === "close_win" || s === "closed_win") return <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-xs">Close Win</span>;
+        if (s === "close_loss" || s === "closed_loss") return <span className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-full font-bold text-xs">Close Loss</span>;
+        if (s === "closed") return <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-full font-bold text-xs">Closed</span>;
+        if (s === "in_process") return <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-bold text-xs">In Process</span>;
+        return <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full font-bold text-xs">Open</span>;
+      }
+    },
+    {
+      key: "cad_file",
+      label: "CAD Design",
+      render: (r) => (
+        r.cad_file ? (
+          <div className="flex items-center gap-1">
+            <a
+              href={r.cad_file}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg text-xs font-bold transition shadow-xs"
+              onClick={(e) => e.stopPropagation()}
+              title={r.cad_file_name || "View CAD File"}
+            >
+              📐 View CAD
+            </a>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleUploadCadModal(r);
+              }}
+              className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] font-bold"
+              title="Replace / Update CAD File"
+            >
+              ✏️
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleUploadCadModal(r);
+            }}
+            className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-50 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 rounded-md text-[11px] font-medium transition"
+          >
+            + Add CAD
+          </button>
+        )
+      )
+    },
     // ✅ SHOW ONLY IF USER IS NOT SALES
     ...(userRole?.name !== "sales"
       ? [{
         key: "assign_to",
         label: "Assign To",
-        render: (r) => r.assign_to_details?.full_name || "-"
+        render: (r) => {
+          const name = r.assign_to_details?.full_name?.trim();
+          if (name) return name;
+          if (r.assign_to_details?.email) return r.assign_to_details.email;
+          return "-";
+        }
       }]
       : [])
   ];
@@ -415,6 +525,17 @@ export default function Lead() {
       const cleanNumber = contact.replace(/[^0-9]/g, '');
       const whatsappNumber = cleanNumber.startsWith('91') ? cleanNumber : `91${cleanNumber}`;
       window.open(`https://wa.me/${whatsappNumber}`, '_blank');
+      setEmailModalData({
+        recipientEmail: row.customer_email || "",
+        recipientName: row.customer_name || "",
+        recipientPhone: row.customer_contact || "",
+        siteName: row.project_name || row.company_name || row.customer_address || "",
+        requirements: row.requirements_details || "",
+        followupCount: row.followups?.length || 0,
+        type: "lead",
+        initialChannel: "whatsapp"
+      });
+      setShowEmailModal(true);
     };
 
     const handleEmail = (e) => {
@@ -425,6 +546,17 @@ export default function Lead() {
         return;
       }
       window.location.href = `mailto:${email}`;
+      setEmailModalData({
+        recipientEmail: row.customer_email || "",
+        recipientName: row.customer_name || "",
+        recipientPhone: row.customer_contact || "",
+        siteName: row.project_name || row.company_name || row.customer_address || "",
+        requirements: row.requirements_details || "",
+        followupCount: row.followups?.length || 0,
+        type: "lead",
+        initialChannel: "email"
+      });
+      setShowEmailModal(true);
     };
 
     return (
@@ -432,6 +564,27 @@ export default function Lead() {
         <button
           onClick={handleWhatsApp}
           className="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (row.cad_file) {
+              window.open(row.cad_file, "_blank");
+            } else {
+              handleUploadCadModal(row);
+            }
+          }}
+          className={`inline-flex items-center px-2 py-1 border rounded-lg text-xs font-bold transition-colors gap-1 ${
+            row.cad_file
+              ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300"
+              : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
+          }`}
+          title={row.cad_file ? `Click to View CAD File (${row.cad_file_name || 'File'})` : "Click to Upload CAD Design"}
+        >
+          <span>📐 CAD</span>
+        </button>
+
+        <button
+          onClick={handleWhatsApp}
+          className="inline-flex items-center px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium transition-colors"
           title="Send WhatsApp"
         >
           <IoLogoWhatsapp className="w-3.5 h-3.5" />
@@ -440,6 +593,10 @@ export default function Lead() {
         <button
           onClick={handleEmail}
           className="inline-flex items-center px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+
+        <button
+          onClick={handleEmail}
+          className="inline-flex items-center px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-medium transition-colors"
           title="Send Email"
         >
           <MdEmail className="w-3.5 h-3.5" />
@@ -456,6 +613,170 @@ export default function Lead() {
           <MdDelete className="w-3.5 h-3.5" />
         </button>
         
+
+        {canEdit && !isDesignerRole && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingLead(row);
+              setShowLeadForm(true);
+            }}
+            className="inline-flex items-center px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-xs font-medium transition-colors"
+            title="Edit Lead"
+          >
+            <MdEdit className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {canDelete && !isDesignerRole && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete(row.id);
+            }}
+            className="inline-flex items-center px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-medium transition-colors"
+            title="Delete"
+          >
+            <MdDelete className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {(() => {
+          const customerName = row.contact_person_name || row.customer_name || row.customer?.name || `Lead #${row.id}`;
+          const existingReqs = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
+          const foundReq = existingReqs.find(r => 
+            String(r.id) === String(row.id) ||
+            String(r.leadId) === String(row.id) ||
+            (r.customerName && customerName && (
+              r.customerName.trim().toLowerCase() === customerName.trim().toLowerCase() ||
+              r.customerName.trim().toLowerCase().includes(customerName.trim().toLowerCase()) ||
+              customerName.trim().toLowerCase().includes(r.customerName.trim().toLowerCase())
+            ))
+          );
+
+          if (foundReq && (foundReq.status === "drawing_completed" || foundReq.status === "attached_to_quotation")) {
+            return (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  Swal.fire({
+                    title: `🎨 CAD Drawing Completed`,
+                    html: `
+                      <div style="text-align: left; font-size: 13px; line-height: 1.6;">
+                        <p><strong>Customer:</strong> ${customerName}</p>
+                        <p><strong>Drawing Title:</strong> ${foundReq.drawingTitle || customerName + ' Gate Layout Plan'}</p>
+                        <p><strong>File Name:</strong> ${foundReq.fileName || "AutoCAD_Drawing_Plan.dwg"}</p>
+                        <p><strong>Format:</strong> ${foundReq.fileType || "AutoCAD/PDF"}</p>
+                        <p><strong>Designer Remarks:</strong> ${foundReq.designerNotes || "Completed CAD drawing according to site specifications."}</p>
+                      </div>
+                    `,
+                    icon: "success",
+                    showCancelButton: true,
+                    confirmButtonText: "📥 Download CAD File",
+                    cancelButtonText: "Go to Design Drawings Page",
+                    confirmButtonColor: "#10b981",
+                    cancelButtonColor: "#4f46e5"
+                  }).then((res) => {
+                    if (res.isConfirmed) {
+                      const link = document.createElement("a");
+                      link.href = foundReq.drawingUrl || "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=60";
+                      link.download = foundReq.fileName || `${customerName}_CAD_Drawing.dwg`;
+                      link.target = "_blank";
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    } else if (res.dismiss === Swal.DismissReason.cancel) {
+                      window.location.href = "/design-drawings";
+                    }
+                  });
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+                title="Click to View & Download CAD Drawing File"
+              >
+                <span>✅ Drawing Ready</span>
+              </button>
+            );
+          }
+
+          if (foundReq && foundReq.status === "pending_drawing") {
+            return (
+              <a
+                href="/design-drawings"
+                className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-medium transition-colors"
+                title="Waiting for Designer Drawing"
+              >
+                <span>⏳ In Designer Queue</span>
+              </a>
+            );
+          }
+
+          return (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                Swal.fire({
+                  title: "Send Lead to Designer",
+                  text: `Enter design & drawing requirements for ${customerName}:`,
+                  input: "textarea",
+                  inputPlaceholder: "Specify boom barrier length, RFID poles, turnstile specs, entrance layout...",
+                  showCancelButton: true,
+                  confirmButtonText: "Send to Designer Queue",
+                  confirmButtonColor: "#4f46e5"
+                }).then((res) => {
+                  if (res.isConfirmed && res.value) {
+                    const token = localStorage.getItem("access");
+                    const BASE_API = import.meta.env.VITE_BASE_API_URL;
+                    if (token && BASE_API) {
+                      fetch(`${BASE_API}/lead/lead/${row.id}/`, {
+                        method: "PATCH",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                          is_sent: true,
+                          is_received: false,
+                          requirements_details: res.value
+                        })
+                      }).catch(() => {});
+                    }
+
+                    const existing = JSON.parse(localStorage.getItem("nnit_design_requests") || "[]");
+                    const newReq = {
+                      id: `DR-${Math.floor(100 + Math.random() * 900)}`,
+                      leadId: row.id,
+                      customerName: customerName,
+                      companyName: row.company_name || row.project_name || "N/A",
+                      salesPersonName: localStorage.getItem("user_name") || "Pravin Dare",
+                      salesPersonEmail: localStorage.getItem("user_email") || "pravin123@gmail.com",
+                      requirements: res.value,
+                      sentDate: new Date().toLocaleString(),
+                      status: "pending_drawing",
+                      is_sent: 1,
+                      is_received: 0,
+                      drawingTitle: "",
+                      drawingSpecs: "",
+                      drawingUrl: "",
+                      designerNotes: "",
+                      completedDate: "",
+                      attachedToQuotation: false
+                    };
+                    localStorage.setItem("nnit_design_requests", JSON.stringify([newReq, ...existing]));
+                    window.dispatchEvent(new Event("designRequestUpdated"));
+                    window.dispatchEvent(new Event("storage"));
+                    Swal.fire("Sent to Designer!", `Lead sent to Designer Queue. (Sent: Yes, Received: No)`, "success");
+                    window.location.reload();
+                  }
+                });
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-medium transition-colors"
+              title="Send to Designer"
+            >
+              <span>🎨 Designer</span>
+            </button>
+          );
+        })()}
+
         <button
           onClick={() => {
             setLeadDetailsId(row.id);
@@ -470,10 +791,30 @@ export default function Lead() {
       </div>
     );
   }, []);
+          className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-medium transition-colors"
+          title="View Details"
+        >
+          <MdRemoveRedEye className="w-3.5 h-3.5" />
+          <span>View</span>
+        </button>
+      </div>
+    );
+  }, [canEdit, canDelete]);
+
+  if (!loadingUser && !canView) {
+    return (
+      <Base title="Leads">
+        <div className="p-8 text-center text-slate-500 bg-white rounded-xl shadow mt-6">
+          <h3 className="text-xl font-bold text-slate-800 mb-2">Access Denied</h3>
+          <p>You do not have permission to view Lead Management.</p>
+        </div>
+      </Base>
+    );
+  }
 
   return (
     <Base
-      title="Enquiries"
+      title="Leads"
       filtersConfig={leadFilters}
       initialFilterValues={initialFilters}
       onFiltersChange={handleFilterChange}
@@ -506,7 +847,7 @@ export default function Lead() {
       <div className="space-y-6 ">
         <div className="bg-white p-4 rounded-md shadow flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Enquiry Management</h2>
+            <h2 className="text-lg font-semibold">Lead Management</h2>
             <div className="text-sm text-slate-600">
               {loading ? "Loading…" : `${totalCount} total • ${rows.length} shown`}
             </div>
@@ -520,12 +861,30 @@ export default function Lead() {
               <MdAdd className="w-5 h-5" />
               Add Enquiry
             </button>
+            {canCreate && !isDesignerRole && (
+              <>
+                <button
+                  onClick={() => setShowBulkImportModal(true)}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors shadow-sm"
+                >
+                  <MdFileUpload className="w-5 h-5" />
+                  Import Leads (CSV)
+                </button>
+                <button
+                  onClick={() => { setEditingLead(null); setShowLeadForm(true); }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm"
+                >
+                  <MdAdd className="w-5 h-5" />
+                  Add Lead
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         <TableView
           columns={columns}
-          rows={rows}
+          rows={displayedRows}
           loading={loading}
           error={error}
           page={currentPage}
@@ -575,6 +934,32 @@ export default function Lead() {
           }}
         />
       )}
+
+      <BulkImportModal
+        open={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        onSuccess={() => fetchData(currentPage)}
+        title="Import Leads (CSV)"
+        sampleCsvUrl={`${BASE_API}/lead/lead/sample-csv/`}
+        importEndpoint={`${BASE_API}/lead/lead/import-bulk/`}
+        token={token}
+        type="leads"
+      />
+
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        recipientPhone={emailModalData.recipientPhone}
+        siteName={emailModalData.siteName}
+        requirements={emailModalData.requirements}
+        followupCount={emailModalData.followupCount}
+        type={emailModalData.type || "lead"}
+        initialChannel={emailModalData.initialChannel || "email"}
+        baseApi={BASE_API}
+        token={token}
+      />
 
     </Base>
   );

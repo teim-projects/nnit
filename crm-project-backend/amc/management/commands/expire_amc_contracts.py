@@ -11,11 +11,11 @@ Schedule (cron example - run daily at midnight):
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from amc.models import AMCContract
+from amc.models import AMCContract, AMCStatus
 
 
 class Command(BaseCommand):
-    help = 'Auto-expire AMC contracts whose amc_end_date has passed today'
+    help = 'Auto-expire AMC contracts whose end date has passed'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -33,35 +33,32 @@ class Command(BaseCommand):
 
         self.stdout.write(f'Running AMC expiry check for date: {today}\n')
 
-        # Find all ACTIVE contracts whose end date has passed
-        expired_qs = AMCContract.objects.filter(
-            status='ACTIVE',
-            amc_end_date__lt=today
-        )
-
-        count = expired_qs.count()
+        # Find all contracts and trigger sync
+        contracts = AMCContract.objects.all()
+        count = contracts.count()
 
         if count == 0:
-            self.stdout.write(self.style.SUCCESS('✓ No contracts to expire. All contracts are up-to-date.'))
+            self.stdout.write(self.style.SUCCESS('✓ No contracts found.'))
             return
 
-        self.stdout.write(f'Found {count} contract(s) to expire:\n')
+        self.stdout.write(f'Processing {count} contract(s):\n')
 
         expired = 0
         errors = 0
 
-        for contract in expired_qs:
+        for contract in contracts:
             try:
-                self.stdout.write(
-                    f'  → {contract.contract_number} | {contract.customer.name} | '
-                    f'ended: {contract.amc_end_date}'
-                )
-
                 if not dry_run:
-                    contract.status = 'EXPIRED'
-                    contract.save(update_fields=['status'])
-                    expired += 1
-                    self.stdout.write(self.style.SUCCESS(f'    ✓ Marked EXPIRED'))
+                    contract.sync_active_cycle_data()
+                    if contract.status == AMCStatus.EXPIRED:
+                        expired += 1
+                        self.stdout.write(self.style.SUCCESS(f'  → {contract.contract_id} marked EXPIRED'))
+                else:
+                    self.stdout.write(self.style.WARNING(f'  [DRY RUN] Checked {contract.contract_id}'))
+
+            except Exception as e:
+                errors += 1
+                self.stdout.write(self.style.ERROR(f'    ✗ Error on {contract.id}: {str(e)}'))
                 else:
                     self.stdout.write(self.style.WARNING(f'    [DRY RUN] Would mark EXPIRED'))
 

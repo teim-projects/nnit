@@ -1,305 +1,676 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, filters, status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.filters import OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from django.db import transaction
 from django.utils import timezone
-from datetime import timedelta
-from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Prefetch
-from rest_framework import filters
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from .models import Customer
-from .serializers import CustomerSearchSerializer
-
-from .models import AMCContract, AMCRenewal  # AMCSparePart removed - inventory dependency
-from .serializers import (
-    AMCContractSerializer,
-    AMCRenewalSerializer,
-    # AMCSparePartSerializer,  # Inventory module removed
-)
-
-from .models import ServiceManagementRecord, ServiceManagementMaterial
-from .serializers import (
-    ServiceManagementRecordSerializer, 
-    ServiceManagementMaterialSerializer,
-    ServiceManagementMaterialCreateSerializer
-)
-
-from django.core.exceptions import ValidationError as DjangoValidationError
-# from inventory.models import InventoryItem  # Inventory module removed
-
-
-class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Customer.objects.all()
-    serializer_class = CustomerSearchSerializer
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'email', 'contact_number']
-    pagination_class = None
-
-
-class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
-    queryset = ServiceManagementRecord.objects.all()
-    serializer_class = ServiceManagementRecordSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = None
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['contract_type', 'customer', 'contract_status']
-    search_fields = ['customer_name', 'customer_contact', 'subject']
-    
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-    
-    @action(detail=True, methods=['post'])
-    def add_material(self, request, pk=None):
-        """Add material to service record"""
-        record = self.get_object()
-        serializer = ServiceManagementMaterialCreateSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            material = ServiceManagementMaterial.objects.create(
-                service_record=record,
-                product_data=serializer.validated_data['product_data'],
-                quantity=serializer.validated_data['quantity'],
-                unit=serializer.validated_data['unit'],
-                rate=serializer.validated_data['rate'],
-                description=serializer.validated_data.get('description', '')
-            )
-            return Response(
-                ServiceManagementMaterialSerializer(material).data,
-                status=status.HTTP_201_CREATED
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=True, methods=['delete'], url_path='material/(?P<material_id>[^/.]+)')
-    def remove_material(self, request, pk=None, material_id=None):
-        """Remove material from service record"""
-        try:
-            material = ServiceManagementMaterial.objects.get(
-                id=material_id,
-                service_record_id=pk
-            )
-            material.delete()
-            record = self.get_object()
-            return Response(
-                ServiceManagementRecordSerializer(record).data,
-                status=status.HTTP_200_OK
-            )
-        except ServiceManagementMaterial.DoesNotExist:
-            return Response(
-                {'error': 'Material not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-
-class ServiceManagementMaterialViewSet(viewsets.ModelViewSet):
-    queryset = ServiceManagementMaterial.objects.all()
-    serializer_class = ServiceManagementMaterialSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = None
+from django.utils.dateparse import parse_date
+from .models import AMCContract, AMCStatus, AMCCycle
+from .serializers import AMCContractSerializer
 
 
 class AMCContractViewSet(viewsets.ModelViewSet):
-    queryset = AMCContract.objects.all()
+    queryset = AMCContract.objects.all().order_by('-updated_at', '-created_at')
     serializer_class = AMCContractSerializer
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['customer', 'status', 'amc_included_in_sale']
-    search_fields = ['contract_number', 'customer__name', 'amc_type']
-    
-    @action(detail=False, methods=['get'])
-    def active_contracts(self, request):
-        """Get all active AMC contracts"""
-        contracts = self.queryset.filter(status='ACTIVE')
-        serializer = self.get_serializer(contracts, many=True)
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, OrderingFilter]
+    filterset_fields = ['customer', 'support_coordinator', 'status', 'amc_type', 'payment_frequency']
+    search_fields = ['contract_id', 'customer__company_name', 'customer__name', 'product', 'project_name']
+    ordering_fields = ['created_at', 'start_date', 'end_date', 'annual_value', 'status']
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Only sync data if explicitly requested (to avoid performance issues)
+        if request.query_params.get('sync') == 'true':
+            try:
+                for amc in queryset[:50]:
+                    try:
+                        amc.sync_active_cycle_data()
+                        if amc.service_requests.count() == 0:
+                            amc.generate_schedule()
+                    except Exception as e:
+                        print(f"Error syncing AMC {amc.id}: {str(e)}")
+                        continue
+            except Exception as e:
+                print(f"Error in AMC list sync: {str(e)}")
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def expiring_soon(self, request):
-        """Get contracts expiring in next 30 days"""
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            instance.sync_active_cycle_data()
+            if instance.service_requests.count() == 0:
+                instance.generate_schedule()
+                instance.refresh_from_db()
+        except Exception as e:
+            print(f"Error syncing AMC {instance.id} on retrieve: {str(e)}")
+            # Continue without syncing if there's an error
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='toggle-status')
+    def toggle_status(self, request, pk=None):
+        amc = self.get_object()
+        if amc.status == AMCStatus.INACTIVE:
+            amc.status = AMCStatus.ACTIVE
+            for c in amc.cycles.all():
+                if c.status == AMCStatus.INACTIVE:
+                    c.status = AMCStatus.ACTIVE
+                    c.save(update_fields=['status'])
+        else:
+            amc.status = AMCStatus.INACTIVE
+            for c in amc.cycles.all():
+                c.status = AMCStatus.INACTIVE
+                c.save(update_fields=['status'])
+        amc.save()
+        amc.sync_active_cycle_data()
+        serializer = self.get_serializer(amc)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='renew')
+    def renew_contract(self, request, pk=None):
+        amc = self.get_object()
+        new_start_date = request.data.get("new_start_date")
+        new_end_date = request.data.get("new_end_date")
+        new_annual_value = request.data.get("new_annual_value", amc.annual_value)
+        payment_frequency = request.data.get("payment_frequency", amc.payment_frequency)
+        remarks = request.data.get("remarks", "")
+
+        if not new_start_date or not new_end_date:
+            return Response(
+                {"error": "Both new_start_date and new_end_date are required for renewal."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        start_date_obj = parse_date(str(new_start_date)) if isinstance(new_start_date, str) else new_start_date
+        end_date_obj = parse_date(str(new_end_date)) if isinstance(new_end_date, str) else new_end_date
+
+        if not start_date_obj or not end_date_obj:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         today = timezone.now().date()
-        expiry_date = today + timedelta(days=30)
-        
-        contracts = self.queryset.filter(
-            amc_end_date__lte=expiry_date,
-            amc_end_date__gte=today,
-            status='ACTIVE'
-        )
-        serializer = self.get_serializer(contracts, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def create_renewal(self, request, pk=None):
-        """Create renewal for expiring contract"""
-        contract = self.get_object()
-        
-        if AMCRenewal.objects.filter(previous_contract=contract, status='RENEWED').exists():
-            return Response(
-                {'error': 'Contract already renewed'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        new_contract = AMCContract.objects.create(
-            customer=contract.customer,
-            amc_type=contract.amc_type,
-            visit_frequency=contract.visit_frequency,
-            product_data=contract.product_data,
-            sale_date=contract.sale_date,
-            warranty_end_date=contract.warranty_end_date,
-            amc_start_date=contract.amc_end_date + timedelta(days=1),
-            amc_end_date=contract.amc_end_date + timedelta(days=365),
-            amc_included_in_sale=False,
-            status='ACTIVE',
-            amc_cost=request.data.get('amc_cost', contract.amc_cost),
-            is_renewal=True,
-            previous_contract=contract
-        )
-        
-        AMCRenewal.objects.create(
-            previous_contract=contract,
-            new_contract=new_contract,
-            renewal_date=timezone.now().date(),
-            renewal_cost=new_contract.amc_cost,
-            status='RENEWED'
-        )
-        
-        serializer = self.get_serializer(new_contract)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        if start_date_obj > today:
+            cycle_status = AMCStatus.SCHEDULED
+        elif (end_date_obj - today).days <= 30 and end_date_obj >= today:
+            cycle_status = AMCStatus.EXPIRING_SOON
+        elif end_date_obj < today:
+            cycle_status = AMCStatus.EXPIRED
+        else:
+            cycle_status = AMCStatus.ACTIVE
 
-    @action(detail=True, methods=['get'])
-    def spare_parts(self, request, pk=None):
-        contract = self.get_object()
-        parts = contract.spare_parts.select_related('inventory_item__item').all()
-        return Response(AMCSparePartSerializer(parts, many=True).data)
+        with transaction.atomic():
+            last_cycle = amc.cycles.order_by('-cycle_number').first()
+            next_cycle_num = (last_cycle.cycle_number + 1) if last_cycle else 1
 
-    @action(detail=True, methods=['post'])
-    def add_spare_part(self, request, pk=None):
-        contract = self.get_object()
-        if contract.amc_type != 'NON_COMPREHENSIVE':
-            return Response(
-                {'detail': 'Spare parts billing applies only to Non-Comprehensive AMC contracts.'},
-                status=status.HTTP_400_BAD_REQUEST
+            AMCCycle.objects.create(
+                amc_contract=amc,
+                cycle_number=next_cycle_num,
+                start_date=start_date_obj,
+                end_date=end_date_obj,
+                annual_value=new_annual_value,
+                payment_frequency=payment_frequency,
+                status=cycle_status,
+                remarks=remarks,
+                created_by=request.user if request.user.is_authenticated else None
             )
 
-        inventory_item_id = request.data.get('inventory_item')
-        quantity = request.data.get('quantity_used') or request.data.get('quantity')
-        rate = request.data.get('rate_per_unit') or request.data.get('rate')
+            amc.sync_active_cycle_data()
 
-        try:
-            inv_item = InventoryItem.objects.get(id=inventory_item_id)
-        except InventoryItem.DoesNotExist:
-            return Response({'detail': 'Inventory item not found.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(amc)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-        if inv_item.product_variant_id is not None:
-            return Response(
-                {'detail': 'Only low-side materials can be added as spare parts.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+    @action(detail=True, methods=['post'], url_path='assign-technician')
+    def assign_technician(self, request, pk=None):
+        amc = self.get_object()
+        technician_id = request.data.get("technician_id")
+        if technician_id is None:
+            amc.assigned_technician = None
+        else:
+            from service_management.models import Technician
+            try:
+                tech = Technician.objects.get(pk=technician_id)
+                amc.assigned_technician = tech
+            except Technician.DoesNotExist:
+                return Response({"error": "Technician not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        try:
-            part = AMCSparePart.objects.create(
-                amc_contract=contract,
-                inventory_item_id=inventory_item_id,
-                quantity_used=quantity,
-                unit=request.data.get('unit', 'Nos'),
-                rate_per_unit=rate,
-                gst_percent=request.data.get('gst_percent', 18),
-                hsn_sac=request.data.get('hsn_sac', ''),
-                description=request.data.get('description', ''),
-            )
-        except (DjangoValidationError, Exception) as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        amc.save(update_fields=['assigned_technician', 'updated_at'])
+        serializer = self.get_serializer(amc)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-        return Response(AMCSparePartSerializer(part).data, status=status.HTTP_201_CREATED)
-
-    @action(detail=True, methods=['delete'], url_path='spare_parts/(?P<part_id>[^/.]+)')
-    def remove_spare_part(self, request, pk=None, part_id=None):
-        contract = self.get_object()
-        try:
-            part = AMCSparePart.objects.get(id=part_id, amc_contract=contract)
-        except AMCSparePart.DoesNotExist:
-            return Response({'detail': 'Spare part not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        if part.invoice_id:
-            return Response(
-                {'detail': 'Cannot remove spare parts that are already invoiced.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        part.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @action(detail=True, methods=['get'])
-    def invoice_draft(self, request, pk=None):
-        contract = self.get_object()
-        if contract.amc_type != 'NON_COMPREHENSIVE':
-            return Response(
-                {'detail': 'Invoice draft is only for Non-Comprehensive AMC contracts.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        parts = contract.spare_parts.filter(invoice__isnull=True).select_related(
-            'inventory_item__item'
-        )
-        if not parts.exists():
-            return Response(
-                {'detail': 'No uninvoiced spare parts found for this contract.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        customer = contract.customer
-        low_side_items = []
-        spare_part_ids = []
-
-        for part in parts:
-            item = part.inventory_item.item
-            spare_part_ids.append(part.id)
-            low_side_items.append({
-                'item': item.id,
-                'item_code': item.item_code,
-                'description': part.description or item.item_code,
-                'hsn_sac': part.hsn_sac or getattr(item, 'hsn_sac', '') or '',
-                'gst_percent': float(part.gst_percent),
-                'quantity': float(part.quantity_used),
-                'unit': part.unit,
-                'rate': float(part.rate_per_unit),
-            })
-
+    @action(detail=True, methods=['post'], url_path='generate-warranty-services')
+    def generate_warranty_services_action(self, request, pk=None):
+        amc = self.get_object()
+        services = amc.generate_warranty_services()
+        from service_management.serializers import ServiceRequestSerializer
         return Response({
-            'amc_contract_id': contract.id,
-            'contract_number': contract.contract_number,
-            'spare_part_ids': spare_part_ids,
-            'customer_id': customer.id,
-            'customer_name': customer.name,
-            'customer_phone': customer.contact_number or '',
-            'buyer_address': customer.address or '',
-            'buyer_gstin': customer.gst or '',
-            'buyer_state': customer.state or '',
-            'work_description': f'AMC Spare Parts - {contract.contract_number}',
-            'low_side_items': low_side_items,
-        })
+            "message": f"Generated {len(services)} quarterly warranty services.",
+            "services": ServiceRequestSerializer(services, many=True).data
+        }, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'])
-    def mark_spare_parts_invoiced(self, request, pk=None):
-        contract = self.get_object()
-        invoice_id = request.data.get('invoice_id')
-        spare_part_ids = request.data.get('spare_part_ids', [])
+    @action(detail=True, methods=['post'], url_path='assign-defaults')
+    def assign_defaults(self, request, pk=None):
+        amc = self.get_object()
+        technician_id = request.data.get("technician_id")
+        contact = request.data.get("default_customer_contact", amc.default_customer_contact)
+        address = request.data.get("default_customer_address", amc.default_customer_address)
+        gps = request.data.get("default_gps_location", amc.default_gps_location)
+        work_desc = request.data.get("default_work_description", amc.default_work_description)
 
-        if not invoice_id:
-            return Response({'detail': 'invoice_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if technician_id is not None:
+            if technician_id == "" or technician_id is None:
+                amc.assigned_technician = None
+            else:
+                from service_management.models import Technician
+                try:
+                    tech = Technician.objects.get(pk=technician_id)
+                    amc.assigned_technician = tech
+                except Technician.DoesNotExist:
+                    return Response({"error": "Technician not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        updated = contract.spare_parts.filter(
-            id__in=spare_part_ids,
-            invoice__isnull=True
-        ).update(invoice_id=invoice_id)
+        amc.default_customer_contact = contact
+        amc.default_customer_address = address
+        amc.default_gps_location = gps
+        amc.default_work_description = work_desc
+        amc.save()
 
-        return Response({'updated': updated})
+        # Sync default assigned technician & work description to unallocated service visits
+        pending_services = amc.service_requests.filter(is_allocated=False)
+        for srv in pending_services:
+            srv.assigned_technician = amc.assigned_technician
+            if work_desc:
+                srv.description = work_desc
+            srv.save()
+
+        serializer = self.get_serializer(amc)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='generate-schedule')
+    def generate_schedule_action(self, request, pk=None):
+        amc = self.get_object()
+        services = amc.generate_schedule()
+        from service_management.serializers import ServiceRequestSerializer
+        return Response({
+            "message": f"Generated/Synced {len(services)} service visits.",
+            "services": ServiceRequestSerializer(services, many=True).data,
+            "per_visit_amount": float(amc.per_visit_amount)
+        }, status=status.HTTP_200_OK)
 
 
-class AMCRenewalViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = AMCRenewal.objects.all()
-    serializer_class = AMCRenewalSerializer
+
+
+
+# ============================================================================
+# NEW VIEWSETS FOR SERVICE SCHEDULES, VISITS, AND RENEWALS
+# ============================================================================
+
+from .models import AMCServiceSchedule, AMCServiceVisit, AMCRenewal
+from .serializers import (
+    AMCServiceScheduleSerializer,
+    AMCServiceVisitSerializer,
+    AMCRenewalSerializer,
+    AMCDashboardStatsSerializer,
+    CalendarEventSerializer
+)
+from datetime import timedelta
+
+
+class AMCServiceScheduleViewSet(viewsets.ModelViewSet):
+    """ViewSet for AMC Service Schedules (planned dates)"""
+    queryset = AMCServiceSchedule.objects.all().select_related('amc_contract', 'approved_by')
+    serializer_class = AMCServiceScheduleSerializer
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['status']
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, OrderingFilter]
+    filterset_fields = ['amc_contract', 'is_completed', 'is_approved', 'reminder_sent']
+    search_fields = ['amc_contract__contract_id']
+    ordering_fields = ['service_date', 'created_at']
+    ordering = ['service_date']
+    
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve_schedule(self, request, pk=None):
+        """Approve a scheduled service"""
+        schedule = self.get_object()
+        schedule.is_approved = True
+        schedule.approved_at = timezone.now()
+        schedule.approved_by = request.user
+        schedule.save()
+        
+        serializer = self.get_serializer(schedule)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AMCServiceVisitViewSet(viewsets.ModelViewSet):
+    """ViewSet for AMC Service Visits (actual visits with allocation)"""
+    queryset = AMCServiceVisit.objects.all().select_related(
+        'amc_contract', 'product', 'crm_service'
+    ).prefetch_related('technicians')
+    serializer_class = AMCServiceVisitSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, OrderingFilter]
+    filterset_fields = ['amc_contract', 'allocation_status', 'product', 'auto_allocation_done']
+    search_fields = ['amc_contract__contract_id', 'product__name']
+    ordering_fields = ['service_date', 'created_at']
+    ordering = ['-service_date']
+    
+    @action(detail=True, methods=['post'], url_path='allocate-work')
+    def allocate_work(self, request, pk=None):
+        """
+        Allocate service visit to technicians and create CRM service request.
+        Similar to old code's "Allocate Work" button functionality.
+        """
+        visit = self.get_object()
+        amc = visit.amc_contract
+        
+        # Check if already allocated
+        if visit.allocation_status == 'ALLOCATED':
+            return Response(
+                {'error': 'Work already allocated for this visit'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if schedule is approved
+        schedule = AMCServiceSchedule.objects.filter(
+            amc_contract=amc,
+            service_date=visit.service_date
+        ).first()
+        
+        if schedule and not schedule.is_approved:
+            return Response(
+                {'error': 'Service schedule not yet approved by admin'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check technicians assigned
+        if not visit.technicians.exists():
+            return Response(
+                {'error': 'Please assign technicians before allocating work'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create CRM Service Request
+        from service_management.models import ServiceRequest, ServiceType, ServiceStatus, ServicePriority
+        
+        service = ServiceRequest.objects.create(
+            service_type=ServiceType.AMC,
+            amc_contract=amc,
+            customer=amc.customer,
+            product_name=visit.product.name if visit.product else amc.product,
+            title=f"AMC Visit - {visit.service_date}",
+            description=amc.default_work_description or f"Scheduled AMC service visit under contract {amc.contract_id}",
+            priority=ServicePriority.MEDIUM,
+            status=ServiceStatus.ASSIGNED,
+            scheduled_date=visit.service_date,
+            service_cost=amc.per_visit_amount,
+            created_by=request.user,
+            is_allocated=True
+        )
+        
+        # Assign technicians to service
+        service.assigned_technicians.set(visit.technicians.all())
+        
+        # Update visit
+        visit.crm_service = service
+        visit.crm_service_created_at = timezone.now()
+        visit.allocation_status = 'ALLOCATED'
+        visit.save()
+        
+        serializer = self.get_serializer(visit)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'], url_path='reschedule')
+    def reschedule_visit(self, request, pk=None):
+        """Reschedule a service visit"""
+        visit = self.get_object()
+        new_date = request.data.get('new_date')
+        reason = request.data.get('reason', '')
+        
+        if not new_date:
+            return Response(
+                {'error': 'new_date is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        old_date = visit.service_date
+        visit.rescheduled_from = old_date
+        visit.service_date = new_date
+        visit.reschedule_reason = reason
+        
+        # Reset allocation if already allocated
+        if visit.crm_service:
+            visit.crm_service = None
+            visit.crm_service_created_at = None
+            visit.allocation_status = 'PENDING'
+        
+        visit.save()
+        
+        serializer = self.get_serializer(visit)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'], url_path='assign-technicians')
+    def assign_technicians(self, request, pk=None):
+        """Assign technicians to a visit"""
+        visit = self.get_object()
+        technician_ids = request.data.get('technician_ids', [])
+        
+        if not technician_ids:
+            return Response(
+                {'error': 'technician_ids list is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        from service_management.models import Technician
+        technicians = Technician.objects.filter(id__in=technician_ids)
+        visit.technicians.set(technicians)
+        
+        serializer = self.get_serializer(visit)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AMCRenewalViewSet(viewsets.ModelViewSet):
+    """ViewSet for AMC Renewal Requests"""
+    queryset = AMCRenewal.objects.all().select_related(
+        'amc_contract', 'admin_action_by', 'new_cycle'
+    )
+    serializer_class = AMCRenewalSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, OrderingFilter]
+    filterset_fields = ['amc_contract', 'status']
+    search_fields = ['amc_contract__contract_id']
+    ordering_fields = ['created_at', 'customer_requested_at']
+    ordering = ['-created_at']
+    
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve_renewal(self, request, pk=None):
+        """Approve renewal request and create new cycle"""
+        renewal = self.get_object()
+        amc = renewal.amc_contract
+        
+        if renewal.status == 'APPROVED':
+            return Response(
+                {'error': 'Renewal already approved'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get renewal details from request
+        new_start_date = request.data.get('new_start_date', amc.end_date + timedelta(days=1))
+        new_end_date = request.data.get('new_end_date')
+        new_annual_value = request.data.get('new_annual_value', amc.annual_value)
+        payment_frequency = request.data.get('payment_frequency', amc.payment_frequency)
+        admin_notes = request.data.get('admin_notes', '')
+        
+        if not new_end_date:
+            # Default: 1 year from start
+            new_end_date = new_start_date + timedelta(days=365)
+        
+        # Create new cycle
+        last_cycle = amc.cycles.order_by('-cycle_number').first()
+        next_cycle_num = (last_cycle.cycle_number + 1) if last_cycle else 1
+        
+        new_cycle = AMCCycle.objects.create(
+            amc_contract=amc,
+            cycle_number=next_cycle_num,
+            start_date=new_start_date,
+            end_date=new_end_date,
+            annual_value=new_annual_value,
+            payment_frequency=payment_frequency,
+            status='SCHEDULED',
+            remarks=f'Renewed from Cycle #{last_cycle.cycle_number if last_cycle else 0}',
+            created_by=request.user
+        )
+        
+        # Update renewal record
+        renewal.status = 'APPROVED'
+        renewal.admin_action_by = request.user
+        renewal.admin_action_at = timezone.now()
+        renewal.admin_notes = admin_notes
+        renewal.new_cycle = new_cycle
+        renewal.save()
+        
+        # Sync contract data
+        amc.sync_active_cycle_data()
+        amc.generate_schedule()
+        
+        serializer = self.get_serializer(renewal)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject_renewal(self, request, pk=None):
+        """Reject renewal request"""
+        renewal = self.get_object()
+        admin_notes = request.data.get('admin_notes', '')
+        
+        renewal.status = 'REJECTED'
+        renewal.admin_action_by = request.user
+        renewal.admin_action_at = timezone.now()
+        renewal.admin_notes = admin_notes
+        renewal.save()
+        
+        serializer = self.get_serializer(renewal)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# ============================================================================
+# DASHBOARD & ANALYTICS
+# ============================================================================
+
+from rest_framework.views import APIView
+
+
+class AMCDashboardView(APIView):
+    """Dashboard statistics for AMC management"""
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = timezone.now().date()
+        next_15_days = today + timedelta(days=15)
+        week_from_now = today + timedelta(days=7)
+
+        # Contract stats
+        total_contracts = AMCContract.objects.count()
+        active_contracts = AMCContract.objects.filter(status='active').count()
+
+        expiring_soon = AMCContract.objects.filter(
+            end_date__lte=next_15_days,
+            end_date__gte=today
+        ).count()
+
+        expired_contracts = AMCContract.objects.filter(status='expired').count()
+
+        # Renewal stats
+        from .models import AMCRenewal
+        renewal_requests_pending = AMCContract.objects.filter(
+            renewal_status__in=['requested', 'pending']
+        ).count() + AMCRenewal.objects.filter(status='REQUESTED').count()
+
+        # Visit stats from ServiceRequest & AMCServiceVisit
+        from service_management.models import ServiceRequest
+        from .models import AMCServiceVisit
+
+        upcoming_sr = ServiceRequest.objects.filter(
+            amc_contract__isnull=False,
+            scheduled_date__range=(today, next_15_days),
+            is_allocated=False
+        ).count()
+        upcoming_sv = AMCServiceVisit.objects.filter(
+            service_date__range=(today, next_15_days),
+            allocation_status='PENDING'
+        ).count()
+        upcoming_visits_count = upcoming_sr + upcoming_sv
+
+        sr_today = ServiceRequest.objects.filter(amc_contract__isnull=False, scheduled_date=today).count()
+        sv_today = AMCServiceVisit.objects.filter(service_date=today).count()
+        visits_today = sr_today + sv_today
+
+        sr_week = ServiceRequest.objects.filter(
+            amc_contract__isnull=False,
+            scheduled_date__range=(today, week_from_now)
+        ).count()
+        sv_week = AMCServiceVisit.objects.filter(
+            service_date__range=(today, week_from_now)
+        ).count()
+        visits_this_week = sr_week + sv_week
+
+        stats = {
+            'total_contracts': total_contracts,
+            'active_contracts': active_contracts,
+            'expiring_soon': expiring_soon,
+            'expired_contracts': expired_contracts,
+            'renewal_requests_pending': renewal_requests_pending,
+            'upcoming_visits_count': upcoming_visits_count,
+            'visits_today': visits_today,
+            'visits_this_week': visits_this_week,
+        }
+
+        serializer = AMCDashboardStatsSerializer(stats)
+        return Response(serializer.data)
+
+
+class AMCCalendarEventsView(APIView):
+    """Calendar events for AMC system"""
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        def get_cust_name(cust):
+            if not cust:
+                return "Customer"
+            return getattr(cust, 'name', None) or getattr(cust, 'company_name', None) or "Customer"
+
+        events = []
+        try:
+            from service_management.models import ServiceRequest
+            from .models import AMCServiceVisit
+
+            # 1. Scheduled service visits & allocated visits from ServiceRequest
+            srs = ServiceRequest.objects.filter(amc_contract__isnull=False).select_related('amc_contract', 'amc_contract__customer', 'customer')
+            for sr in srs:
+                if sr.scheduled_date:
+                    cust_name = get_cust_name(sr.customer or (sr.amc_contract.customer if sr.amc_contract else None))
+                    contract_code = sr.amc_contract.contract_id if sr.amc_contract else "AMC-000"
+                    product = sr.product_name or (sr.amc_contract.product if sr.amc_contract else "Service")
+
+                    if sr.is_allocated:
+                        color = '#10b981'  # Emerald Green for allocated visit
+                        type_title = f"Service Visit | {cust_name}"
+                        type_str = "Service Visit"
+                    else:
+                        color = '#3b82f6'  # Blue for scheduled visit
+                        type_title = f"Scheduled Service | {cust_name}"
+                        type_str = "Scheduled Service"
+
+                    events.append({
+                        'title': type_title,
+                        'start': sr.scheduled_date.isoformat(),
+                        'backgroundColor': color,
+                        'borderColor': color,
+                        'extendedProps': {
+                            'type': type_str,
+                            'contract': contract_code,
+                            'contract_id_pk': sr.amc_contract.id if sr.amc_contract else None,
+                            'customer': cust_name,
+                            'product': product,
+                            'status': sr.status,
+                            'service_id': sr.id,
+                        }
+                    })
+
+            # 2. AMC Service Visits from AMCServiceVisit (if any)
+            visits = AMCServiceVisit.objects.select_related('amc_contract', 'amc_contract__customer', 'product').all()
+            for visit in visits:
+                cust_name = get_cust_name(visit.amc_contract.customer if visit.amc_contract else None)
+                product = visit.product.name if visit.product else (visit.amc_contract.product if visit.amc_contract else "Service")
+
+                color = '#3b82f6'  # Default blue
+                if visit.allocation_status == 'ALLOCATED':
+                    color = '#10b981'  # Green
+                elif visit.allocation_status == 'COMPLETED':
+                    color = '#6c757d'  # Gray
+                elif visit.allocation_status == 'CANCELLED':
+                    color = '#ef4444'  # Red
+                elif visit.allocation_status == 'IN_PROGRESS':
+                    color = '#f59e0b'  # Amber
+
+                events.append({
+                    'title': f"Service Visit | {cust_name}",
+                    'start': visit.service_date.isoformat(),
+                    'backgroundColor': color,
+                    'borderColor': color,
+                    'extendedProps': {
+                        'type': 'Service Visit',
+                        'contract': visit.amc_contract.contract_id if visit.amc_contract else "AMC-000",
+                        'contract_id_pk': visit.amc_contract.id if visit.amc_contract else None,
+                        'customer': cust_name,
+                        'product': product,
+                        'status': visit.allocation_status,
+                        'visit_id': visit.id,
+                    }
+                })
+
+            # 3. AMC Expiry Dates from AMCContract
+            active_amcs = AMCContract.objects.select_related('customer').filter(end_date__isnull=False)
+            for amc in active_amcs:
+                cust_name = get_cust_name(amc.customer)
+                events.append({
+                    'title': f"Contract Expiry | {cust_name}",
+                    'start': amc.end_date.isoformat(),
+                    'backgroundColor': '#ef4444',
+                    'borderColor': '#ef4444',
+                    'extendedProps': {
+                        'type': 'Contract Expiry',
+                        'contract': amc.contract_id or "AMC-000",
+                        'contract_id_pk': amc.id,
+                        'customer': cust_name,
+                        'product': amc.product,
+                        'status': amc.status,
+                        'annual_value': float(amc.annual_value) if amc.annual_value else 0,
+                    }
+                })
+
+            # 4. Renewal Due dates (30 days before expiry)
+            from datetime import timedelta
+            today = timezone.now().date()
+            expiring_soon = AMCContract.objects.select_related('customer').filter(
+                end_date__gte=today,
+                end_date__lte=today + timedelta(days=30),
+                status__in=['active', 'expiring_soon']
+            )
+            for amc in expiring_soon:
+                renewal_date = amc.end_date - timedelta(days=30)
+                if renewal_date >= today:
+                    cust_name = get_cust_name(amc.customer)
+                    events.append({
+                        'title': f"Renewal Due | {cust_name}",
+                        'start': renewal_date.isoformat(),
+                        'backgroundColor': '#f59e0b',  # Amber
+                        'borderColor': '#f59e0b',
+                        'extendedProps': {
+                            'type': 'Renewal Due',
+                            'contract': amc.contract_id or "AMC-000",
+                            'contract_id_pk': amc.id,
+                            'customer': cust_name,
+                            'product': amc.product,
+                            'status': 'renewal_due',
+                            'expiry_date': amc.end_date.isoformat(),
+                        }
+                    })
+        except Exception as e:
+            print("Error generating AMC calendar events:", e)
+
+        return Response(events)

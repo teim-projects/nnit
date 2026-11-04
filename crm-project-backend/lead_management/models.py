@@ -52,8 +52,11 @@ class LeadSource(models.TextChoices):
 # Lead status
 class LeadStatus(models.TextChoices):
     OPEN = 'open', 'Open'
+    CLOSE_WIN = 'close_win', 'Close Win'
+    CLOSE_LOSS = 'close_loss', 'Close Loss'
     CLOSED = 'closed', 'Closed'
     IN_PROCESS = 'in_process', 'In Process'
+
 
 
 class ServiceType(models.TextChoices):
@@ -82,6 +85,7 @@ class lead_management(models.Model):
     followup_date = models.DateField(blank=True, null=True)
     last_followup_date = models.DateField(blank=True, null=True)
     remarks = models.TextField(blank=True, null=True)
+    company_name = models.CharField(max_length=255, blank=True, null=True)
     project_name = models.CharField(max_length=100, blank=True, null=True)
     project_adderess = models.CharField(max_length=500, blank=True, null=True)
     creatd_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_created')
@@ -94,6 +98,20 @@ class lead_management(models.Model):
     # Customer conversion tracking
     is_converted = models.BooleanField(default=False)
     converted_at = models.DateTimeField(blank=True, null=True)
+    # Customer Provided Layout & Site Details for Designer
+    site_location = models.CharField(max_length=500, blank=True, null=True, help_text="Site Location / Project Address")
+    site_requirement = models.TextField(blank=True, null=True, help_text="Site Requirements & Design Specifications")
+    customer_layout = models.FileField(upload_to="customer_layouts/", blank=True, null=True, help_text="Layout drawing/file provided by customer")
+    customer_layout_name = models.CharField(max_length=255, blank=True, null=True)
+    customer_layout_url = models.TextField(blank=True, null=True, help_text="Data URL or Base64 or external link of customer layout")
+
+    # CAD Design File
+    cad_file = models.FileField(upload_to="lead_cad_files/", blank=True, null=True)
+    cad_file_name = models.CharField(max_length=255, blank=True, null=True)
+    # Designer & Drawing Workflow Flags (boolean 0/1)
+    is_sent = models.BooleanField(default=False)
+    is_received = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -105,7 +123,10 @@ class lead_management(models.Model):
             raise ValidationError({"followup_date": "followup_date cannot be before date."})
 
     def save(self, *args, **kwargs):
-        self.full_clean()
+        # Only run full_clean on new instances (create), not on updates
+        # Updates are validated at the serializer level
+        if not self.pk:
+            self.full_clean()
         super().save(*args, **kwargs)
 
 
@@ -261,7 +282,13 @@ class LeadFollowUp(models.Model):
         lead.followup_date = self.next_followup_date or self.followup_date
         if self.remarks:
             lead.remarks = self.remarks
-        lead.save(update_fields=["status", "followup_date", "last_followup_date", "remarks"])
+        # Use update_fields to bypass full_clean on the lead model
+        lead_management.objects.filter(pk=lead.pk).update(
+            status=lead.status,
+            last_followup_date=lead.last_followup_date,
+            followup_date=lead.followup_date,
+            remarks=lead.remarks,
+        )
 
 
 # Lead FAQ

@@ -14,10 +14,13 @@ from datetime import timedelta
 from pathlib import Path
 import os
 from dotenv import load_dotenv  
-# Load environment variables from .env file
-load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# Load environment variables from .env/.env.dev or .env.dev or .env
+load_dotenv(BASE_DIR / ".env" / ".env.dev")
+load_dotenv(BASE_DIR / ".env.dev")
+load_dotenv(BASE_DIR / ".env")
+load_dotenv()
 
 
 # Quick-start development settings - unsuitable for production
@@ -26,6 +29,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("SECRET_KEY","unsafe-dev-key")
 # SECRET_KEY = 'django-insecure-enn@a0!v4mho+wm@l@r9=(_^jy(2n+^7#49a4l!2g+%=p+-zv7'
+
+# Allow up to 15MB payload size for product image uploads / Base64 URIs
+DATA_UPLOAD_MAX_MEMORY_SIZE = 15728640
+FILE_UPLOAD_MAX_MEMORY_SIZE = 15728640
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
@@ -70,6 +77,7 @@ INSTALLED_APPS = [
     # 'inventory',  # Temporarily disabled - module removed
     'amc',
     'parking_products',
+    'service_management',
 ] 
 
 SITE_ID = 1
@@ -142,7 +150,7 @@ REST_FRAMEWORK = {
     ),
 
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'api.pagination.StandardPagination',
     'PAGE_SIZE': 10, 
     
 }
@@ -175,7 +183,7 @@ AUTHENTICATION_BACKENDS = [
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "k_crm_db",
+        "NAME": "nnit_db",
         "USER": "root",
         "PASSWORD": "",          # XAMPP default password is blank
         "HOST": "localhost",
@@ -240,20 +248,17 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# add u r frontend url here change only domain  keep this /password-reset-confirm
-# FRONTEND_URL = f"http://localhost:5173/password-reset-confirm"
+# Password reset frontend URL
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173/password-reset-confirm')
 
-# password reset frontend url
-FRONTEND_URL = os.getenv('FRONTEND_URL')
-
-# ✅ Use Gmail to send real emails
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+# ✅ SMTP Email Configuration (Gmail App Password)
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'connectteim@gmail.com')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'ywthqsqgnzmuzpdn')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'connectteim@gmail.com')
 
 
 # JWT settings 

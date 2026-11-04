@@ -89,6 +89,9 @@ class QuotationSerializer(serializers.ModelSerializer):
     customer_contact = serializers.CharField(
         source="customer.contact_number", read_only=True
     )
+    customer_email = serializers.CharField(
+        source="customer.email", read_only=True, default=""
+    )
     
     branch_name = serializers.CharField(
         source="branch.name", read_only=True
@@ -194,7 +197,14 @@ class QuotationSerializer(serializers.ModelSerializer):
         version.subtotal = version_subtotal
         version.gst_amount = version_gst_total
         version.total_amount = version_subtotal + version_gst_total
-        version.grand_total = version.total_amount
+        add_charges = (
+            float(version.transportation_charges or 0) +
+            float(version.packing_forwarding_charges or 0) +
+            float(version.loading_unloading_charges or 0) +
+            float(version.insurance_charges or 0) +
+            float(version.miscellaneous_charges or 0)
+        )
+        version.grand_total = version.total_amount + add_charges
     
         version.save()
 
@@ -226,23 +236,18 @@ class QuotationSerializer(serializers.ModelSerializer):
         # STEP 2️⃣ BUILD NUMBER USING DB ID
         # ======================================
         now = datetime.now()
-        year = str(now.year)[-2:]
-        month = str(now.month).zfill(2)
+        year = now.strftime("%Y")
+        month = now.strftime("%m")
+        seq = f"{quotation.id:03d}"
         
-        # Try to get AC type from first high side item if exists
-        ac_code = "GEN"
-        if high_items and high_items[0].get("product_data"):
-            product_name = high_items[0]["product_data"].get("name", "")
-            ac_code = product_name[:3].upper() if product_name else "GEN"
-    
-        quotation_no = f"KA/{ac_code}/{year}/{month}{quotation.id}"
+        quotation_no = f"NNIT/{month}-{year}/{seq}"
         quotation.quotation_no = quotation_no
         quotation.save(update_fields=["quotation_no"])
     
         # ======================================
         # CREATE VERSION
         # ======================================
-        version_no = f"{quotation.quotation_no}-R1"
+        version_no = f"{quotation.quotation_no}-RV1"
         
         version = QuotationVersion.objects.create(
             quotation=quotation,
@@ -331,11 +336,31 @@ class QuotationServiceItemCreateSerializer(serializers.ModelSerializer):
 # SIMPLE QUOTATION SERIALIZER
 # For the simple form: customer + parking product + qty + unit_price
 # =====================================================
-class SimpleQuotationSerializer(serializers.Serializer):
-    customer = serializers.IntegerField()
+class SimpleQuotationItemSerializer(serializers.Serializer):
     parking_product_id = serializers.IntegerField()
-    quantity = serializers.IntegerField(min_value=1)
+    quantity = serializers.IntegerField(min_value=1, default=1)
     unit_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    installation_charges = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
+    cars = serializers.IntegerField(required=False, allow_null=True)
+    car_capacity = serializers.IntegerField(required=False, allow_null=True)
+
+
+class SimpleQuotationSerializer(serializers.Serializer):
+    customer = serializers.IntegerField(required=False, allow_null=True)
+    contact_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    company_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    email = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    items = SimpleQuotationItemSerializer(many=True, required=False)
+
+    sales_person = serializers.IntegerField(required=False, allow_null=True)
+    sales_person_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    sales_person_phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    # Legacy fields for backward compatibility
+    parking_product_id = serializers.IntegerField(required=False)
+    quantity = serializers.IntegerField(min_value=1, required=False, default=1)
+    unit_price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     gst_percent = serializers.DecimalField(max_digits=5, decimal_places=2, default=18)
     terms_ids = serializers.ListField(
         child=serializers.IntegerField(),
@@ -348,16 +373,65 @@ class SimpleQuotationSerializer(serializers.Serializer):
     def create(self, validated_data):
         from parking_products.models import ParkingProduct
         from lead_management.models import Customer
+        from django.contrib.auth import get_user_model
+        from django.db import models
+        User = get_user_model()
+
         request = self.context.get("request")
 
-        customer = Customer.objects.get(pk=validated_data["customer"])
-        parking_product = ParkingProduct.objects.get(pk=validated_data["parking_product_id"])
-        quantity = validated_data["quantity"]
-        unit_price = validated_data["unit_price"]
-        gst_percent = validated_data.get("gst_percent", 18)
+        cust_id = validated_data.get("customer")
+        customer = None
+        if cust_id:
+            customer = Customer.objects.filter(pk=cust_id).first()
 
-        # Build subject from parking product
-        subject = f"{parking_product.product_name} - {parking_product.category.display_name}"
+        if not customer:
+            mob = (validated_data.get("contact_number") or "").strip()
+            if mob:
+                customer = Customer.objects.filter(
+                    models.Q(contact_number__icontains=mob) |
+                    models.Q(secondary_contact_number__icontains=mob)
+                ).first()
+
+        if not customer:
+            cust_name = validated_data.get("company_name") or "New Customer"
+            customer = Customer.objects.create(
+                name=cust_name,
+                contact_number=validated_data.get("contact_number") or None,
+                email=validated_data.get("email") or None,
+                is_lead_only=False
+            )
+        items_input = validated_data.get("items")
+        gst_percent = float(validated_data.get("gst_percent", 18))
+
+        # Build items array from either multi-item array or legacy single fields
+        raw_items = []
+        if items_input and len(items_input) > 0:
+            raw_items = items_input
+        elif validated_data.get("parking_product_id"):
+            raw_items = [{
+                "parking_product_id": validated_data["parking_product_id"],
+                "quantity": validated_data.get("quantity", 1),
+                "unit_price": validated_data.get("unit_price", 0),
+                "description": "",
+                "installation_charges": 0
+            }]
+        else:
+            raise serializers.ValidationError("At least one product item is required")
+
+        # Fetch first product to build subject & quotation code
+        first_product_id = raw_items[0]["parking_product_id"]
+        first_product = ParkingProduct.objects.get(pk=first_product_id)
+        subject = f"{first_product.product_name} - {first_product.category.display_name}"
+
+        # Resolve sales person
+        sp_id = validated_data.get("sales_person")
+        sp_obj = User.objects.filter(pk=sp_id).first() if sp_id else None
+        sp_name = validated_data.get("sales_person_name")
+        if not sp_name and sp_obj:
+            sp_name = f"{sp_obj.first_name or ''} {sp_obj.last_name or ''}".strip() or sp_obj.username
+        sp_phone = validated_data.get("sales_person_phone")
+        if not sp_phone and sp_obj:
+            sp_phone = getattr(sp_obj, 'mobile_no', '') or getattr(sp_obj, 'phone', '')
 
         # Create quotation
         quotation = Quotation.objects.create(
@@ -366,64 +440,109 @@ class SimpleQuotationSerializer(serializers.Serializer):
             subject=subject,
             site_name="",
             thank_you_note="Thank you for choosing us. We look forward to serving you.",
+            sales_person=sp_obj,
+            sales_person_name=sp_name,
+            sales_person_phone=sp_phone,
         )
 
-        # Build quotation number
         from datetime import datetime as dt
         now = dt.now()
-        year = str(now.year)[-2:]
-        month = str(now.month).zfill(2)
-        code = parking_product.product_name[:3].upper() if parking_product.product_name else "PKG"
-        quotation.quotation_no = f"KA/{code}/{year}/{month}{quotation.id}"
+        year = now.strftime("%Y")
+        month = now.strftime("%m")
+        seq = f"{quotation.id:03d}"
+        quotation.quotation_no = f"NNIT/{month}-{year}/{seq}"
         quotation.save(update_fields=["quotation_no"])
+
+        # Extract 5 additional charges & types
+        trans_chg = float(validated_data.get("transportation_charges") or validated_data.get("transport_charges") or 0)
+        pack_chg = float(validated_data.get("packing_forwarding_charges") or validated_data.get("packing_charges") or 0)
+        load_chg = float(validated_data.get("loading_unloading_charges") or validated_data.get("loading_charges") or 0)
+        ins_chg = float(validated_data.get("insurance_charges") or validated_data.get("insurance") or 0)
+        misc_chg = float(validated_data.get("miscellaneous_charges") or validated_data.get("miscellaneous") or 0)
+
+        trans_type = validated_data.get("transportation_charges_type") or "custom"
+        pack_type = validated_data.get("packing_forwarding_charges_type") or "custom"
+        load_type = validated_data.get("loading_unloading_charges_type") or "custom"
+        ins_type = validated_data.get("insurance_charges_type") or "custom"
+        misc_type = validated_data.get("miscellaneous_charges_type") or "custom"
 
         # Create version
         version = QuotationVersion.objects.create(
             quotation=quotation,
-            version_no=f"{quotation.quotation_no}-R1",
+            version_no=f"{quotation.quotation_no}-RV1",
             is_active=True,
             gst_type="CGST_SGST",
             created_by=request.user if request else None,
+            transportation_charges=trans_chg,
+            packing_forwarding_charges=pack_chg,
+            loading_unloading_charges=load_chg,
+            insurance_charges=ins_chg,
+            miscellaneous_charges=misc_chg,
+            transportation_charges_type=trans_type,
+            packing_forwarding_charges_type=pack_type,
+            loading_unloading_charges_type=load_type,
+            insurance_charges_type=ins_type,
+            miscellaneous_charges_type=misc_type,
         )
 
-        # Product data snapshot
-        product_data = {
-            "id": parking_product.id,
-            "name": parking_product.product_name,
-            "sku": parking_product.product_code or parking_product.product_name,
-            "category": parking_product.category.display_name,
-            "car_capacity": parking_product.car_capacity,
-        }
+        total_subtotal = 0.0
+        total_gst_amount = 0.0
 
-        base_amount = float(quantity) * float(unit_price)
-        gst_value = (base_amount * float(gst_percent)) / 100
-        total_with_gst = base_amount + gst_value
+        for item_data in raw_items:
+            product = ParkingProduct.objects.get(pk=item_data["parking_product_id"])
+            qty = int(item_data.get("quantity", 1))
+            u_price = float(item_data.get("unit_price", 0))
+            inst_charges = float(item_data.get("installation_charges", 0))
+            desc = item_data.get("description") or f"{product.product_name} ({product.category.display_name})"
 
-        QuotationHighSideItem.objects.create(
-            quotation_version=version,
-            product_data=product_data,
-            quantity=quantity,
-            unit_price=unit_price,
-            unit="NOS",
-            gst_percent=gst_percent,
-            mathadi_charges=0,
-            transportation_charges=0,
-            description="",
-            hsn_sac="",
-            base_amount=base_amount,
-            gst_amount=gst_value,
-            total_with_gst=total_with_gst,
-        )
+            custom_cars = item_data.get("cars") if item_data.get("cars") is not None else item_data.get("car_capacity")
+            if custom_cars is not None and str(custom_cars).isdigit() and int(custom_cars) > 0:
+                car_cap_val = int(custom_cars)
+            else:
+                car_cap_val = getattr(product, 'car_capacity', 2) or 2
+
+            product_data_snapshot = {
+                "id": product.id,
+                "name": product.product_name,
+                "sku": product.product_code or product.product_name,
+                "category": product.category.display_name,
+                "car_capacity": car_cap_val,
+                "load_capacity": float(getattr(product, 'load_capacity', 0) or 0),
+            }
+
+            base_amount = qty * u_price
+            line_subtotal = base_amount + (qty * inst_charges)
+            gst_value = (line_subtotal * gst_percent) / 100
+            total_with_gst = line_subtotal + gst_value
+
+            QuotationHighSideItem.objects.create(
+                quotation_version=version,
+                product_data=product_data_snapshot,
+                quantity=qty,
+                unit_price=u_price,
+                unit="NOS",
+                gst_percent=gst_percent,
+                mathadi_charges=inst_charges * qty,
+                transportation_charges=0,
+                description=desc,
+                hsn_sac="",
+                base_amount=line_subtotal,
+                gst_amount=gst_value,
+                total_with_gst=total_with_gst,
+            )
+
+            total_subtotal += line_subtotal
+            total_gst_amount += gst_value
 
         # Update version totals
-        half_gst = gst_value / 2
-        version.subtotal = base_amount
-        version.gst_amount = gst_value
+        half_gst = total_gst_amount / 2.0
+        version.subtotal = total_subtotal
+        version.gst_amount = total_gst_amount
         version.cgst_amount = half_gst
         version.sgst_amount = half_gst
         version.igst_amount = 0
-        version.total_amount = base_amount + gst_value
-        version.grand_total = base_amount + gst_value
+        version.total_amount = total_subtotal + total_gst_amount
+        version.grand_total = total_subtotal + total_gst_amount + trans_chg + pack_chg + load_chg + ins_chg + misc_chg
         version.save()
 
         # Create Terms & Conditions for quotation

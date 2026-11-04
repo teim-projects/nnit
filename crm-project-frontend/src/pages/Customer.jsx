@@ -2,10 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Base from "../components/Base";
 import TableView from "../components/TableView";
 import Swal from "sweetalert2";
+import { useModulePermissions } from "../hooks/useAuth";
 import AddCustomerForm from "../components/customers/AddCustomerForm";
 import CustomerDetails from "../components/customers/CustomerDetails";
 import { IoLogoWhatsapp } from "react-icons/io5";
 import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd } from "react-icons/md";
+import { MdEmail, MdDelete, MdRemoveRedEye, MdAdd, MdEdit, MdFileUpload } from "react-icons/md";
+import BulkImportModal from "../components/BulkImportModal";
+import SendEmailModal from "../components/SendEmailModal";
 
 export default function Customer() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
@@ -17,6 +21,8 @@ export default function Customer() {
   }
   
   const API_URL = `${BASE_API}/lead/customer/`;
+
+  const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("customers");
 
   const initialFilters = useMemo(() => ({ search: "" }), []);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
@@ -32,6 +38,9 @@ export default function Customer() {
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [detailCustomerId, setDetailCustomerId] = useState(null);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailModalData, setEmailModalData] = useState({});
 
   const token = useMemo(() => (
     localStorage.getItem("access") ||
@@ -133,6 +142,16 @@ export default function Customer() {
       const cleanNumber = contact.replace(/[^0-9]/g, '');
       const whatsappNumber = cleanNumber.startsWith('91') ? cleanNumber : `91${cleanNumber}`;
       window.open(`https://wa.me/${whatsappNumber}`, '_blank');
+      setEmailModalData({
+        recipientEmail: row.email || "",
+        recipientName: row.name || "",
+        recipientPhone: row.contact_number || "",
+        siteName: row.site_address || row.address || "",
+        type: "customer",
+        isCustomer: true,
+        initialChannel: "whatsapp"
+      });
+      setShowEmailModal(true);
     };
 
     const handleEmail = (e) => {
@@ -143,6 +162,16 @@ export default function Customer() {
         return;
       }
       window.location.href = `mailto:${email}`;
+      setEmailModalData({
+        recipientEmail: row.email || "",
+        recipientName: row.name || "",
+        recipientPhone: row.contact_number || "",
+        siteName: row.site_address || row.address || "",
+        type: "customer",
+        isCustomer: true,
+        initialChannel: "email"
+      });
+      setShowEmailModal(true);
     };
 
     const handleDeleteClick = async (e) => {
@@ -175,6 +204,7 @@ export default function Customer() {
         <button
           onClick={handleWhatsApp}
           className="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
+          className="inline-flex items-center px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium transition-colors"
           title="Send WhatsApp"
         >
           <IoLogoWhatsapp className="w-3.5 h-3.5" />
@@ -183,6 +213,10 @@ export default function Customer() {
         <button
           onClick={handleEmail}
           className="inline-flex items-center px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+
+        <button
+          onClick={handleEmail}
+          className="inline-flex items-center px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-medium transition-colors"
           title="Send Email"
         >
           <MdEmail className="w-3.5 h-3.5" />
@@ -207,6 +241,53 @@ export default function Customer() {
       </div>
     );
   }, [currentPage, API_URL, token]);
+
+        {canEdit && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingCustomer(row);
+              setShowCustomerForm(true);
+            }}
+            className="inline-flex items-center px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-xs font-medium transition-colors"
+            title="Edit Customer"
+          >
+            <MdEdit className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {canDelete && (
+          <button
+            onClick={handleDeleteClick}
+            className="inline-flex items-center px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-medium transition-colors"
+            title="Delete"
+          >
+            <MdDelete className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        <button
+          onClick={() => setDetailCustomerId(row.id)}
+          className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-medium transition-colors"
+          title="View Details"
+        >
+          <MdRemoveRedEye className="w-3.5 h-3.5" />
+          <span>View</span>
+        </button>
+      </div>
+    );
+  }, [currentPage, API_URL, token, canEdit, canDelete]);
+
+  if (!loadingUser && !canView) {
+    return (
+      <Base title="Customers">
+        <div className="p-8 text-center text-slate-500 bg-white rounded-xl shadow mt-6">
+          <h3 className="text-xl font-bold text-slate-800 mb-2">Access Denied</h3>
+          <p>You do not have permission to view Customer Management.</p>
+        </div>
+      </Base>
+    );
+  }
 
   return (
     <Base
@@ -243,6 +324,24 @@ export default function Customer() {
                 <MdAdd className="w-5 h-5" />
                 Add Customer
               </button>
+              {canCreate && (
+                <>
+                  <button
+                    onClick={() => setShowBulkImportModal(true)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors shadow-sm"
+                  >
+                    <MdFileUpload className="w-5 h-5" />
+                    Import Customers (CSV)
+                  </button>
+                  <button
+                    onClick={() => { setEditingCustomer(null); setShowCustomerForm(true); }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm"
+                  >
+                    <MdAdd className="w-5 h-5" />
+                    Add Customer
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -271,6 +370,30 @@ export default function Customer() {
           fetchData(editingCustomer ? currentPage : 1);
           setEditingCustomer(null);
         }}
+      />
+
+      <BulkImportModal
+        open={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        onSuccess={() => fetchData(1)}
+        title="Import Customers (CSV)"
+        sampleCsvUrl={`${BASE_API}/lead/customer/sample-csv/`}
+        importEndpoint={`${BASE_API}/lead/customer/import-bulk/`}
+        token={token}
+        type="customers"
+      />
+
+      <SendEmailModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        recipientPhone={emailModalData.recipientPhone}
+        siteName={emailModalData.siteName}
+        type={emailModalData.type || "customer"}
+        initialChannel={emailModalData.initialChannel || "email"}
+        baseApi={BASE_API}
+        token={token}
       />
     </Base>
   );

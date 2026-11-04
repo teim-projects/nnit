@@ -11,6 +11,8 @@ class ProductCategory(models.Model):
         ('puzzle_parking', 'Puzzle Parking'),
         ('tower_parking', 'Tower Parking'),
         ('pit_parking', 'Pit Parking'),
+        ('pit_stack_parking', 'Pit Stack Parking'),
+        ('pit_puzzle_parking', 'Pit Puzzle Parking'),
         ('cantilever', 'Cantilever Parking'),
     ]
     
@@ -136,7 +138,20 @@ class ParkingProduct(models.Model):
     
     # Images
     image_url = models.URLField(blank=True, null=True, help_text="External image URL (optional)")
+    image = models.ImageField(upload_to='parking_products/', blank=True, null=True, help_text="Uploaded product image")
+    image_url = models.TextField(blank=True, null=True, help_text="External image URL or Base64 data (optional)")
     brochure_url = models.URLField(blank=True, null=True)
+
+    @property
+    def display_image(self):
+        if self.image:
+            try:
+                return self.image.url
+            except Exception:
+                pass
+        if self.image_url:
+            return self.image_url
+        return None
     
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)

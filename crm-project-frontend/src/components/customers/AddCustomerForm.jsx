@@ -325,41 +325,39 @@ export default function AddCustomerForm({
 
   return (
     <>
-      <div className="fixed inset-0 mt-8  bg-black/40 flex items-start sm:items-center justify-center z-50">
-        <div className="bg-white rounded-md shadow-lg w-full max-w-2xl relative max-h-[85vh] flex flex-col">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1050] p-4 pt-20">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
 
-          {/* ---- FIXED HEADER ---- */}
-          <div className="sticky top-0 bg-white z-10 border-b px-4 py-3 flex justify-between items-center">
-            <h2 className="text-lg font-semibold">
+          {/* ── Header ── */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+            <h2 className="text-base font-bold text-slate-800">
               {customer ? "Edit Customer" : "Add Customer"}
             </h2>
-            <button
-              onClick={onClose}
-              className="text-xl font-bold hover:text-red-500"
-              aria-label="Close"
-            >
+            <button onClick={onClose}
+              className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              aria-label="Close">
               ✕
             </button>
           </div>
 
-          {/* ---- SCROLLABLE FORM BODY ---- */}
-          <div className="px-4 py-3 overflow-y-auto flex-1">
+          {/* ── Scrollable Body ── */}
+          <div className="px-6 py-5 overflow-y-auto flex-1">
             <form className="space-y-4" onSubmit={handleSubmit}>
 
               {/* Basic Information - 2 Column Grid */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Name */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">Name <span className="text-red-500">*</span></label>
-                  <input className="w-full px-3 py-2 rounded-md border border-slate-200"
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Name <span className="text-red-500">*</span></label>
+                  <input className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     value={name} onChange={e => setName(e.target.value)} />
                 </div>
 
                 {/* Contact Number */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">Contact Number</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Contact Number</label>
                   <input 
-                    className="w-full px-3 py-2 rounded-md border border-slate-200"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     type="text"
                     inputMode="numeric"
                     maxLength={10}
@@ -374,37 +372,37 @@ export default function AddCustomerForm({
 
                 {/* Landline Number */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">Landline Number</label>
-                  <input className="w-full px-3 py-2 rounded-md border border-slate-200"
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Landline Number</label>
+                  <input className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     value={landLineNumber} onChange={e => setLandLineNumber(e.target.value)} />
                 </div>
 
                 {/* Email */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">Email</label>
-                  <input className="w-full px-3 py-2 rounded-md border border-slate-200"
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                  <input className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     value={email} onChange={e => setEmail(e.target.value)} />
                 </div>
 
                 {/* Secondary Email */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">Secondary Email</label>
-                  <input className="w-full px-3 py-2 rounded-md border border-slate-200"
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Secondary Email</label>
+                  <input className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     value={secondary_email} onChange={e => setSecondary_email(e.target.value)} />
                 </div>
 
                 {/* POC name */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">POC Name</label>
-                  <input className="w-full px-3 py-2 rounded-md border border-slate-200"
+                  <label className="block text-sm font-medium text-slate-700 mb-1">POC Name</label>
+                  <input className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     value={pocName} onChange={e => setPocName(e.target.value)} />
                 </div>
 
                 {/* POC contact number */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">POC Contact</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">POC Contact</label>
                   <input 
-                    className="w-full px-3 py-2 rounded-md border border-slate-200"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     type="text"
                     inputMode="numeric"
                     maxLength={10}
@@ -419,9 +417,9 @@ export default function AddCustomerForm({
 
                 {/* GST */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">GST Number</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">GST Number</label>
                   <input 
-                    className="w-full px-3 py-2 rounded-md border border-slate-200"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     value={gst} 
                     onChange={e => setGst(e.target.value.toUpperCase())}
                     maxLength={15}
@@ -431,9 +429,9 @@ export default function AddCustomerForm({
 
                 {/* PAN */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">PAN Number</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">PAN Number</label>
                   <input 
-                    className="w-full px-3 py-2 rounded-md border border-slate-200"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     value={pan} 
                     onChange={e => setPan(e.target.value.toUpperCase())}
                     maxLength={10}
@@ -444,8 +442,8 @@ export default function AddCustomerForm({
 
               {/* Billing Address */}
               <div>
-                <label className="text-sm text-slate-700 mb-1 block">Address</label>
-                <textarea className="w-full px-3 py-2 rounded-md border border-slate-200"
+                <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
+                <textarea className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                   value={address} onChange={e => setAddress(e.target.value)} />
               </div>
 
@@ -453,7 +451,7 @@ export default function AddCustomerForm({
               <div className="grid grid-cols-3 gap-3">
                 {/* Billing State */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">State</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">State</label>
                   <div className="input-like-select">
                     <StateSelect
                       countryid={INDIA_ID}
@@ -471,7 +469,7 @@ export default function AddCustomerForm({
 
                 {/* Billing City */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">City</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">City</label>
                   <div className="input-like-select">
                     <CitySelect
                       key={`city-billing-${stateid}`}
@@ -489,13 +487,13 @@ export default function AddCustomerForm({
 
                 {/* Pin Code */}
                 <div>
-                  <label className="text-sm text-slate-700 mb-1 block">Pin Code</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Pin Code</label>
                   <input
                     type="text"
                     inputMode="numeric"
                     maxLength={6}
                     pattern="\d{6}"
-                    className="w-full px-3 py-2 rounded-md border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 invalid:border-red-500"
+                    className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                     value={pinCode}
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/g, "");
@@ -518,15 +516,15 @@ export default function AddCustomerForm({
               {!bothAddressSame && (
                 <>
                   <div>
-                    <label className="text-sm text-slate-700 mb-1 block">Site Address</label>
-                    <textarea className="w-full px-3 py-2 rounded-md border border-slate-200"
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Site Address</label>
+                    <textarea className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                       value={siteAddress} onChange={e => setSiteAddress(e.target.value)} />
                   </div>
 
                   <div className="grid grid-cols-3 gap-3">
                     {/* Site State */}
                     <div>
-                      <label className="text-sm text-slate-700 mb-1 block">Site State</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Site State</label>
                       <div className="input-like-select">
                         <StateSelect
                           countryid={INDIA_ID}
@@ -544,7 +542,7 @@ export default function AddCustomerForm({
 
                     {/* Site City */}
                     <div>
-                      <label className="text-sm text-slate-700 mb-1 block">Site City</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Site City</label>
                       <div className="input-like-select">
                         <CitySelect
                           key={`city-site-${siteStateid}`}
@@ -562,12 +560,12 @@ export default function AddCustomerForm({
 
                     {/* Site Pin */}
                     <div>
-                      <label className="text-sm text-slate-700 mb-1 block">Site Pin</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Site Pin</label>
                       <input
                         type="text"
                         inputMode="numeric"
                         maxLength={6}
-                        className="w-full px-3 py-2 rounded-md border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 rounded-md border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition"
                         value={sitePinCode}
                         onChange={(e) => setSitePinCode(e.target.value.replace(/\D/g, ""))}
                         placeholder="6-digit PIN"
@@ -578,14 +576,14 @@ export default function AddCustomerForm({
               )}
 
               {/* Buttons */}
-              <div className="flex justify-end gap-2 pt-4">
-                <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button type="button" onClick={onClose}
+                  className="px-5 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
                   Cancel
                 </button>
-                <button type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded"
-                  disabled={loading}>
-                  {loading ? (customer ? "Updating..." : "Saving...") : (customer ? "Update" : "Save")}
+                <button type="submit" disabled={loading}
+                  className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition disabled:opacity-50">
+                  {loading ? (customer ? "Updating…" : "Saving…") : (customer ? "Update" : "Save")}
                 </button>
               </div>
 

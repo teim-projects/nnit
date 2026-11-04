@@ -1,23 +1,22 @@
-from django.urls import path, include
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 from .views import (
     AMCContractViewSet,
+    AMCServiceScheduleViewSet,
+    AMCServiceVisitViewSet,
     AMCRenewalViewSet,
-    ServiceManagementRecordViewSet,
-    ServiceManagementMaterialViewSet,
-    CustomerViewSet
+    AMCDashboardView,
+    AMCCalendarEventsView
 )
 
 router = DefaultRouter()
 router.register(r'contracts', AMCContractViewSet, basename='amc-contract')
+router.register(r'schedules', AMCServiceScheduleViewSet, basename='amc-schedule')
+router.register(r'visits', AMCServiceVisitViewSet, basename='amc-visit')
 router.register(r'renewals', AMCRenewalViewSet, basename='amc-renewal')
-router.register(r'service-records', ServiceManagementRecordViewSet, basename='service-record')
-router.register(r'service-materials', ServiceManagementMaterialViewSet, basename='service-material')
-router.register(r'customers', CustomerViewSet, basename='customer')
-
 
 urlpatterns = [
-    path('', include(router.urls)),
-    path('lead-management/', include('lead_management.urls')),
-    path('quotation/', include('quotation.urls')),
-]
+    path('dashboard/', AMCDashboardView.as_view(), name='amc-dashboard'),
+    path('calendar-events/', AMCCalendarEventsView.as_view(), name='amc-calendar-events'),
+    path('calendar/', AMCCalendarEventsView.as_view(), name='amc-calendar'),  # Alias for backward compatibility
+] + router.urls

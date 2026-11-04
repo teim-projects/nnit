@@ -12,7 +12,7 @@ export default function ServiceManagementList({ baseApi, token, filters = {} }) 
   const fetchServices = async () => {
     setLoading(true);
     try {
-      let url = `${baseApi}/amc/service-records/`;
+      let url = `${baseApi}/api/amc/service-records/`;
       if (filters?.search) {
         url += `?search=${encodeURIComponent(filters.search)}`;
       }
@@ -53,7 +53,7 @@ export default function ServiceManagementList({ baseApi, token, filters = {} }) 
     if (!result.isConfirmed) return;
 
     try {
-      const res = await fetch(`${baseApi}/amc/service-records/${id}/`, {
+      const res = await fetch(`${baseApi}/api/amc/service-records/${id}/`, {
         method: "DELETE",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
