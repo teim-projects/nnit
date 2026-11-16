@@ -27,4 +27,4 @@ def create_default_terms_for_quotation(sender, instance, created, **kwargs):
                 is_customized=False
             )
         
-        print(f"✅ Added {default_terms.count()} default terms to Quotation {instance.quotation_no}")
+        print(f"[OK] Added {default_terms.count()} default terms to Quotation {instance.quotation_no}")
