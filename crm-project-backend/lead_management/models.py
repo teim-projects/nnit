@@ -188,6 +188,11 @@ class LeadFollowUp(models.Model):
     remarks = models.TextField(blank=True, null=True)
     discussion_notes = models.TextField(blank=True, null=True)
     
+    # Site & Question fields
+    site_name = models.CharField(max_length=255, blank=True, null=True, help_text="Site name or project site location")
+    site_photo = models.ImageField(upload_to='followup_site_photos/', blank=True, null=True, help_text="Site photo taken during follow-up")
+    followup_question = models.TextField(blank=True, null=True, help_text="Follow-up question or inquiry details")
+
     # Interaction details - matching form exactly
     interaction_type = models.CharField(
         max_length=20,

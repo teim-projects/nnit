@@ -899,25 +899,40 @@ export default function AddLeadFollowUpFormNew({
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Conducted By <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
-                      validationErrors.conductedBy ? "border-red-500" : "border-gray-300"
-                    }`}
-                    value={conductedBy}
-                    onChange={(e) => setConductedBy(e.target.value)}
-                  >
-                    <option value="">Select Team Member</option>
-                    {usersList.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name || user.full_name || user.username || user.id}
-                      </option>
-                    ))}
-                  </select>
-                  {usersLoading && <span className="text-xs text-gray-400">Loading users...</span>}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Conducted By <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                        validationErrors.conductedBy ? "border-red-500" : "border-gray-300"
+                      }`}
+                      value={conductedBy}
+                      onChange={(e) => setConductedBy(e.target.value)}
+                    >
+                      <option value="">Select Team Member</option>
+                      {usersList.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name || user.full_name || user.username || user.id}
+                        </option>
+                      ))}
+                    </select>
+                    {usersLoading && <span className="text-xs text-gray-400">Loading users...</span>}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Site Name (optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter site name / project location"
+                      value={siteName}
+                      onChange={(e) => setSiteName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1203,6 +1218,56 @@ export default function AddLeadFollowUpFormNew({
                       onChange={(e) => setSiteChallenges(e.target.value)}
                       placeholder="Any specific challenges at the site?"
                     />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Site Photo (optional)
+                    </label>
+                    {sitePhotoPreview ? (
+                      <div className="flex items-center justify-between w-full px-3 h-[46px] bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={sitePhotoPreview}
+                            alt="Site Preview"
+                            className="h-8 w-8 object-cover rounded border border-slate-300 shadow-sm shrink-0"
+                          />
+                          <span className="text-xs font-medium text-slate-700 truncate whitespace-nowrap">
+                            {sitePhoto?.name || "Photo Attached"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setSitePhoto(null); setSitePhotoPreview(null); }}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition shrink-0 ml-2"
+                          title="Remove Photo"
+                        >
+                          <FiTrash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center justify-between w-full px-3 h-[46px] border border-dashed border-gray-300 rounded-lg cursor-pointer bg-slate-50/60 hover:bg-orange-50/50 hover:border-orange-400 transition group overflow-hidden">
+                        <div className="flex items-center gap-2 min-w-0 text-slate-600 group-hover:text-orange-600">
+                          <FiCamera className="w-4 h-4 text-slate-400 group-hover:text-orange-500 transition shrink-0" />
+                          <span className="text-xs font-medium truncate whitespace-nowrap">Upload Site Photo</span>
+                        </div>
+                        <span className="text-[11px] font-semibold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-md group-hover:bg-orange-600 group-hover:text-white transition shrink-0 ml-2">
+                          Browse
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              setSitePhoto(file);
+                              setSitePhotoPreview(URL.createObjectURL(file));
+                            }
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
                   </div>
                 </div>
               </div>

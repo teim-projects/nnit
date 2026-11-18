@@ -115,6 +115,23 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
             return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
         return None
 
+    def to_internal_value(self, data):
+        import json
+        if hasattr(data, 'dict'):
+            data = data.dict()
+        elif hasattr(data, 'copy'):
+            data = data.copy()
+        else:
+            data = dict(data)
+        for json_field in ['faq_answers', 'suggested_solution', 'qualifying_info', 'requirement_info']:
+            val = data.get(json_field)
+            if isinstance(val, str):
+                try:
+                    data[json_field] = json.loads(val)
+                except (ValueError, TypeError):
+                    pass
+        return super().to_internal_value(data)
+
     @transaction.atomic
     def create(self, validated_data):
         request = self.context.get("request")

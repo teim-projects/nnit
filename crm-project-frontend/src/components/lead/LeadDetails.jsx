@@ -905,10 +905,32 @@ const LeadDetails = ({ open, onClose, leadId, baseApi, token, onCreateQuotation,
                               </p>
                             )}
 
+                            {fu.site_name && (
+                              <p className="text-sm font-semibold text-indigo-700 mb-2">
+                                📍 Site Name: {fu.site_name}
+                              </p>
+                            )}
+
+                            {fu.site_photo && (
+                              <div className="mb-4">
+                                <p className="text-xs font-semibold text-gray-500 mb-1">📷 Site Photo:</p>
+                                <a href={fu.site_photo} target="_blank" rel="noopener noreferrer">
+                                  <img src={fu.site_photo} alt="Site Photo" className="h-28 w-auto rounded-xl border border-gray-200 shadow-sm hover:opacity-90 transition object-cover" />
+                                </a>
+                              </div>
+                            )}
+
                             {/* Remarks/Discussion Notes */}
                             <p className="text-sm text-gray-700 mb-5 font-medium leading-relaxed">
                               {fu.remarks || fu.discussion_notes || "No discussion notes recorded."}
                             </p>
+
+                            {fu.followup_question && (
+                              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
+                                <h5 className="text-xs font-bold text-amber-700 uppercase mb-1">FOLLOW-UP QUESTION / INQUIRY</h5>
+                                <p className="text-sm text-amber-900 font-medium">{fu.followup_question}</p>
+                              </div>
+                            )}
 
                             {/* Commitments Section */}
                             {(fu.client_commitment || fu.our_commitment) && (
