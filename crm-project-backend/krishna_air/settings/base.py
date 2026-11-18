@@ -185,7 +185,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "nnit_db",
         "USER": "root",
-        "PASSWORD": "",          # XAMPP default password is blank
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),          # XAMPP default password is blank
         "HOST": "localhost",
         "PORT": "3306",
     }
