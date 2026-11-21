@@ -24,6 +24,19 @@ const SEARCH_ROUTES = [
   { label: "Parking Products",   path: "/parking-products" },
   { label: "Terms & Conditions", path: "/terms-conditions" },
   { label: "AMC",                path: "/amc" },
+  // Inventory ERP Routes
+  { label: "Inventory Dashboard", path: "/inventory/dashboard" },
+  { label: "Inventory Products", path: "/inventory/products" },
+  { label: "Inventory Categories", path: "/inventory/categories" },
+  { label: "Inventory Warehouses", path: "/inventory/warehouses" },
+  { label: "Purchase Orders", path: "/inventory/purchase-orders" },
+  { label: "Goods Receipt Note (GRN)", path: "/inventory/grn" },
+  { label: "Material Requisition (MR)", path: "/inventory/material-requisitions" },
+  { label: "Delivery Challan (DC)", path: "/inventory/delivery-challan" },
+  { label: "Stock Summary", path: "/inventory/stock-summary" },
+  { label: "BOM (Bill of Materials)", path: "/inventory/bom" },
+  { label: "Create BOM", path: "/inventory/bom/create" },
+  { label: "Inventory Valuation Report", path: "/inventory/reports/valuation" },
 ];
 
 /* ─── helpers ─────────────────────────────────────────────── */

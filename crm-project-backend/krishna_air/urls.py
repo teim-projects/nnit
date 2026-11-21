@@ -50,6 +50,8 @@ urlpatterns = [
     path('parking/', include('parking_products.urls')),
     path('api/services/', include('service_management.urls')),
     path('services/', include('service_management.urls')),
+    path('api/inventory/', include('inventory.urls')),
+    path('inventory/', include('inventory.urls')),
 ]
 
 if settings.DEBUG:

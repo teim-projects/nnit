@@ -564,32 +564,60 @@ def _build_simple_quotation_context(quotation, version):
     }
 
 
+def _render_html_to_pdf(html_string, base_url=None):
+    """
+    Renders HTML to PDF using WeasyPrint if available,
+    with an automatic fallback to xhtml2pdf.
+    """
+    global HTML
+    if HTML is None:
+        try:
+            from weasyprint import HTML as _HTML
+            HTML = _HTML
+        except Exception:
+            HTML = None
+
+    if HTML is not None:
+        try:
+            return HTML(
+                string=html_string,
+                base_url=base_url or getattr(settings, 'ABSOLUTE_URL', '/'),
+            ).write_pdf()
+        except Exception as we_err:
+            logger.warning(f"WeasyPrint rendering failed, trying xhtml2pdf fallback: {we_err}")
+
+    # Robust Fallback: xhtml2pdf
+    try:
+        import io
+        from xhtml2pdf import pisa
+        pdf_out = io.BytesIO()
+        pisa_status = pisa.CreatePDF(html_string, dest=pdf_out)
+        if not pisa_status.err:
+            return pdf_out.getvalue()
+        logger.error(f"xhtml2pdf generation reported errors: {pisa_status.err}")
+    except Exception as xh_err:
+        logger.error(f"xhtml2pdf fallback failed: {xh_err}")
+
+    raise RuntimeError("PDF generation failed: Neither WeasyPrint nor xhtml2pdf could generate the document.")
+
+
 def generate_quotation_pdf(quotation, version, base_url=None):
     """
     Generate quotation PDF — Annexure I format matching NNIT style.
     Version: 2.1 - Updated Terms & Conditions styling
     """
     try:
-        if HTML is None:
-            raise RuntimeError(
-                "PDF generation is unavailable. Install WeasyPrint system libraries first."
-            )
         context = _build_simple_quotation_context(quotation, version)
         
         # Force template reload by clearing Django template cache
         from django.template import engines
-        from django.template.loader import get_template
         engines.all()  # This triggers cache refresh
         
         # Add version to context to force reload
         context['pdf_version'] = '2.1'
         
         html_string = render_to_string('pdf/quotation.html', context)
-        pdf = HTML(
-            string=html_string,
-            base_url=base_url or getattr(settings, 'ABSOLUTE_URL', '/'),
-        ).write_pdf()
-        return pdf
+        return _render_html_to_pdf(html_string, base_url=base_url)
     except Exception as e:
         logger.error(f"Error generating quotation PDF: {str(e)}", exc_info=True)
         raise
@@ -597,17 +625,11 @@ def generate_quotation_pdf(quotation, version, base_url=None):
 
 def generate_quotation_print_pdf(quotation, version, base_url=None):
     """
-    New WeasyPrint quotation PDF (invoice-style layout).
+    New WeasyPrint quotation PDF (invoice-style layout) with xhtml2pdf fallback.
     Version: 2.1 - Updated Terms & Conditions styling
     """
-    if HTML is None:
-        raise RuntimeError(
-            "PDF generation is unavailable on this machine. Install WeasyPrint system libraries first."
-        )
-    
     # Force template reload by clearing Django template cache
     from django.template import engines
-    from django.template.loader import get_template
     engines.all()  # This triggers cache refresh
     
     dummy_rows = [
@@ -667,8 +689,4 @@ def generate_quotation_print_pdf(quotation, version, base_url=None):
     }
 
     html_string = render_to_string('pdf/quotation_print.html', context)
-    pdf = HTML(
-        string=html_string,
-        base_url=base_url or getattr(settings, 'ABSOLUTE_URL', '/'),
-    ).write_pdf()
-    return pdf
+    return _render_html_to_pdf(html_string, base_url=base_url)

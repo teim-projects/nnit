@@ -250,13 +250,6 @@ export default function QuotationList({ onAdd, onEdit, filters = {}, canCreate =
   function ActionButtons({ q, v, isLatest = false }) {
     return (
       <div className="flex items-center justify-center gap-1 flex-wrap">
-        {/* View CAD / PDF Drawing */}
-        <button onClick={() => handleViewQuotationDrawing(q)}
-          title="View Attached Design Drawing"
-          className="p-1.5 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 flex items-center gap-1 font-bold text-xs">
-          <span>🎨 Drawing</span>
-        </button>
-
         {/* View PDF */}
         <button onClick={() => openPDF(q.id, v?.id)}
           title="View PDF"

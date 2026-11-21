@@ -1,23 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useUserRole } from "../hooks/useAuth";
+import { getRegisteredSidebarModules } from "../config/navigationConfig";
 import Swal from "sweetalert2";
-
-const MODULE_LIST = [
-  { key: "dashboard", label: "Dashboard & Telemetry", description: "View system telemetry, analytics, and overview charts" },
-  { key: "leads", label: "Lead Management", description: "Create, view, edit, and manage sales leads" },
-  { key: "design_drawings", label: "Design Drawings", description: "Sales Person & Designer CAD drawing workflow" },
-  { key: "designer_queue", label: "Designer Work Queue", description: "Designer incoming lead queue to upload CAD drawings & return to sales" },
-  { key: "followups", label: "Follow-up Management", description: "Schedule and manage customer follow-ups" },
-  { key: "quotations", label: "Quotations", description: "Generate and send quotation PDFs to customers" },
-  { key: "products", label: "Parking Product Master", description: "Manage products, pricing, and specifications" },
-  { key: "customers", label: "Customer Management", description: "Manage customer profiles and contact details" },
-  { key: "amc", label: "AMC & Renewals", description: "Track annual maintenance contracts and service renewals" },
-  { key: "accounts", label: "Accounts & Staff", description: "User account creation, staff assignments, and permissions" },
-  { key: "invoice", label: "Invoices & Billing", description: "Generate, download, and manage invoices" },
-  { key: "reports", label: "Report & Analysis", description: "System analytics, revenue, lead sources, and reporting" },
-  { key: "terms", label: "Terms & Conditions", description: "Manage legal terms and condition templates" },
-  { key: "role_management", label: "Role & Access Control", description: "Configure system roles and permission matrices" },
-];
 
 export default function RoleAccessManagement() {
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
@@ -38,6 +22,28 @@ export default function RoleAccessManagement() {
   const [rolePermissions, setRolePermissions] = useState({});
 
   const token = localStorage.getItem("access");
+
+  // Dynamically derive registered modules directly from Sidebar navigation config
+  // plus any custom modules configured in roles (Automatically syncs when new buttons are added!)
+  const MODULE_LIST = useMemo(() => {
+    const extraRoleKeys = [];
+    roles.forEach((r) => {
+      if (r?.permissions && typeof r.permissions === "object") {
+        Object.keys(r.permissions).forEach((k) => {
+          if (!extraRoleKeys.includes(k)) extraRoleKeys.push(k);
+        });
+      }
+    });
+    return getRegisteredSidebarModules(extraRoleKeys);
+  }, [roles]);
+
+  const getInitialDefaultPermissions = (modules = MODULE_LIST) => {
+    const defaults = {};
+    modules.forEach((m) => {
+      defaults[m.key] = { can_view: true, can_create: true, can_edit: true, can_delete: true };
+    });
+    return defaults;
+  };
 
   // Fetch Roles from Backend
   const fetchRoles = async () => {
@@ -65,14 +71,6 @@ export default function RoleAccessManagement() {
     fetchRoles();
   }, []);
 
-  const getInitialDefaultPermissions = () => {
-    const defaults = {};
-    MODULE_LIST.forEach((m) => {
-      defaults[m.key] = { can_view: true, can_create: true, can_edit: true, can_delete: true };
-    });
-    return defaults;
-  };
-
   const selectedRole = useMemo(() => {
     return roles.find((r) => r.id === selectedRoleId) || null;
   }, [roles, selectedRoleId]);
@@ -80,10 +78,10 @@ export default function RoleAccessManagement() {
   // When selected role changes, populate permissions state
   useEffect(() => {
     if (selectedRole) {
-      const currentPerms = { ...getInitialDefaultPermissions(), ...(selectedRole.permissions || {}) };
+      const currentPerms = { ...getInitialDefaultPermissions(MODULE_LIST), ...(selectedRole.permissions || {}) };
       setRolePermissions(currentPerms);
     }
-  }, [selectedRoleId]);
+  }, [selectedRoleId, selectedRole, MODULE_LIST]);
 
   const showToast = (message, type = "success") => {
     setNotification({ message, type });
@@ -263,7 +261,7 @@ export default function RoleAccessManagement() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 sm:p-5 lg:p-6 w-full space-y-6">
       {/* Toast Notification */}
       {notification && (
         <div
@@ -435,8 +433,15 @@ export default function RoleAccessManagement() {
                     <tr key={mod.key} className="hover:bg-slate-50/60 transition-colors">
                       {/* Module Info */}
                       <td className="py-4 px-6">
-                        <div className="font-semibold text-slate-800">{mod.label}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{mod.description}</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-800">{mod.label}</span>
+                          {mod.section && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                              {mod.section}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">{mod.description}</div>
                       </td>
 
                       {/* View Permission */}

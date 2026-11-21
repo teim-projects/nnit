@@ -19,26 +19,41 @@ import {
   FiTrash2,
   FiSearch,
   FiFilter,
-  FiInfo
+  FiInfo,
+  FiPrinter,
+  FiRepeat
 } from "react-icons/fi";
+import { MdRemoveRedEye, MdEdit, MdDelete } from "react-icons/md";
+import { IoLogoWhatsapp } from "react-icons/io5";
 import Swal from "sweetalert2";
 import Base from "../components/Base";
-import { useModulePermissions } from "../hooks/useAuth";
+import { useModulePermissions, useUserRole } from "../hooks/useAuth";
+import AddDesignerSendModal from "../components/designer/AddDesignerSendModal";
+import DesignerSlipModal from "../components/designer/DesignerSlipModal";
+import DesignerUploadModal from "../components/designer/DesignerUploadModal";
+import SalesRevisionModal from "../components/designer/SalesRevisionModal";
+import DesignVersionHistoryModal from "../components/designer/DesignVersionHistoryModal";
+import { triggerFileDownload, safeSaveDesignRequests } from "../utils/designFileStorage";
+import { getCurrentUserDisplayName, healDesignRequests, isRequestOwnedByUser, isSameDesignRequest } from "../utils/auth";
 
 export default function DesignManagement() {
+  const BASE_API = import.meta.env.VITE_BASE_API_URL;
+  const token = localStorage.getItem("access") || "";
+
   const { canView, canCreate, canEdit, canDelete, isLoading: loadingUser } = useModulePermissions("design_drawings");
+  const { userRole, userData, userName, isSuperUser } = useUserRole(BASE_API);
+  const activeRole = (userRole?.name || localStorage.getItem("user_role") || "sales").toLowerCase();
+  const isSuper = isSuperUser || activeRole === "admin" || activeRole === "superadmin";
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "sales";
   const sendParam = searchParams.get("send");
   const leadIdParam = searchParams.get("leadId");
 
-  const BASE_API = import.meta.env.VITE_BASE_API_URL;
-  const token = localStorage.getItem("access") || "";
-
   // Logged-in User Profile & Role
-  const currentUserEmail = localStorage.getItem("user_email") || "pravin123@gmail.com";
-  const currentUserName = localStorage.getItem("user_name") || "Pravin Dare";
+  const currentUserEmail = localStorage.getItem("user_email") || "";
+  const currentUserName = getCurrentUserDisplayName();
   const [currentRole, setCurrentRole] = useState(localStorage.getItem("user_role") || "sales");
 
   // Active Tab
@@ -75,7 +90,7 @@ export default function DesignManagement() {
       confirmButtonColor: "#ef4444",
     }).then((res) => {
       if (res.isConfirmed) {
-        localStorage.setItem("nnit_design_requests", JSON.stringify([]));
+        safeSaveDesignRequests([]);
         setDesignRequests([]);
         window.dispatchEvent(new Event("designRequestUpdated"));
         window.dispatchEvent(new Event("storage"));
@@ -164,28 +179,61 @@ export default function DesignManagement() {
       const isSent = r.is_sent === 1 || r.is_sent === true || r.is_sent === "1" || r.is_sent === "true";
       if (!isSent) return; // Skip unsent leads
 
-      const key = String(r.leadId || r.id || r.customerName || "").trim().toLowerCase();
-      if (key && !seenKeys.has(key)) {
-        seenKeys.add(key);
+      const key = (r.leadId && r.leadId !== "null" && r.leadId !== "undefined")
+        ? `lead-${r.leadId}`
+        : String(r.id || r.reqNo || "");
+      if (key && !seenKeys.has(key.toLowerCase())) {
+        seenKeys.add(key.toLowerCase());
         if (r.id) seenKeys.add(String(r.id).toLowerCase());
-        if (r.leadId) seenKeys.add(String(r.leadId).toLowerCase());
+        if (r.reqNo) seenKeys.add(String(r.reqNo).toLowerCase());
+        if (r.leadId && r.leadId !== "null" && r.leadId !== "undefined") {
+          seenKeys.add(`lead-${r.leadId}`.toLowerCase());
+          seenKeys.add(`ds-${r.leadId}`.toLowerCase());
+        }
+
+        const clientName = r.clientCoName || r.customerName || "Unknown Customer";
+        const contactPerson = r.contactPerson || r.contact_person_name || "—";
+        const contactNumber = r.contactNumber || r.contact_person_number || "—";
+        const projName = r.projectName || r.companyName || "N/A";
+        const projLoc = r.projectAddress || r.location || "N/A";
+        const reqs = r.requirements || "Site Entrance CAD Drawing & Specs";
+        const qty = r.quantity || "As per STD";
+        const rmk = r.remark || "-";
+        const salesPerson = (r.salesPersonName && r.salesPersonName !== "Sales Person")
+          ? r.salesPersonName
+          : (currentRole === "sales" ? currentUserName : (r.salesPersonName || "Sales Person"));
+        const sentDt = r.sentDate || new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
         deduplicatedList.push({
-          id: r.id || `DR-${r.leadId}`,
+          ...r,
+          id: r.id || `DS-${r.leadId || Math.floor(100 + Math.random() * 900)}`,
+          reqNo: r.reqNo || r.id || `DS-${r.leadId || 101}`,
           leadId: r.leadId,
-          customerName: r.customerName || "Unknown Customer",
-          projectName: r.projectName || r.companyName || "N/A",
-          companyName: r.projectName || r.companyName || "N/A",
-          location: r.location || "N/A",
-          requirements: r.requirements || "Site Entrance CAD Drawing & Specs",
+          salutation: r.salutation || (clientName.startsWith("M/s.") ? "M/s." : "M/s."),
+          clientCoName: clientName,
+          customerName: clientName,
+          projectName: projName,
+          companyName: projName,
+          projectAddress: projLoc,
+          location: projLoc,
+          contactPersonSalutation: r.contactPersonSalutation || (contactPerson.startsWith("MS.") ? "MS." : "MS."),
+          contactPerson: contactPerson,
+          contactNumber: contactNumber,
+          requirements: reqs,
+          quantity: qty,
+          remark: rmk,
           customerLayoutName: r.customerLayoutName || "",
           customerLayoutUrl: r.customerLayoutUrl || "",
-          salesPersonName: r.salesPersonName || "Sales Person",
+          salesPersonName: salesPerson,
           salesPersonEmail: r.salesPersonEmail || "sales@nnit.com",
-          sentDate: r.sentDate || new Date().toLocaleString(),
+          sentDate: sentDt,
           status: r.status || "pending_drawing",
           is_sent: 1,
           is_received: r.is_received ?? 0,
+          current_version: r.current_version || (r.versions?.length || 1),
+          versions: r.versions || [],
+          drawingFiles: r.drawingFiles || [],
+          change_notes: r.change_notes || "",
           drawingTitle: r.drawingTitle || "",
           drawingSpecs: r.drawingSpecs || "",
           fileName: r.fileName || "",
@@ -198,49 +246,97 @@ export default function DesignManagement() {
 
     // 2. Add API Leads ONLY IF l.is_sent is True/1 (Explicitly Sent by Sales Person)
     apiLeads.forEach(l => {
-      const isSent = l.is_sent === true || l.is_sent === 1 || l.is_sent === "true" || l.is_sent === "1";
+      const isSent = l.is_sent === true || l.is_sent === 1 || l.is_sent === "true" || l.is_sent === "1" || l.cad_file || l.customer_layout;
       if (!isSent) return; // Skip leads that Sales Person has NOT sent to designer!
 
       const idKey = String(l.id).toLowerCase();
-      const drKey = `dr-${l.id}`;
-      const custName = (l.contact_person_name || l.customer_name || l.customer?.name || "").trim().toLowerCase();
+      const drKey = `lead-${l.id}`.toLowerCase();
+      const dsKey = `ds-${l.id}`.toLowerCase();
 
-      if (!seenKeys.has(idKey) && !seenKeys.has(drKey) && (!custName || !seenKeys.has(custName))) {
+      if (!seenKeys.has(idKey) && !seenKeys.has(drKey) && !seenKeys.has(dsKey)) {
         seenKeys.add(idKey);
         seenKeys.add(drKey);
-        if (custName) seenKeys.add(custName);
+        seenKeys.add(dsKey);
 
+        const coName = l.company_name || l.customer_name || l.customer?.name || "Client";
+        const contactPerson = l.contact_person_name || l.customer_name || "Contact";
+        const contactNumber = l.contact_person_number || l.customer_contact || l.customer?.contact_number || "—";
         const proj = l.project_name || l.company_name || "N/A";
         const loc = l.site_location || l.project_adderess || l.customer_address || l.customer?.site_address || "N/A";
         const reqs = compileLeadRequirements(l);
         const custLayoutName = l.customer_layout_name || l.cad_file_name || "";
         const custLayoutUrl = l.customer_layout_url || l.customer_layout || l.cad_file || "";
+        const salesPerson = l.assign_to_details?.full_name || l.assigned_to_details?.username || l.created_by_details?.full_name || "Sales Person";
+        const sentDt = l.created_at ? new Date(l.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : (l.date || "Recent");
 
         deduplicatedList.push({
-          id: `DR-${l.id}`,
+          id: `LEAD-${l.id}`,
+          reqNo: `DS-${l.id}`,
           leadId: l.id,
-          customerName: l.contact_person_name || l.customer_name || l.customer?.name || `Lead #${l.id}`,
+          salutation: coName.startsWith("M/s.") ? "M/s." : "M/s.",
+          clientCoName: coName.startsWith("M/s.") ? coName : `M/s. ${coName}`,
+          customerName: coName.startsWith("M/s.") ? coName : `M/s. ${coName}`,
           projectName: proj,
           companyName: proj,
+          projectAddress: loc,
           location: loc,
+          contactPersonSalutation: contactPerson.startsWith("MS.") ? "MS." : "MS.",
+          contactPerson: contactPerson.startsWith("MS.") || contactPerson.startsWith("Mr.") ? contactPerson : `MS. ${contactPerson}`,
+          contactNumber: contactNumber,
           requirements: reqs,
+          quantity: "As per STD",
+          remark: l.remarks || "-",
           customerLayoutName: custLayoutName,
           customerLayoutUrl: custLayoutUrl,
-          salesPersonName: l.assign_to_details?.full_name || "Pravin Dare",
+          salesPersonName: salesPerson,
           salesPersonEmail: l.assign_to_details?.email || "sales@nnit.com",
-          sentDate: l.date || new Date().toLocaleDateString(),
-          status: l.is_received ? "drawing_completed" : "pending_drawing",
+          sentDate: sentDt,
+          status: l.cad_file || l.is_received ? "drawing_completed" : "pending_drawing",
           is_sent: 1,
-          is_received: l.is_received ? 1 : 0,
-          drawingTitle: "",
+          is_received: l.is_received || l.cad_file ? 1 : 0,
+          current_version: 1,
+          versions: [],
+          drawingFiles: [],
+          change_notes: "",
+          drawingTitle: l.cad_file_name || "",
           drawingSpecs: "",
-          fileName: "",
+          fileName: l.cad_file_name || "",
           fileType: "autocad",
-          drawingUrl: "",
+          drawingUrl: l.cad_file || "",
           designerNotes: ""
         });
       }
     });
+
+    // If completely empty, seed sample request matching user's slip
+    if (deduplicatedList.length === 0) {
+      const sample = {
+        id: "DS-101",
+        reqNo: "DS-101",
+        salutation: "M/s.",
+        clientCoName: "M/s. Shree Associate",
+        customerName: "M/s. Shree Associate",
+        projectName: "Avdhut Residency",
+        projectAddress: "Guruwar peth",
+        location: "Guruwar peth",
+        contactPersonSalutation: "MS.",
+        contactPerson: "MS. Jigar Patel",
+        contactNumber: "9890907870",
+        requirements: "2DP101 STACK & 3DP304 STACK & CANTILEVER CP401",
+        quantity: "As per STD",
+        remark: "-",
+        customerLayoutName: "",
+        customerLayoutUrl: "",
+        salesPersonName: "Pravin Dare",
+        salesPersonEmail: "pravin123@gmail.com",
+        sentDate: new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
+        status: "pending_drawing",
+        is_sent: 1,
+        is_received: 0,
+      };
+      deduplicatedList.push(sample);
+      localStorage.setItem("nnit_design_requests", JSON.stringify([sample]));
+    }
 
     setDesignRequests(deduplicatedList);
   }, [compileLeadRequirements]);
@@ -257,378 +353,137 @@ export default function DesignManagement() {
   }, [fetchAllRequests]);
 
   // Modal States
-  const [showSendModal, setShowSendModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingRequest, setEditingRequest] = useState(null);
+  const [showSlipModal, setShowSlipModal] = useState(false);
+  const [slipRequest, setSlipRequest] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadRequest, setUploadRequest] = useState(null);
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [revisionRequest, setRevisionRequest] = useState(null);
+  const [showVersionModal, setShowVersionModal] = useState(false);
+  const [versionRequest, setVersionRequest] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
-  // Form State: Send to Designer
-  const [sendForm, setSendForm] = useState({
-    selectedLeadId: "",
-    customerName: "",
-    projectName: "",
-    location: "",
-    requirements: "",
-    customerLayoutName: "",
-    customerLayoutUrl: "",
-    customerLayoutFile: null
-  });
-
-  // Handle lead prefill selection
-  const handleSelectLeadToPrefill = useCallback(async (leadId, leadList = availableLeads) => {
-    if (!leadId) {
-      setSendForm({
-        selectedLeadId: "",
-        customerName: "",
-        projectName: "",
-        location: "",
-        requirements: "",
-        customerLayoutName: "",
-        customerLayoutUrl: "",
-        customerLayoutFile: null
-      });
-      return;
-    }
-
-    let lead = leadList.find(l => String(l.id) === String(leadId));
-
-    const token = localStorage.getItem("access");
-    const BASE_API = import.meta.env.VITE_BASE_API_URL;
-    if (token && BASE_API) {
-      try {
-        const res = await fetch(`${BASE_API}/lead/lead/${leadId}/`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const detailLead = await res.json();
-          lead = { ...lead, ...detailLead };
-        }
-      } catch (err) {
-        console.warn("Lead detail fetch fallback", err);
-      }
-    }
-
-    if (lead) {
-      const compiledReqs = compileLeadRequirements(lead);
-      setSendForm({
-        selectedLeadId: lead.id,
-        customerName: lead.contact_person_name || lead.customer_name || lead.customer?.name || "",
-        projectName: lead.project_name || lead.company_name || "",
-        location: lead.site_location || lead.project_adderess || lead.customer_address || lead.customer?.site_address || "",
-        requirements: compiledReqs,
-        customerLayoutName: lead.customer_layout_name || lead.cad_file_name || "",
-        customerLayoutUrl: lead.customer_layout_url || lead.customer_layout || lead.cad_file || "",
-        customerLayoutFile: null
-      });
-    }
-  }, [availableLeads, compileLeadRequirements]);
-
+  // Check URL params for auto-open
   useEffect(() => {
-    if (sendParam === "true" && leadIdParam) {
-      setShowSendModal(true);
-      handleSelectLeadToPrefill(leadIdParam);
+    if (sendParam === "true") {
+      setShowAddModal(true);
     }
-  }, [sendParam, leadIdParam, handleSelectLeadToPrefill]);
+  }, [sendParam]);
 
-  // Handle Customer Layout File upload by Sales Person
-  const handleCustomerLayoutChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setSendForm(prev => ({
-        ...prev,
-        customerLayoutName: file.name,
-        customerLayoutUrl: reader.result,
-        customerLayoutFile: file
-      }));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Form State: Designer Drawing Upload
-  const [uploadForm, setUploadForm] = useState({
-    drawingTitle: "",
-    drawingSpecs: "",
-    fileName: "",
-    fileType: "",
-    fileDataUrl: "",
-    drawingUrl: "",
-    designerNotes: ""
-  });
-
-  // Filtered requests based on search & status
+  // Filtered requests based on active tab, ownership & search/status
+  // Admin / Super Admin: sees ALL requests across system
+  // Sales Person / Staff: in Sales tab sees ONLY requests they created/sent
   const filteredRequests = useMemo(() => {
     return designRequests.filter(r => {
+      if (activeTab === "sales" && !isSuper) {
+        const isMine = isRequestOwnedByUser(r, { userRole, isSuperUser, userName, userData });
+        if (!isMine) return false;
+      }
+
       const matchSearch =
         searchQuery === "" ||
         r.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.reqNo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         r.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.clientCoName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         r.projectName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         r.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.projectAddress?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.contactPerson?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.contactNumber?.includes(searchQuery) ||
+        r.salesPersonName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         r.requirements?.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchStatus =
         statusFilter === "all" ||
-        (statusFilter === "pending" && r.status === "pending_drawing") ||
+        (statusFilter === "pending" && (r.status === "pending_drawing" || r.status === "revision_requested")) ||
+        (statusFilter === "revision" && r.status === "revision_requested") ||
         (statusFilter === "completed" && (r.status === "drawing_completed" || r.status === "attached_to_quotation"));
 
       return matchSearch && matchStatus;
     });
-  }, [designRequests, searchQuery, statusFilter]);
+  }, [designRequests, searchQuery, statusFilter, activeTab, isSuper, userRole, isSuperUser, userName, userData]);
 
-  // Metric Counts
+  // Metric Counts (Calculated for accessible requests)
+  const accessibleRequestsForMetrics = useMemo(() => {
+    if (isSuper) return designRequests;
+    return designRequests.filter(r => isRequestOwnedByUser(r, { userRole, isSuperUser, userName, userData }));
+  }, [designRequests, isSuper, userRole, isSuperUser, userName, userData]);
+
   const metrics = useMemo(() => {
-    const total = designRequests.length;
-    const pending = designRequests.filter(r => r.status === "pending_drawing").length;
-    const completed = designRequests.filter(r => r.status === "drawing_completed" || r.status === "attached_to_quotation").length;
-    const attached = designRequests.filter(r => r.status === "attached_to_quotation").length;
-    return { total, pending, completed, attached };
-  }, [designRequests]);
+    const list = accessibleRequestsForMetrics;
+    const total = list.length;
+    const pending = list.filter(r => r.status === "pending_drawing").length;
+    const revisions = list.filter(r => r.status === "revision_requested").length;
+    const completed = list.filter(r => r.status === "drawing_completed" || r.status === "attached_to_quotation").length;
+    const attached = list.filter(r => r.status === "attached_to_quotation").length;
+    return { total, pending, revisions, completed, attached };
+  }, [accessibleRequestsForMetrics]);
 
-  // Action 1: Sales Person Sends Lead to Designer
+  // Open New / Edit Designer Send Modal
   const handleOpenSendModal = () => {
-    setSendForm({
-      selectedLeadId: "",
-      customerName: "",
-      projectName: "",
-      location: "",
-      requirements: "",
-      customerLayoutName: "",
-      customerLayoutUrl: "",
-      customerLayoutFile: null
-    });
-    setShowSendModal(true);
+    setEditingRequest(null);
+    setShowAddModal(true);
   };
 
-  const handleSendToDesigner = async (e) => {
-    e.preventDefault();
-    if (!sendForm.customerName.trim() || !sendForm.requirements.trim()) {
-      Swal.fire("Required", "Please enter Customer Name and Site Requirements.", "warning");
-      return;
-    }
+  const handleEditRequest = (req) => {
+    setEditingRequest(req);
+    setShowAddModal(true);
+  };
 
-    const token = localStorage.getItem("access");
-    const BASE_API = import.meta.env.VITE_BASE_API_URL;
-    let targetLeadId = sendForm.selectedLeadId || Date.now();
+  // Delete Request
+  const handleDeleteRequest = async (req) => {
+    const confirm = await Swal.fire({
+      title: "Delete Request?",
+      text: `Are you sure you want to remove request for "${req.projectName || req.customerName}"?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      confirmButtonText: "Yes, Delete",
+    });
 
-    if (token && BASE_API) {
-      try {
-        if (sendForm.selectedLeadId) {
-          await fetch(`${BASE_API}/lead/lead/${sendForm.selectedLeadId}/send-to-designer/`, {
+    if (confirm.isConfirmed) {
+      setDesignRequests((prev) => {
+        const updated = prev.filter((item) => !isSameDesignRequest(item, req));
+        safeSaveDesignRequests(updated);
+        return updated;
+      });
+
+      if (BASE_API && req.leadId && token) {
+        try {
+          await fetch(`${BASE_API}/lead/lead/${req.leadId}/`, {
             method: "PATCH",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`
+              Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({
-              project_name: sendForm.projectName,
-              site_location: sendForm.location,
-              site_requirement: sendForm.requirements,
-              customer_layout_name: sendForm.customerLayoutName,
-              customer_layout_url: sendForm.customerLayoutUrl
-            })
+            body: JSON.stringify({ is_sent: false }),
           });
-        } else {
-          // Create customer + lead
-          const custRes = await fetch(`${BASE_API}/lead/customer/`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              name: sendForm.customerName,
-              site_address: sendForm.location,
-              contact_number: `9${Math.floor(100000000 + Math.random() * 900000000)}`
-            })
-          });
-          let customerId = null;
-          if (custRes.ok) {
-            const custData = await custRes.json();
-            customerId = custData.id;
-          }
-          if (customerId) {
-            const leadRes = await fetch(`${BASE_API}/lead/lead/`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                customer: customerId,
-                project_name: sendForm.projectName || "N/A",
-                company_name: sendForm.projectName || "N/A",
-                project_adderess: sendForm.location || "N/A",
-                site_location: sendForm.location || "N/A",
-                requirements_details: sendForm.requirements,
-                site_requirement: sendForm.requirements,
-                customer_layout_name: sendForm.customerLayoutName,
-                customer_layout_url: sendForm.customerLayoutUrl,
-                lead_source: "other",
-                is_sent: true,
-                is_received: false
-              })
-            });
-            if (leadRes.ok) {
-              const leadData = await leadRes.json();
-              targetLeadId = leadData.id;
-            }
-          }
+        } catch {
+          // ignore
         }
-      } catch (err) {
-        console.warn("Backend Lead send fallback to local storage", err);
       }
+
+      window.dispatchEvent(new Event("designRequestUpdated"));
+      window.dispatchEvent(new Event("storage"));
+      Swal.fire("Deleted!", "Request removed successfully.", "success");
     }
-
-    const newRequest = {
-      id: `DR-${targetLeadId}`,
-      leadId: targetLeadId,
-      customerName: sendForm.customerName,
-      projectName: sendForm.projectName || "N/A",
-      companyName: sendForm.projectName || "N/A",
-      location: sendForm.location || "N/A",
-      requirements: sendForm.requirements,
-      customerLayoutName: sendForm.customerLayoutName || "",
-      customerLayoutUrl: sendForm.customerLayoutUrl || "",
-      salesPersonName: currentUserName,
-      salesPersonEmail: currentUserEmail,
-      sentDate: new Date().toLocaleString(),
-      status: "pending_drawing",
-      is_sent: 1,
-      is_received: 0,
-      drawingTitle: "",
-      drawingSpecs: "",
-      fileName: "",
-      fileType: "",
-      drawingUrl: "",
-      designerNotes: "",
-      completedDate: "",
-      attachedToQuotation: false
-    };
-
-    setDesignRequests(prev => {
-      const filtered = prev.filter(r => String(r.leadId) !== String(targetLeadId) && String(r.id) !== String(newRequest.id));
-      const updated = [newRequest, ...filtered];
-      localStorage.setItem("nnit_design_requests", JSON.stringify(updated));
-      return updated;
-    });
-
-    window.dispatchEvent(new Event("designRequestUpdated"));
-    window.dispatchEvent(new Event("storage"));
-    setShowSendModal(false);
-    Swal.fire({
-      title: "Sent to Designer!",
-      text: `Lead for ${sendForm.customerName} (${sendForm.projectName || "Project"}) sent to Designer Queue. (Sent: Yes, Received: No)`,
-      icon: "success",
-      confirmButtonColor: "#4f46e5"
-    });
   };
 
   // Action 2: Designer Opens Upload Modal
   const handleOpenUploadModal = (req) => {
-    setSelectedRequest(req);
-    setUploadForm({
-      drawingTitle: req.drawingTitle || `${req.customerName} Gate Layout Plan`,
-      drawingSpecs: req.drawingSpecs || "AutoCAD CAD Drawing & Site Specification Plan",
-      fileName: req.fileName || "",
-      fileType: req.fileType || "autocad",
-      fileDataUrl: req.drawingUrl || "",
-      drawingUrl: req.drawingUrl || "",
-      designerNotes: req.designerNotes || "AutoCAD drawing completed according to site specifications."
-    });
+    setUploadRequest(req);
     setShowUploadModal(true);
-  };
-
-  // File Picker Handler for AutoCAD, PDF, Images, Zip, Any format
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const ext = file.name.split(".").pop().toLowerCase();
-    let type = "other";
-    if (ext === "dwg" || ext === "dxf") type = "autocad";
-    else if (ext === "pdf") type = "pdf";
-    else if (["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) type = "image";
-    else if (["zip", "rar", "7z"].includes(ext)) type = "archive";
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setUploadForm(prev => ({
-        ...prev,
-        fileName: file.name,
-        fileType: type,
-        fileDataUrl: reader.result,
-        drawingUrl: reader.result
-      }));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Action 3: Designer Submits Drawing & Returns to Sales
-  const handleDesignerSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedRequest) return;
-
-    if (selectedRequest.leadId && token && BASE_API) {
-      fetch(`${BASE_API}/lead/lead/${selectedRequest.leadId}/`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ is_sent: true, is_received: true })
-      }).catch(() => {});
-    }
-
-    setDesignRequests(prev => {
-      const updated = prev.map(r => {
-        const isMatch = (
-          String(r.id) === String(selectedRequest.id) ||
-          String(r.leadId) === String(selectedRequest.leadId) ||
-          (r.customerName && selectedRequest.customerName && (
-            r.customerName.toLowerCase() === selectedRequest.customerName.toLowerCase()
-          ))
-        );
-
-        if (isMatch) {
-          return {
-            ...r,
-            status: "drawing_completed",
-            is_sent: 1,
-            is_received: 1,
-            drawingTitle: uploadForm.drawingTitle || `${selectedRequest.customerName} Gate Layout Plan`,
-            drawingSpecs: uploadForm.drawingSpecs || "AutoCAD CAD Drawing & Site Specification",
-            fileName: uploadForm.fileName || "AutoCAD_Drawing_Plan.dwg",
-            fileType: uploadForm.fileType || "autocad",
-            drawingUrl: uploadForm.fileDataUrl || uploadForm.drawingUrl || "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=60",
-            designerNotes: uploadForm.designerNotes,
-            completedDate: new Date().toLocaleString()
-          };
-        }
-        return r;
-      });
-      localStorage.setItem("nnit_design_requests", JSON.stringify(updated));
-      return updated;
-    });
-
-    setShowUploadModal(false);
-    window.dispatchEvent(new Event("designRequestUpdated"));
-    window.dispatchEvent(new Event("storage"));
-    Swal.fire({
-      title: "Drawing Returned to Sales!",
-      text: `Drawing (${uploadForm.fileName || "File"}) sent to Sales (Sent: Yes, Received: Yes).`,
-      icon: "success",
-      confirmButtonColor: "#10b981"
-    });
   };
 
   // Action 4: Sales Person Attaches Drawing to Quotation
   const handleAttachToQuotation = (req) => {
     setDesignRequests(prev => {
-      const updated = prev.map(r => (r.id === req.id ? { ...r, status: "attached_to_quotation", attachedToQuotation: true } : r));
-      localStorage.setItem("nnit_design_requests", JSON.stringify(updated));
+      const updated = prev.map(r => (isSameDesignRequest(r, req) ? { ...r, status: "attached_to_quotation", attachedToQuotation: true } : r));
+      safeSaveDesignRequests(updated);
       return updated;
     });
     window.dispatchEvent(new Event("designRequestUpdated"));
@@ -843,135 +698,242 @@ export default function DesignManagement() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-100/70 text-slate-600 font-extrabold border-b border-slate-200/80 uppercase tracking-wider text-[11px]">
-                    <th className="py-3.5 px-4 w-24">Req ID</th>
-                    <th className="py-3.5 px-4">Customer & Project</th>
-                    <th className="py-3.5 px-4">Site Location</th>
-                    <th className="py-3.5 px-4 max-w-xs">Requirements & Specs</th>
+                  <tr className="bg-slate-100/70 text-slate-700 font-extrabold border-b border-slate-200/80 uppercase tracking-wider text-[11px]">
+                    <th className="py-3.5 px-3 w-20">Req #</th>
+                    <th className="py-3.5 px-3 w-16 text-center">Version</th>
+                    <th className="py-3.5 px-4">Client / Co & Project</th>
+                    <th className="py-3.5 px-4">Project Add</th>
+                    <th className="py-3.5 px-4">Contact Person</th>
+                    <th className="py-3.5 px-4 max-w-xs">Requirements 's</th>
                     <th className="py-3.5 px-4">Customer Layout</th>
-                    <th className="py-3.5 px-4 text-center">Sales Sent</th>
-                    <th className="py-3.5 px-4 text-center">Designer Sent</th>
+                    <th className="py-3.5 px-4">Sales Person (Sent By)</th>
+                    <th className="py-3.5 px-4">Sent Date & Time</th>
                     <th className="py-3.5 px-4">Drawing Status</th>
-                    <th className="py-3.5 px-4 text-center">Drawing Action</th>
+                    <th className="py-3.5 px-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {filteredRequests.length > 0 ? (
-                    filteredRequests.map(req => (
-                      <tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-3.5 px-4 font-black text-indigo-600 text-xs">{req.id}</td>
-                        <td className="py-3.5 px-4">
-                          <div className="font-extrabold text-slate-900 text-xs">{req.customerName}</div>
-                          <div className="text-xs text-indigo-600 font-semibold flex items-center gap-1 mt-0.5">
-                            <FiFolder className="w-3.5 h-3.5 shrink-0" />
-                            <span>{req.projectName || req.companyName || "N/A"}</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-slate-700 max-w-xs">
-                          {req.location && req.location !== "N/A" ? (
-                            <div className="flex items-center gap-1.5 text-slate-700">
-                              <FiMapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                              <span className="truncate max-w-[130px]">{req.location}</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 font-normal">—</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 max-w-sm">
-                          {req.requirements ? (
-                            <div
-                              className="text-slate-800 font-medium text-[11px] max-h-20 overflow-y-auto whitespace-pre-line leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-200/80 hover:border-indigo-300 transition"
-                              title={req.requirements}
+                    filteredRequests.map(req => {
+                      const verNo = req.current_version || (req.versions?.length || 1);
+                      return (
+                        <tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3.5 px-3">
+                            <span className="font-mono font-bold text-xs text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-200">
+                              {req.reqNo || req.id}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-3 text-center">
+                            <button
+                              onClick={() => {
+                                setVersionRequest(req);
+                                setShowVersionModal(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 cursor-pointer shadow-2xs transition"
+                              title="Click to view Version Timeline & History"
                             >
-                              {req.requirements}
+                              <FiLayers className="w-3 h-3 text-indigo-500" />
+                              <span>V{verNo}</span>
+                            </button>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-extrabold text-slate-900 text-xs">{req.clientCoName || req.customerName}</div>
+                            <div className="text-xs text-indigo-600 font-semibold flex items-center gap-1 mt-0.5">
+                              <FiFolder className="w-3.5 h-3.5 shrink-0" />
+                              <span>{req.projectName || "N/A"}</span>
                             </div>
-                          ) : (
-                            <span className="text-slate-400 italic text-xs">No specs provided</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {req.customerLayoutName || req.customerLayoutUrl ? (
-                            <a
-                              href={req.customerLayoutUrl || "#"}
-                              target="_blank"
-                              rel="noreferrer"
-                              download={req.customerLayoutName}
-                              className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 border border-indigo-200/80 w-max transition cursor-pointer shadow-2xs"
-                            >
-                              <FiPaperclip className="w-3.5 h-3.5" />
-                              <span className="truncate max-w-[100px]">{req.customerLayoutName || "View Layout"}</span>
-                            </a>
-                          ) : (
-                            <span className="text-slate-400 text-xs font-normal">—</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${req.is_sent ? "bg-indigo-50 text-indigo-700 border border-indigo-200/80" : "bg-slate-100 text-slate-400"}`}>
-                            {req.is_sent ? "✓ Sent" : "No"}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${req.is_received ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80" : "bg-amber-50 text-amber-700 border border-amber-200/80"}`}>
-                            {req.is_received ? "✓ Yes" : "⏳ Pending"}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {req.status === "pending_drawing" && (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
-                              <FiClock className="w-3.5 h-3.5" /> Pending Drawing
-                            </span>
-                          )}
-                          {req.status === "drawing_completed" && (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                              <FiCheckCircle className="w-3.5 h-3.5" /> Drawing Ready
-                            </span>
-                          )}
-                          {req.status === "attached_to_quotation" && (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
-                              <FiPaperclip className="w-3.5 h-3.5" /> Quote Attached
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center justify-center gap-2">
+                          </td>
+                          <td className="py-3.5 px-4 font-medium text-slate-700 max-w-xs">
+                            {(req.projectAddress || req.location) && (req.projectAddress || req.location) !== "N/A" ? (
+                              <div className="flex items-center gap-1.5 text-slate-700">
+                                <FiMapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                <span className="truncate max-w-[130px]">{req.projectAddress || req.location}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 font-normal">—</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-800 text-xs">{req.contactPerson || "—"}</div>
+                            {req.contactNumber && req.contactNumber !== "—" && (
+                              <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500 mt-0.5">
+                                <span>{req.contactNumber}</span>
+                                <a
+                                  href={`https://wa.me/91${req.contactNumber.replace(/\D/g, "")}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-600 hover:text-emerald-700 p-0.5"
+                                  title="WhatsApp"
+                                >
+                                  <IoLogoWhatsapp className="w-3.5 h-3.5" />
+                                </a>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 max-w-xs">
+                            {req.requirements ? (
+                              <div
+                                className="text-slate-800 font-medium text-[11px] max-h-20 overflow-y-auto whitespace-pre-line leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-200/80 hover:border-indigo-300 transition"
+                                title={req.requirements}
+                              >
+                                {req.requirements}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic text-xs">No specs provided</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {req.customerLayoutName || req.customerLayoutUrl ? (
+                              <a
+                                href={req.customerLayoutUrl || "#"}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={req.customerLayoutName}
+                                className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 border border-indigo-200/80 w-max transition cursor-pointer shadow-2xs"
+                              >
+                                <FiPaperclip className="w-3.5 h-3.5" />
+                                <span className="truncate max-w-[100px]">{req.customerLayoutName || "View Layout"}</span>
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 text-xs font-normal">—</span>
+                            )}
+                          </td>
+                          {/* Sales Person (Sent By) */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                              <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                                👤
+                              </span>
+                              <span className="truncate max-w-[110px]">
+                                {(req.salesPersonName && req.salesPersonName !== "Sales Person")
+                                  ? req.salesPersonName
+                                  : (currentRole === "sales" ? currentUserName : (req.salesPersonName || "Sales Person"))}
+                              </span>
+                            </div>
+                          </td>
+                          {/* Sent Date & Time */}
+                          <td className="py-3.5 px-4 whitespace-nowrap text-xs font-semibold text-slate-700">
+                            <div className="flex items-center gap-1 text-slate-600">
+                              <FiClock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{req.sentDate || "—"}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {req.status === "revision_requested" && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 animate-pulse">
+                                <FiRepeat className="w-3.5 h-3.5 text-purple-600" /> Revision Req (V{verNo})
+                              </span>
+                            )}
                             {req.status === "pending_drawing" && (
-                              <span className="px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200/80 rounded-xl font-semibold text-xs flex items-center gap-1">
-                                <FiClock className="w-3.5 h-3.5 text-amber-600" />
-                                <span>In Queue</span>
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
+                                <FiClock className="w-3.5 h-3.5" /> In Queue (V{verNo})
                               </span>
                             )}
                             {req.status === "drawing_completed" && (
-                              <button
-                                onClick={() => handleAttachToQuotation(req)}
-                                className="w-8 h-8 rounded-full bg-[#00ac4f] hover:bg-[#009643] text-white flex items-center justify-center transition shadow-2xs cursor-pointer shrink-0"
-                                title="Attach to Quotation"
-                              >
-                                <FiPaperclip className="w-4 h-4 text-white" />
-                              </button>
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                                <FiCheckCircle className="w-3.5 h-3.5" /> Drawing Ready (V{verNo})
+                              </span>
                             )}
                             {req.status === "attached_to_quotation" && (
-                              <button
-                                onClick={() => navigate("/quotation")}
-                                className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition shadow-2xs cursor-pointer shrink-0"
-                                title="View Quotation"
-                              >
-                                <FiFileText className="w-4 h-4 text-white" />
-                              </button>
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
+                                <FiPaperclip className="w-3.5 h-3.5" /> Quote Attached (V{verNo})
+                              </span>
                             )}
-                            <button
-                              onClick={() => { setSelectedRequest(req); setShowViewModal(true); }}
-                              className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
-                              title="View Details"
-                            >
-                              <FiEye className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Request Revision / Change Requirements */}
+                              <button
+                                onClick={() => {
+                                  setRevisionRequest(req);
+                                  setShowRevisionModal(true);
+                                }}
+                                className="w-8 h-8 rounded-full bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+                                title="Request Revision / Change Requirements"
+                              >
+                                <FiRepeat className="w-4 h-4" />
+                              </button>
+
+                              {/* Version History Button */}
+                              <button
+                                onClick={() => {
+                                  setVersionRequest(req);
+                                  setShowVersionModal(true);
+                                }}
+                                className="w-8 h-8 rounded-full bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+                                title="View Version History Timeline"
+                              >
+                                <FiLayers className="w-4 h-4" />
+                              </button>
+
+                              {/* View / Print Slip */}
+                              <button
+                                onClick={() => {
+                                  setSlipRequest(req);
+                                  setShowSlipModal(true);
+                                }}
+                                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-700 text-slate-700 hover:text-white flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+                                title="View & Print Slip"
+                              >
+                                <FiPrinter className="w-4 h-4" />
+                              </button>
+
+                              {/* Edit Request */}
+                              <button
+                                onClick={() => handleEditRequest(req)}
+                                className="w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+                                title="Edit Request"
+                              >
+                                <MdEdit className="w-4 h-4" />
+                              </button>
+
+                              {/* Delete Request */}
+                              <button
+                                onClick={() => handleDeleteRequest(req)}
+                                className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+                                title="Delete Request"
+                              >
+                                <MdDelete className="w-4 h-4" />
+                              </button>
+
+                              {/* Attach to Quotation if completed */}
+                              {req.status === "drawing_completed" && (
+                                <button
+                                  onClick={() => handleAttachToQuotation(req)}
+                                  className="w-8 h-8 rounded-full bg-[#00ac4f] hover:bg-[#009643] text-white flex items-center justify-center transition shadow-2xs cursor-pointer shrink-0"
+                                  title="Attach to Quotation"
+                                >
+                                  <FiPaperclip className="w-4 h-4 text-white" />
+                                </button>
+                              )}
+
+                              {/* View Quotation if attached */}
+                              {req.status === "attached_to_quotation" && (
+                                <button
+                                  onClick={() => navigate("/quotation")}
+                                  className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition shadow-2xs cursor-pointer shrink-0"
+                                  title="View Quotation"
+                                >
+                                  <FiFileText className="w-4 h-4 text-white" />
+                                </button>
+                              )}
+
+                              {/* View Details */}
+                              <button
+                                onClick={() => { setSelectedRequest(req); setShowViewModal(true); }}
+                                className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+                                title="View Full Details"
+                              >
+                                <FiEye className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
+                      <td colSpan={11} className="py-12 text-center text-slate-400 font-medium">
                         No design requests found. Click "Send Lead to Designer" above to create one.
                       </td>
                     </tr>
@@ -993,7 +955,7 @@ export default function DesignManagement() {
                 </span>
               </h3>
               <span className="text-xs text-slate-500 font-medium hidden sm:inline">
-                Upload AutoCAD (.dwg/.dxf), PDF, or layout files and send to Sales
+                Upload CAD (.dwg/.dxf), PDF, or layout files and send to Sales • Multiple file support & Revisions
               </span>
             </div>
 
@@ -1001,116 +963,196 @@ export default function DesignManagement() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-100/70 text-slate-600 font-extrabold border-b border-slate-200/80 uppercase tracking-wider text-[11px]">
-                    <th className="py-3.5 px-4 w-24">Req ID</th>
-                    <th className="py-3.5 px-4">Customer & Project</th>
-                    <th className="py-3.5 px-4">Site Location</th>
-                    <th className="py-3.5 px-4 max-w-xs">Requirements & Specs</th>
+                    <th className="py-3.5 px-3 w-20">Req #</th>
+                    <th className="py-3.5 px-3 w-16 text-center">Version</th>
+                    <th className="py-3.5 px-4">Client / Co & Project</th>
+                    <th className="py-3.5 px-4">Project Add</th>
+                    <th className="py-3.5 px-4">Contact Person</th>
+                    <th className="py-3.5 px-4 max-w-xs">Requirements 's</th>
                     <th className="py-3.5 px-4">Customer Layout</th>
-                    <th className="py-3.5 px-4 text-center">Sales Sent</th>
-                    <th className="py-3.5 px-4 text-center">Designer Sent</th>
+                    <th className="py-3.5 px-4">Sales Person (Sent By)</th>
+                    <th className="py-3.5 px-4">Sent Date & Time</th>
                     <th className="py-3.5 px-4">Design Status</th>
                     <th className="py-3.5 px-4 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {filteredRequests.length > 0 ? (
-                    filteredRequests.map(req => (
-                      <tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-3.5 px-4 font-black text-indigo-600 text-xs">{req.id}</td>
-                        <td className="py-3.5 px-4">
-                          <div className="font-extrabold text-slate-900 text-xs">{req.customerName}</div>
-                          <div className="text-xs text-indigo-600 font-semibold flex items-center gap-1 mt-0.5">
-                            <FiFolder className="w-3.5 h-3.5 shrink-0" />
-                            <span>{req.projectName || req.companyName || "N/A"}</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-slate-700 max-w-xs">
-                          {req.location && req.location !== "N/A" ? (
-                            <div className="flex items-center gap-1.5 text-slate-700">
-                              <FiMapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                              <span className="truncate max-w-[130px]">{req.location}</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 font-normal">—</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 max-w-sm">
-                          {req.requirements ? (
-                            <div
-                              className="text-slate-800 font-medium text-[11px] max-h-20 overflow-y-auto whitespace-pre-line leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-200/80 hover:border-indigo-300 transition"
-                              title={req.requirements}
-                            >
-                              {req.requirements}
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 italic text-xs">No specs provided</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {req.customerLayoutName || req.customerLayoutUrl ? (
-                            <a
-                              href={req.customerLayoutUrl || "#"}
-                              target="_blank"
-                              rel="noreferrer"
-                              download={req.customerLayoutName}
-                              className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 border border-indigo-200/80 w-max transition cursor-pointer shadow-2xs"
-                            >
-                              <FiPaperclip className="w-3.5 h-3.5" />
-                              <span className="truncate max-w-[100px]">{req.customerLayoutName || "View Layout"}</span>
-                            </a>
-                          ) : (
-                            <span className="text-slate-400 text-xs font-normal">—</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${req.is_sent ? "bg-indigo-50 text-indigo-700 border border-indigo-200/80" : "bg-slate-100 text-slate-400"}`}>
-                            {req.is_sent ? "✓ Sent" : "No"}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${req.is_received ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80" : "bg-amber-50 text-amber-700 border border-amber-200/80"}`}>
-                            {req.is_received ? "✓ Yes" : "⏳ Pending"}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {req.status === "pending_drawing" ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
-                              <FiClock className="w-3.5 h-3.5" /> Pending Drawing
+                    filteredRequests.map(req => {
+                      const verNo = req.current_version || (req.versions?.length || 1);
+                      return (
+                        <tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3.5 px-3">
+                            <span className="font-mono font-bold text-xs text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-200">
+                              {req.reqNo || req.id}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                              <FiCheckCircle className="w-3.5 h-3.5" /> Completed
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center justify-center gap-2">
+                          </td>
+                          <td className="py-3.5 px-3 text-center">
                             <button
-                              onClick={() => handleOpenUploadModal(req)}
-                              className={`w-8 h-8 rounded-full flex items-center justify-center transition shadow-2xs cursor-pointer shrink-0 ${
-                                req.status === "pending_drawing"
-                                  ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                                  : "bg-amber-500 hover:bg-amber-600 text-white"
-                              }`}
-                              title={req.status === "pending_drawing" ? "Upload CAD Drawing" : "Edit CAD Drawing"}
+                              onClick={() => {
+                                setVersionRequest(req);
+                                setShowVersionModal(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 cursor-pointer shadow-2xs transition"
+                              title="Click to view Version Timeline & History"
                             >
-                              <FiUpload className="w-4 h-4 text-white" />
+                              <FiLayers className="w-3 h-3 text-indigo-500" />
+                              <span>V{verNo}</span>
                             </button>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-extrabold text-slate-900 text-xs">{req.clientCoName || req.customerName}</div>
+                            <div className="text-xs text-indigo-600 font-semibold flex items-center gap-1 mt-0.5">
+                              <FiFolder className="w-3.5 h-3.5 shrink-0" />
+                              <span>{req.projectName || "N/A"}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 font-medium text-slate-700 max-w-xs">
+                            {(req.projectAddress || req.location) && (req.projectAddress || req.location) !== "N/A" ? (
+                              <div className="flex items-center gap-1.5 text-slate-700">
+                                <FiMapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                <span className="truncate max-w-[130px]">{req.projectAddress || req.location}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 font-normal">—</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-800 text-xs">{req.contactPerson || "—"}</div>
+                            {req.contactNumber && req.contactNumber !== "—" && (
+                              <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500 mt-0.5">
+                                <span>{req.contactNumber}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 max-w-sm">
+                            {req.requirements ? (
+                              <div
+                                className="text-slate-800 font-medium text-[11px] max-h-20 overflow-y-auto whitespace-pre-line leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-200/80 hover:border-indigo-300 transition"
+                                title={req.requirements}
+                              >
+                                {req.requirements}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic text-xs">No specs provided</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {req.customerLayoutName || req.customerLayoutUrl ? (
+                              <a
+                                href={req.customerLayoutUrl || "#"}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={req.customerLayoutName}
+                                className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 border border-indigo-200/80 w-max transition cursor-pointer shadow-2xs"
+                              >
+                                <FiPaperclip className="w-3.5 h-3.5" />
+                                <span className="truncate max-w-[100px]">{req.customerLayoutName || "View Layout"}</span>
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 text-xs font-normal">—</span>
+                            )}
+                          </td>
+                          {/* Sales Person (Sent By) */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                              <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                                👤
+                              </span>
+                              <span className="truncate max-w-[110px]">
+                                {(req.salesPersonName && req.salesPersonName !== "Sales Person")
+                                  ? req.salesPersonName
+                                  : (currentRole === "sales" ? currentUserName : (req.salesPersonName || "Sales Person"))}
+                              </span>
+                            </div>
+                          </td>
+                          {/* Sent Date & Time */}
+                          <td className="py-3.5 px-4 whitespace-nowrap text-xs font-semibold text-slate-700">
+                            <div className="flex items-center gap-1 text-slate-600">
+                              <FiClock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{req.sentDate || "—"}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {req.status === "revision_requested" && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 animate-pulse">
+                                <FiRepeat className="w-3.5 h-3.5 text-purple-600" /> Revision Req (V{verNo})
+                              </span>
+                            )}
+                            {req.status === "pending_drawing" && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
+                                <FiClock className="w-3.5 h-3.5" /> Pending Drawing (V{verNo})
+                              </span>
+                            )}
+                            {(req.status === "drawing_completed" || req.status === "attached_to_quotation") && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                                <FiCheckCircle className="w-3.5 h-3.5" /> Completed (V{verNo})
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Upload CAD Drawing */}
+                              <button
+                                onClick={() => handleOpenUploadModal(req)}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center transition shadow-2xs cursor-pointer shrink-0 ${
+                                  req.status === "revision_requested"
+                                    ? "bg-purple-600 hover:bg-purple-700 text-white"
+                                    : req.status === "pending_drawing"
+                                    ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                                    : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                }`}
+                                title={
+                                  req.status === "revision_requested"
+                                    ? `Upload Revised CAD Drawings (V${verNo})`
+                                    : req.status === "pending_drawing"
+                                    ? "Upload CAD Drawings"
+                                    : "Edit / Add CAD Drawings"
+                                }
+                              >
+                                <FiUpload className="w-4 h-4 text-white" />
+                              </button>
 
-                            <button
-                              onClick={() => { setSelectedRequest(req); setShowViewModal(true); }}
-                              className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
-                              title="View Details"
-                            >
-                              <FiEye className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              {/* Version History Button */}
+                              <button
+                                onClick={() => {
+                                  setVersionRequest(req);
+                                  setShowVersionModal(true);
+                                }}
+                                className="w-8 h-8 rounded-full bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+                                title="View Version History"
+                              >
+                                <FiLayers className="w-4 h-4" />
+                              </button>
+
+                              {/* View Slip */}
+                              <button
+                                onClick={() => {
+                                  setSlipRequest(req);
+                                  setShowSlipModal(true);
+                                }}
+                                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-700 text-slate-700 hover:text-white flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+                                title="View & Print Slip"
+                              >
+                                <FiPrinter className="w-4 h-4" />
+                              </button>
+
+                              {/* View Details */}
+                              <button
+                                onClick={() => { setSelectedRequest(req); setShowViewModal(true); }}
+                                className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition cursor-pointer shadow-2xs shrink-0"
+                                title="View Details"
+                              >
+                                <FiEye className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
+                      <td colSpan={11} className="py-12 text-center text-slate-400 font-medium">
                         No design requests in Designer Queue.
                       </td>
                     </tr>
@@ -1121,215 +1163,81 @@ export default function DesignManagement() {
           </div>
         )}
 
-        {/* ── MODAL 1: SEND LEAD TO DESIGNER ── */}
-        {showSendModal && (
-          <div className="fixed inset-0 bg-black/60 z-[1200] flex items-center justify-center p-4 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fadeIn">
-              <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
-                <h3 className="font-extrabold text-base flex items-center gap-2">
-                  <FiSend className="text-indigo-400" />
-                  <span>Send Lead Details to Designer Queue</span>
-                </h3>
-                <button onClick={() => setShowSendModal(false)} className="text-slate-400 hover:text-white p-1 cursor-pointer">
-                  <FiX className="w-5 h-5" />
-                </button>
-              </div>
+        {/* ── MODAL 1: ADD / EDIT DESIGNER REQUEST (Full Slip Format) ── */}
+        <AddDesignerSendModal
+          open={showAddModal}
+          onClose={() => {
+            setShowAddModal(false);
+            setEditingRequest(null);
+          }}
+          onSuccess={() => fetchAllRequests()}
+          baseApi={BASE_API}
+          token={token}
+          initialData={editingRequest}
+        />
 
-              <form onSubmit={handleSendToDesigner} className="p-6 space-y-4 text-xs">
-                {availableLeads.length > 0 && (
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Select Lead from System (Optional)</label>
-                    <select
-                      value={sendForm.selectedLeadId}
-                      onChange={e => handleSelectLeadToPrefill(e.target.value)}
-                      className="w-full border border-slate-300 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800"
-                    >
-                      <option value="">-- Manual Entry / Create New Request --</option>
-                      {availableLeads.map(l => (
-                        <option key={l.id} value={l.id}>
-                          Lead #{l.id} — {l.contact_person_name || l.customer_name || l.customer?.name} ({l.project_name || l.company_name || "Project"})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+        {/* ── MODAL: DESIGNER SLIP VIEW & PRINT (Exact Physical Slip Format) ── */}
+        <DesignerSlipModal
+          open={showSlipModal}
+          onClose={() => {
+            setShowSlipModal(false);
+            setSlipRequest(null);
+          }}
+          request={slipRequest}
+        />
 
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">1. Project Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Sharma Residency / Apex Horizon Project"
-                    value={sendForm.projectName}
-                    onChange={e => setSendForm({ ...sendForm, projectName: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900"
-                  />
-                </div>
+        {/* ── MODAL 2: DESIGNER MULTI-FILE UPLOAD & REVISION MODAL ── */}
+        <DesignerUploadModal
+          open={showUploadModal}
+          onClose={() => {
+            setShowUploadModal(false);
+            setUploadRequest(null);
+          }}
+          request={uploadRequest}
+          onSuccess={() => {
+            fetchAllRequests();
+            setShowUploadModal(false);
+            setUploadRequest(null);
+          }}
+          baseApi={BASE_API}
+          token={token}
+        />
 
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">2. Customer Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. BHARAT MANOJ SHARMA"
-                    value={sendForm.customerName}
-                    onChange={e => setSendForm({ ...sendForm, customerName: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900"
-                  />
-                </div>
+        {/* ── MODAL 3: SALES REVISION REQUEST MODAL (Change Requirements) ── */}
+        <SalesRevisionModal
+          open={showRevisionModal}
+          onClose={() => {
+            setShowRevisionModal(false);
+            setRevisionRequest(null);
+          }}
+          request={revisionRequest}
+          onSuccess={() => {
+            fetchAllRequests();
+            setShowRevisionModal(false);
+            setRevisionRequest(null);
+          }}
+          baseApi={BASE_API}
+          token={token}
+        />
 
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">3. Site Location / Address *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Plot No 42, Sector 62, Noida, Uttar Pradesh"
-                    value={sendForm.location}
-                    onChange={e => setSendForm({ ...sendForm, location: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800"
-                  />
-                </div>
+        {/* ── MODAL 4: DESIGN VERSION HISTORY TIMELINE ── */}
+        <DesignVersionHistoryModal
+          open={showVersionModal}
+          onClose={() => {
+            setShowVersionModal(false);
+            setVersionRequest(null);
+          }}
+          request={versionRequest}
+        />
 
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">4. Site Requirement & Specs *</label>
-                  <textarea
-                    rows={4}
-                    required
-                    placeholder="Specify boom barrier length, pit parking details..."
-                    value={sendForm.requirements}
-                    onChange={e => setSendForm({ ...sendForm, requirements: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    5. Customer Provided Layout File (Image, PDF, DWG, Zip)
-                  </label>
-                  <input
-                    type="file"
-                    accept=".dwg,.dxf,.pdf,.png,.jpg,.jpeg,.zip,.rar"
-                    onChange={handleCustomerLayoutChange}
-                    className="w-full border border-slate-300 rounded-xl p-2 focus:ring-2 focus:ring-indigo-500 bg-slate-50 text-xs"
-                  />
-                  {sendForm.customerLayoutName && (
-                    <div className="mt-2 text-xs font-bold text-indigo-900 flex items-center justify-between bg-indigo-50 p-2.5 rounded-xl border border-indigo-200">
-                      <span className="flex items-center gap-1.5 truncate">
-                        <FiPaperclip className="text-indigo-600 shrink-0" />
-                        Attached: {sendForm.customerLayoutName}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setShowSendModal(false)}
-                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm cursor-pointer transition"
-                  >
-                    Submit to Designer Queue
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ── MODAL 2: DESIGNER UPLOADS DWG / PDF / FILE ── */}
-        {showUploadModal && selectedRequest && (
-          <div className="fixed inset-0 bg-black/60 z-[1200] flex items-center justify-center p-4 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fadeIn">
-              <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
-                <h3 className="font-extrabold text-base flex items-center gap-2">
-                  <FiUpload className="text-emerald-400" />
-                  <span>Upload Drawing File & Return to Sales</span>
-                </h3>
-                <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-white p-1 cursor-pointer">
-                  <FiX className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleDesignerSubmit} className="p-6 space-y-4 text-xs">
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium space-y-1.5">
-                  <div><strong className="text-indigo-900">Project: </strong>{selectedRequest.projectName || selectedRequest.companyName}</div>
-                  <div><strong className="text-indigo-900">Customer: </strong>{selectedRequest.customerName}</div>
-                  <div><strong className="text-indigo-900">Location: </strong>{selectedRequest.location}</div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Drawing Title *</label>
-                  <input
-                    type="text"
-                    required
-                    value={uploadForm.drawingTitle}
-                    onChange={e => setUploadForm({ ...uploadForm, drawingTitle: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Attach Completed Drawing File (.dwg, PDF, Image, ZIP) *
-                  </label>
-                  <input
-                    type="file"
-                    accept=".dwg,.dxf,.pdf,.png,.jpg,.jpeg,.zip,.rar"
-                    onChange={handleFileChange}
-                    className="w-full border border-slate-300 rounded-xl p-2 focus:ring-2 focus:ring-emerald-500 bg-slate-50"
-                  />
-                  {uploadForm.fileName && (
-                    <div className="mt-2 text-xs font-bold text-slate-700 flex items-center gap-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
-                      <FiPaperclip className="text-emerald-600" />
-                      <span>Selected: {uploadForm.fileName}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Designer Remarks</label>
-                  <textarea
-                    rows={2}
-                    value={uploadForm.designerNotes}
-                    onChange={e => setUploadForm({ ...uploadForm, designerNotes: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-emerald-500 font-medium"
-                  />
-                </div>
-
-                <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setShowUploadModal(false)}
-                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm flex items-center gap-1.5 cursor-pointer transition"
-                  >
-                    <FiCornerDownLeft /> Return to Sales
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ── MODAL 3: VIEW ALL DETAILS ── */}
+        {/* ── MODAL 5: VIEW ALL DETAILS PREVIEW ── */}
         {showViewModal && selectedRequest && (
           <div className="fixed inset-0 bg-black/60 z-[1200] flex items-center justify-center p-4 backdrop-blur-xs">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fadeIn">
               <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
                 <h3 className="font-extrabold text-base flex items-center gap-2">
                   <FiFileText className="text-indigo-400" />
-                  <span>Request Details — {selectedRequest.id}</span>
+                  <span>Request Details — {selectedRequest.reqNo || selectedRequest.id}</span>
                 </h3>
                 <button onClick={() => setShowViewModal(false)} className="text-slate-400 hover:text-white p-1 cursor-pointer">
                   <FiX className="w-5 h-5" />
@@ -1343,13 +1251,28 @@ export default function DesignManagement() {
                     <span className="font-black text-indigo-700 text-sm">{selectedRequest.projectName || selectedRequest.companyName || "N/A"}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-bold block text-[10px] uppercase tracking-wider">CUSTOMER NAME</span>
-                    <span className="font-black text-slate-900 text-sm">{selectedRequest.customerName}</span>
+                    <span className="text-slate-400 font-bold block text-[10px] uppercase tracking-wider">CLIENT / CUSTOMER</span>
+                    <span className="font-black text-slate-900 text-sm">{selectedRequest.clientCoName || selectedRequest.customerName}</span>
                   </div>
                   <div className="col-span-2">
                     <span className="text-slate-400 font-bold block text-[10px] uppercase tracking-wider">SITE LOCATION</span>
                     <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 mt-0.5">
-                      <FiMapPin className="text-rose-500 shrink-0" /> {selectedRequest.location || "N/A"}
+                      <FiMapPin className="text-rose-500 shrink-0" /> {selectedRequest.projectAddress || selectedRequest.location || "N/A"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-bold block text-[10px] uppercase tracking-wider">SENT BY (SALES PERSON)</span>
+                    <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 mt-0.5">
+                      <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold shrink-0">👤</span>
+                      {(selectedRequest.salesPersonName && selectedRequest.salesPersonName !== "Sales Person")
+                        ? selectedRequest.salesPersonName
+                        : (currentRole === "sales" ? currentUserName : (selectedRequest.salesPersonName || "Sales Person"))}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-bold block text-[10px] uppercase tracking-wider">SENT DATE & TIME</span>
+                    <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 mt-0.5">
+                      <FiClock className="text-slate-400 shrink-0" /> {selectedRequest.sentDate || "—"}
                     </span>
                   </div>
                 </div>
@@ -1388,35 +1311,39 @@ export default function DesignManagement() {
                   )}
                 </div>
 
-                {/* Designer Output */}
-                {(selectedRequest.drawingUrl || selectedRequest.fileName || selectedRequest.drawingTitle || selectedRequest.status === "drawing_completed" || selectedRequest.status === "attached_to_quotation") && (
-                  <div className="space-y-2.5 border-t border-slate-200/80 pt-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-emerald-800 text-xs flex items-center gap-1">
-                        <FiCheckCircle /> RETURNED DRAWING FILE:
-                      </span>
-                      {renderFileTypeBadge(selectedRequest.fileType || "autocad", selectedRequest.fileName || "Drawing.dwg")}
-                    </div>
-
-                    <div className="p-3 bg-slate-100 rounded-xl border border-slate-200/80 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FiFileText className="w-5 h-5 text-indigo-600" />
-                        <div>
-                          <span className="font-bold text-slate-900 block text-xs">{selectedRequest.fileName || "AutoCAD_Drawing.dwg"}</span>
+                {/* Designer Uploaded CAD Files (Multiple File Support) */}
+                {selectedRequest.drawingFiles && Array.isArray(selectedRequest.drawingFiles) && selectedRequest.drawingFiles.length > 0 ? (
+                  <div>
+                    <span className="font-bold text-slate-700 block mb-1">
+                      DESIGNER CAD FILES ({selectedRequest.drawingFiles.length}):
+                    </span>
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                      {selectedRequest.drawingFiles.map((f, i) => (
+                        <div key={i} className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
+                          <span className="text-emerald-900 font-bold truncate text-[11px]">{f.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => triggerFileDownload(f, f.name)}
+                            className="text-emerald-700 hover:text-emerald-900 font-bold text-[10px] flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-emerald-300 shadow-2xs cursor-pointer"
+                          >
+                            <FiDownload className="w-3 h-3" /> Download
+                          </button>
                         </div>
-                      </div>
-                      <a
-                        href={selectedRequest.drawingUrl || "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=60"}
-                        download={selectedRequest.fileName || `${selectedRequest.customerName}_CAD.dwg`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs flex items-center gap-1 shrink-0 transition cursor-pointer shadow-xs"
-                      >
-                        <FiDownload /> Download CAD
-                      </a>
+                      ))}
                     </div>
                   </div>
-                )}
+                ) : (selectedRequest.drawingUrl || selectedRequest.fileName) ? (
+                  <div className="p-3 bg-slate-100 rounded-xl border border-slate-200/80 flex items-center justify-between">
+                    <span className="font-bold text-slate-900 block text-xs truncate">{selectedRequest.fileName || "CAD Drawing.dwg"}</span>
+                    <button
+                      type="button"
+                      onClick={() => triggerFileDownload({ url: selectedRequest.drawingUrl, name: selectedRequest.fileName }, selectedRequest.fileName || "Drawing.dwg")}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs flex items-center gap-1 shrink-0 transition cursor-pointer shadow-xs"
+                    >
+                      <FiDownload /> Download CAD
+                    </button>
+                  </div>
+                ) : null}
 
                 <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                   <button

@@ -82,7 +82,9 @@ class CustomUserManager(BaseUserManager):
 # Custom Roles 
 DEFAULT_MODULES = [
     "dashboard", "leads", "followups", "quotations", "products", 
-    "customers", "amc", "accounts", "invoice", "terms", "role_management"
+    "customers", "designer_send", "design_drawings", "designer_queue",
+    "amc", "services", "technicians", "accounts", "invoice", "reports",
+    "templates", "terms", "role_management"
 ]
 
 def get_default_permissions():

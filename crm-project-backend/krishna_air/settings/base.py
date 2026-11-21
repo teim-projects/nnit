@@ -74,7 +74,7 @@ INSTALLED_APPS = [
     'product_management',
     'quotation',
     
-    # 'inventory',  # Temporarily disabled - module removed
+    'inventory',
     'amc',
     'parking_products',
     'service_management',
@@ -179,28 +179,63 @@ AUTHENTICATION_BACKENDS = [
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+def get_database_config():
+    import socket
+    use_sqlite = os.getenv("USE_SQLITE", "false").lower() == "true"
+    if not use_sqlite:
+        host = os.getenv("DB_HOST", "localhost")
+        port = int(os.getenv("DB_PORT", 3306))
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.8)
+        try:
+            s.connect((host, port))
+            s.close()
+            return {
+                "ENGINE": "django.db.backends.mysql",
+                "NAME": os.getenv("DB_NAME", "nnit_db"),
+                "USER": os.getenv("DB_USER", "root"),
+                "PASSWORD": os.getenv("DB_PASSWORD", ""),
+                "HOST": host,
+                "PORT": str(port),
+            }
+        except Exception:
+            s.close()
+    
+    # Graceful fallback to SQLite when MySQL is not running locally
+    return {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": "nnit_db",
-        "USER": "root",
-        "PASSWORD": "",          # XAMPP default password is blank
-        "HOST": "localhost",
-        "PORT": "3306",
-    }
+    "default": get_database_config()
 }
 
 
-# Redis cache settings
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+# Redis cache settings with Local Memory fallback if Redis server is down
+def get_cache_config():
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(0.5)
+    try:
+        s.connect(("127.0.0.1", 6379))
+        s.close()
+        return {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1"),
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            }
         }
-    }
+    except Exception:
+        s.close()
+        return {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "nnit-locmem-cache",
+        }
+
+CACHES = {
+    "default": get_cache_config()
 }
 
 

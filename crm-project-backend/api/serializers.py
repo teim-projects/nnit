@@ -66,10 +66,18 @@ class CustomLoginSerializer(LoginSerializer):
 
 
 class CustomUserDetailsSerializer(UserDetailsSerializer):
+    full_name = serializers.SerializerMethodField()
+
     class Meta:
         model = CustomUser
-        fields = ('id', 'email', 'mobile_no', 'role',  'profile_photo')
+        fields = ('id', 'email', 'mobile_no', 'first_name', 'last_name', 'full_name', 'role', 'profile_photo')
         read_only_fields = ('email',)
+
+    def get_full_name(self, obj):
+        name = f"{obj.first_name or ''} {obj.last_name or ''}".strip()
+        if not name and obj.email:
+            name = obj.email.split("@")[0].replace(".", " ").replace("_", " ").title()
+        return name or obj.mobile_no or ""
 
     def to_internal_value(self, instance):
         internal = super().to_internal_value(instance)

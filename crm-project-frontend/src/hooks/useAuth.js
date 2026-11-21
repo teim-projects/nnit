@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { logoutUser } from '../utils/auth';
+import { logoutUser, resolveUserDisplayName, healDesignRequests } from '../utils/auth';
 
 export function useUserRole(baseApi) {
   const [userRole, setUserRole] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [userName, setUserName] = useState(() => localStorage.getItem("user_name") || "");
   const [isSuperUser, setIsSuperUser] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [trigger, setTrigger] = useState(0);
@@ -21,6 +23,8 @@ export function useUserRole(baseApi) {
     const token = localStorage.getItem("access");
     if (!token) {
       setUserRole(null);
+      setUserData(null);
+      setUserName("");
       setIsSuperUser(false);
       setIsLoading(false);
       return;
@@ -40,12 +44,28 @@ export function useUserRole(baseApi) {
         return res.json();
       })
       .then(data => {
+        setUserData(data);
         setUserRole(data.role);
         setIsSuperUser(!!data.is_superuser || data.role?.name?.toLowerCase() === 'admin');
+
+        // Resolve display name and persist to localStorage
+        const resolvedName = resolveUserDisplayName(data);
+        if (resolvedName) {
+          setUserName(resolvedName);
+          localStorage.setItem("user_name", resolvedName);
+          // Automatically heal any existing design requests that had placeholder "Sales Person"
+          healDesignRequests(resolvedName);
+        }
+        if (data.email) localStorage.setItem("user_email", data.email);
+        if (data.first_name) localStorage.setItem("user_first_name", data.first_name);
+        if (data.last_name) localStorage.setItem("user_last_name", data.last_name);
+        if (data.id) localStorage.setItem("user_id", String(data.id));
+        if (data.role?.name) localStorage.setItem("user_role", data.role.name);
       })
       .catch(err => {
         console.error("Failed to fetch user role:", err);
         setUserRole(null);
+        setUserData(null);
         setIsSuperUser(false);
       })
       .finally(() => {
@@ -54,7 +74,7 @@ export function useUserRole(baseApi) {
   }, [baseApi, trigger]);
 
   const permissions = userRole?.permissions || {};
-  return { userRole, permissions, isLoading, isSuperUser };
+  return { userRole, userData, userName, permissions, isLoading, isSuperUser };
 }
 
 export function useModulePermissions(moduleKey) {

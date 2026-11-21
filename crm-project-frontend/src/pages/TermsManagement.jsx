@@ -186,14 +186,14 @@ const TermsManagement = () => {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto py-8 px-4">
+      <div className="w-full py-8 px-4">
         <div className="text-center">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4">
+    <div className="w-full py-8 px-4">
       {/* Header */}
       <div className="mb-8 flex justify-between items-center">
         <div>

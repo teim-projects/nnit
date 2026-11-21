@@ -19,6 +19,11 @@ venv/
 *.log
 
 
+# Database
+*.sqlite3
+*.sqlite3-journal
+db.sqlite3
+
 # Python cache
 __pycache__/
 *.py[cod]

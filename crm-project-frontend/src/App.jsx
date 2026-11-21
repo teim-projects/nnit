@@ -29,6 +29,7 @@ import RoleAccessManagement from './pages/RoleAccessManagement';
 import ReportsAnalytics from './pages/ReportsAnalytics';
 import DesignManagement from './pages/DesignManagement';
 import DesignerQueue from './pages/DesignerQueue';
+import DesignerSend from './pages/DesignerSend';
 import TechnicianPage from './pages/TechnicianPage';
 import ServicePage from './pages/ServicePage';
 import TemplateManagement from './pages/TemplateManagement';
@@ -36,6 +37,16 @@ import TechnicianWorkList from './pages/TechnicianWorkList';
 import CompletedWorkList from './pages/CompletedWorkList';
 import TechnicianDashboard from './pages/TechnicianDashboard';
 import ChatbotWidget from './components/ChatbotWidget';
+
+// ── Inventory ERP Module Pages ──
+import InventoryDashboard from './pages/inventory/InventoryDashboard';
+import InventoryMasters from './pages/inventory/InventoryMasters';
+import InventoryProcurement from './pages/inventory/InventoryProcurement';
+import InventoryMaterialMovement from './pages/inventory/InventoryMaterialMovement';
+import StockSummaryPage from './pages/inventory/StockSummaryPage';
+import StockRecordPage from './pages/inventory/StockRecordPage';
+import BOMManagementPage from './pages/inventory/BOMManagementPage';
+import InventoryReportsPage from './pages/inventory/InventoryReportsPage';
 
 function ProtectedRoute({ isLoggedIn, children }) {
   if (!isLoggedIn) {
@@ -88,7 +99,7 @@ function AppRoutes() {
 
         {/* Desktop sidebar */}
         {!hideNavbar && (
-          <aside className="hidden md:flex md:flex-col w-64 shrink-0 h-full overflow-y-auto">
+          <aside className="hidden md:flex md:flex-col w-64 shrink-0 h-full overflow-y-auto bg-white border-r border-slate-200/70">
             <Sidebar />
           </aside>
         )}
@@ -124,9 +135,53 @@ function AppRoutes() {
               <Route path="/technicians" element={<ProtectedRoute isLoggedIn={isLoggedIn}><TechnicianPage /></ProtectedRoute>} />
               <Route path="/followup-management" element={<ProtectedRoute isLoggedIn={isLoggedIn}><FollowupManagement /></ProtectedRoute>} />
               <Route path="/role-access" element={<ProtectedRoute isLoggedIn={isLoggedIn}><RoleAccessManagement /></ProtectedRoute>} />
+              <Route path="/designer-send" element={<ProtectedRoute isLoggedIn={isLoggedIn}><DesignerSend /></ProtectedRoute>} />
               <Route path="/design-drawings" element={<ProtectedRoute isLoggedIn={isLoggedIn}><DesignManagement /></ProtectedRoute>} />
               <Route path="/designer-queue" element={<ProtectedRoute isLoggedIn={isLoggedIn}><DesignerQueue /></ProtectedRoute>} />
               <Route path="/templates" element={<ProtectedRoute isLoggedIn={isLoggedIn}><TemplateManagement /></ProtectedRoute>} />
+
+              {/* ── Inventory ERP Module Routes ── */}
+              <Route path="/inventory" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryDashboard /></ProtectedRoute>} />
+              <Route path="/inventory/dashboard" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryDashboard /></ProtectedRoute>} />
+              
+              {/* Masters */}
+              <Route path="/inventory/products" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMasters /></ProtectedRoute>} />
+              <Route path="/inventory/categories" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMasters /></ProtectedRoute>} />
+              <Route path="/inventory/sub-categories" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMasters /></ProtectedRoute>} />
+              <Route path="/inventory/brands" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMasters /></ProtectedRoute>} />
+              <Route path="/inventory/uom" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMasters /></ProtectedRoute>} />
+              <Route path="/inventory/warehouses" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMasters /></ProtectedRoute>} />
+
+              {/* Procurement */}
+              <Route path="/inventory/vendors" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryProcurement /></ProtectedRoute>} />
+              <Route path="/inventory/material-requisitions" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryProcurement /></ProtectedRoute>} />
+              <Route path="/inventory/purchase-orders" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryProcurement /></ProtectedRoute>} />
+              <Route path="/inventory/grn" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryProcurement /></ProtectedRoute>} />
+
+              {/* Material Movement */}
+              <Route path="/inventory/mtn" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMaterialMovement /></ProtectedRoute>} />
+              <Route path="/inventory/delivery-challan" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMaterialMovement /></ProtectedRoute>} />
+              <Route path="/inventory/material-return" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMaterialMovement /></ProtectedRoute>} />
+              <Route path="/inventory/stock-transfer" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMaterialMovement /></ProtectedRoute>} />
+              <Route path="/inventory/stock-adjustment" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryMaterialMovement /></ProtectedRoute>} />
+
+              {/* Stock Summary & Records */}
+              <Route path="/inventory/stock-summary" element={<ProtectedRoute isLoggedIn={isLoggedIn}><StockSummaryPage /></ProtectedRoute>} />
+              <Route path="/inventory/stock-record" element={<ProtectedRoute isLoggedIn={isLoggedIn}><StockRecordPage /></ProtectedRoute>} />
+
+              {/* BOM */}
+              <Route path="/inventory/bom" element={<ProtectedRoute isLoggedIn={isLoggedIn}><BOMManagementPage /></ProtectedRoute>} />
+              <Route path="/inventory/bom/create" element={<ProtectedRoute isLoggedIn={isLoggedIn}><BOMManagementPage /></ProtectedRoute>} />
+
+              {/* Reports */}
+              <Route path="/inventory/reports/*" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryReportsPage /></ProtectedRoute>} />
+              <Route path="/inventory/reports/purchase-register" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryReportsPage /></ProtectedRoute>} />
+              <Route path="/inventory/reports/product-purchase-history" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryReportsPage /></ProtectedRoute>} />
+              <Route path="/inventory/reports/product-price-history" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryReportsPage /></ProtectedRoute>} />
+              <Route path="/inventory/reports/vendor-purchase-history" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryReportsPage /></ProtectedRoute>} />
+              <Route path="/inventory/reports/product-price-comparison" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryReportsPage /></ProtectedRoute>} />
+              <Route path="/inventory/reports/low-stock" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryReportsPage /></ProtectedRoute>} />
+              <Route path="/inventory/reports/valuation" element={<ProtectedRoute isLoggedIn={isLoggedIn}><InventoryReportsPage /></ProtectedRoute>} />
 
               {/* Fallback route */}
               <Route path="*" element={<Navigate to={isLoggedIn ? "/dashboard" : "/login"} replace />} />
